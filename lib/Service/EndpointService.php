@@ -421,7 +421,10 @@ class EndpointService
     ): Entity|array
     {
         if (isset($pathParams['id']) === true && $pathParams['id'] === end($pathParams)) {
-            return $this->replaceInternalReferences(mapper: $mapper, object: $mapper->find($pathParams['id']));
+            return $this->objectService->getOpenRegisters()->renderEntity(
+                entity: $this->replaceInternalReferences(mapper: $mapper, object: $mapper->find($pathParams['id'])),
+                extend: $parameters['_extend'] ?? $parameters['extend'] ?? null
+            );
 
 
         } else if (isset($pathParams['id']) === true) {
@@ -439,8 +442,8 @@ class EndpointService
             $main = $mapper->findByUuid($pathParams['id'])->getObject();
             $ids = $main[$property];
 
-            if (isset($main[$property]) === false) {
-                return $this->replaceInternalReferences(mapper: $mapper, object: $mapper->find($pathParams['id']));
+            if(isset($main[$property]) === false) {
+                return $this->objectService->getOpenRegisters()->renderEntity(entity: $this->replaceInternalReferences(mapper: $mapper, object: $mapper->find($pathParams['id'])));
             }
 
             if ($ids === null || empty($ids) === true) {
@@ -478,7 +481,7 @@ class EndpointService
         $result = $mapper->findAllPaginated(requestParams: $parameters);
 
         $result['results'] = array_map(function ($object) use ($mapper) {
-            return $this->replaceInternalReferences(mapper: $mapper, serializedObject: $object);
+            return $this->objectService->getOpenRegisters()->renderEntity(entity: $this->replaceInternalReferences(mapper: $mapper, object: $object));
         }, $result['results']);
 
         $returnArray = [
@@ -837,6 +840,7 @@ class EndpointService
                     'fileparts_create' => $this->processFilePartRule($rule, $data, $endpoint, $objectId),
                     'filepart_upload' => $this->processFilePartUploadRule(rule: $rule, data: $data, request: $request, objectId: $objectId),
                     'download' => $this->processDownloadRule($rule, $data, $objectId),
+                    'extend_input' => $this->processExtendInputRule(rule: $rule, data: $data),
                     default => throw new Exception('Unsupported rule type: ' . $rule->getType()),
                 };
 
@@ -995,6 +999,45 @@ class EndpointService
 
         return $data;
     }
+
+    /**
+     * Extends input for performing business logic
+     *
+     * @param Rule $rule The rule containing the configuration which parameters could be extended
+     * @param array $data The data array containing the input parameters.
+     *
+     * @return array The data array with the extended parameters in the 'extendedParameters' key.
+     * @throws ContainerExceptionInterface
+     * @throws NotFoundExceptionInterface
+     */
+    private function processExtendInputRule(Rule $rule, array $data): array
+    {
+        $parameters = new Dot($data['parameters']);
+        $config = $rule->getConfiguration();
+        $extendedParameters = new Dot();
+
+        foreach ($config['extend_input']['properties'] as $property) {
+            $value = $parameters->get($property);
+
+            if(filter_var($value, FILTER_VALIDATE_URL) !== false) {
+                $exploded = explode(separator: '/', string: $value);
+                $value = end($exploded);
+            }
+
+            try {
+                $object = $this->objectService->getOpenRegisters()->getMapper('objectEntity')->find(identifier: $value);
+            } catch (DoesNotExistException $exception) {
+                continue;
+            }
+            $extendedParameters->add($property, $this->objectService->getOpenRegisters()->renderEntity($object->jsonSerialize()));
+
+        }
+
+        $data['extendedParameters'] = $extendedParameters->all();
+
+        return $data;
+    }
+
 
     /**
      * Processes a synchronization rule
