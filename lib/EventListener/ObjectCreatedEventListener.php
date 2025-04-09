@@ -6,9 +6,6 @@ use OCA\OpenConnector\Service\SynchronizationService;
 use OCP\EventDispatcher\Event;
 use OCP\EventDispatcher\IEventListener;
 use OCA\OpenRegister\Event\ObjectCreatedEvent;
-use OCA\OpenRegister\Event\ObjectUpdatedEvent;
-use OCA\OpenRegister\Event\ObjectDeletedEvent;
-use OCA\OpenConnector\Db\SynchronizationContractMapper;
 
 class ObjectCreatedEventListener implements IEventListener
 {
@@ -25,9 +22,29 @@ class ObjectCreatedEventListener implements IEventListener
     public function handle(Event $event): void
     {
         if ($event instanceof ObjectCreatedEvent === false) {
-			return;
-		}
+            return;
+        }
+
+        if (method_exists($event, 'getObject') === false) {
+            return;
+        }
+
+
         $object = $event->getObject();
-		$this->synchronizationService->synchronizeToTarget($object);
+        if ($object === null || $object->getRegister() === null || $object->getSchema() === null) {
+            return;
+        }
+
+        $synchronizations = $this->synchronizationService->findAllBySourceId(register: $object->getRegister(), schema: $object->getSchema());
+        foreach ($synchronizations as $synchronization) {
+            try {
+                $this->synchronizationService->synchronize($synchronization, false, $object);
+            } catch (\Exception $e) {
+                $this->logger->error('Failed to process object event: ' . $e->getMessage() . ' for synchronization ' . $synchronization->getId(), [
+                    'exception' => $e,
+                    'event' => get_class($event)
+                ]);
+            }
+        }
     }
 }
