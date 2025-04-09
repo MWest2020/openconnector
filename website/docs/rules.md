@@ -164,6 +164,11 @@ Locking rules provide exclusive access control for resources. Configuration incl
   - unlock: Release a previously locked resource
 - timeout: Duration in minutes before the lock automatically expires
 
+### Audit trail rules
+
+The type `audit_trail` gives the possibility to access the audit trails of an object. If the endpoint contains the path parameter `audittrail-id`, individual audit trail lines can be accessed. These rules do not take extra configuration at this time.
+
+
 ## Tags in Rules
 
 For the fetch file and write file rule you can add tags to these files. This can be useful when wanting to make a difference between files for further use.
