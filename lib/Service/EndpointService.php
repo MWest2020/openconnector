@@ -839,9 +839,10 @@ class EndpointService
                     'javascript' => $this->processJavaScriptRule($rule, $data),
                     'fileparts_create' => $this->processFilePartRule($rule, $data, $endpoint, $objectId),
                     'filepart_upload' => $this->processFilePartUploadRule(rule: $rule, data: $data, request: $request, objectId: $objectId),
-                    'download' => $this->processDownloadRule($rule, $data, $objectId),
+                    'download' => $this->processDownloadRule(rule: $rule, data: $data, objectId: $objectId),
                     'extend_input' => $this->processExtendInputRule(rule: $rule, data: $data),
                     'audit_trail' => $this->processAuditTrailRule(rule: $rule, endpoint: $endpoint, data: $data, objectId: $objectId),
+                    'write_file' => $this->processWriteFileRule(rule: $rule, data: $data, objectId: $objectId),
                     'lock' => $this->processLockingRule(rule: $rule, data: $data, objectId: $objectId),
                     default => throw new Exception('Unsupported rule type: ' . $rule->getType()),
                 };
@@ -1085,7 +1086,7 @@ class EndpointService
      * @param string $objectId The object id of the object to lock or unlock
      *
      * @return array The updated data array.
-     * 
+     *
      * @throws ContainerExceptionInterface
      * @throws NotFoundExceptionInterface
      * @throws \OCP\Files\NotFoundException
@@ -1104,6 +1105,91 @@ class EndpointService
         $data['body'] = $this->objectService->getOpenRegisters()->renderEntity(entity: $object->jsonSerialize());
 
         return $data;
+    }
+
+    /**
+     * Process a rule to write files.
+     *
+     * @param Rule $rule The rule to process.
+     * @param array $data The data to write.
+     * @param string $objectId The object to write the data to.
+     * @param int $registerId The register the object is in.
+     * @param int $schemaId The schema the object is in.
+     *
+     * @return array
+     * @throws ContainerExceptionInterface
+     * @throws NotFoundExceptionInterface
+     * @throws Exception
+     */
+    private function processWriteFileRule(Rule $rule, array $data, string $objectId): array
+    {
+        if (isset($rule->getConfiguration()['write_file']) === false) {
+            throw new Exception('No configuration found for write_file');
+        }
+
+        $config  = $rule->getConfiguration()['write_file'];
+        $dataDot = new Dot($data);
+        $files = $dataDot[$config['filePath']];
+        if (isset($files) === false || empty($files) === true) {
+            return $dataDot->jsonSerialize();
+        }
+
+        // Check if associative array
+        if (is_array($files) === true && isset($files[0]) === true & array_keys($files[0]) !== range(0, count($files[0]) - 1)) {
+            $result = [];
+            foreach ($files as $key => $value) {
+
+                // Check for tags
+                $tags = [];
+                if (is_array($value) === true) {
+                    $content = $value['content'];
+                    if (isset($value['label']) === true && isset($config['tags']) === true &&
+                        in_array(needle: $value['label'], haystack: $config['tags']) === true) {
+                        $tags = [$value['label']];
+                    }
+                    if (isset($value['filename']) === true) {
+                        $fileName = $value['filename'];
+                    }
+                } else {
+                    $content = $value;
+                }
+
+                try {
+                    // Write file with OpenRegister ObjectService.
+                    $objectService = $this->containerInterface->get('OCA\OpenRegister\Service\ObjectService');
+                    $file = $objectService->addFile(object: $objectId, fileName: $fileName, base64Content: $content);
+
+                    $tags = array_merge($config['tags'] ?? [], ["object:$objectId"]);
+                    if ($file instanceof \OCP\Files\File === true) {
+                        $this->attachTagsToFile(fileId: $file->getId(), tags: $tags);
+                    }
+
+                    $result[$key] = $file->getPath();
+                } catch (Exception $exception) {
+                }
+            }
+            $result[$key] = $file->getPath();
+            $dataDot[$config['filePath']] = $result;
+        } else {
+            $content = $files;
+            $fileName = $dataDot[$config['fileNamePath']];
+
+            try {
+                // Write file with OpenRegister ObjectService.
+                $objectService = $this->containerInterface->get('OCA\OpenRegister\Service\ObjectService');
+                $file = $objectService->addFile(object: $objectId, fileName: $fileName, base64Content: $content);
+
+                $tags = array_merge($config['tags'] ?? [], ["object:$objectId"]);
+                if ($file instanceof File === true) {
+                    $this->attachTagsToFile(fileId: $file->getId(), tags: $tags);
+                }
+                $dataDot[$config['filePath']] = $file->getPath();
+            } catch (Exception $exception) {
+            }
+        }
+
+
+        return $dataDot->jsonSerialize();
     }
 
     /**
