@@ -842,6 +842,7 @@ class EndpointService
                     'download' => $this->processDownloadRule($rule, $data, $objectId),
                     'extend_input' => $this->processExtendInputRule(rule: $rule, data: $data),
                     'audit_trail' => $this->processAuditTrailRule(rule: $rule, endpoint: $endpoint, data: $data, objectId: $objectId),
+                    'lock' => $this->processLockingRule(rule: $rule, data: $data, objectId: $objectId),
                     default => throw new Exception('Unsupported rule type: ' . $rule->getType()),
                 };
 
@@ -1076,6 +1077,34 @@ class EndpointService
         return $data;
     }
 
+    /**
+     * Process a locking rule, either locking or unlocking a resource.
+     *
+     * @param Rule $rule Rule containing configuration for the execution of the rule.
+     * @param array $data The data to update
+     * @param string $objectId The object id of the object to lock or unlock
+     *
+     * @return array The updated data array.
+     *
+     * @throws ContainerExceptionInterface
+     * @throws NotFoundExceptionInterface
+     * @throws \OCP\Files\NotFoundException
+     */
+    private function processLockingRule(Rule $rule, array $data, string $objectId): array
+    {
+        $config = $rule->getConfiguration();
+
+        if($config['locking']['action'] === 'lock') {
+            $process = (Uuid::v4())->jsonSerialize();
+            $object = $this->objectService->getOpenRegisters()->lockObject(identifier: $objectId, process: $process, duration: $config['locking']['duration'] ?? 3600);
+        } else if ($config['locking']['action'] === 'unlock') {
+            $object = $this->objectService->getOpenRegisters()->unlockObject(identifier: $objectId);
+        }
+
+        $data['body'] = $this->objectService->getOpenRegisters()->renderEntity(entity: $object->jsonSerialize());
+
+        return $data;
+    }
 
     /**
      * Processes a synchronization rule
