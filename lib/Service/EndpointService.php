@@ -421,7 +421,10 @@ class EndpointService
     ): Entity|array
     {
         if (isset($pathParams['id']) === true && $pathParams['id'] === end($pathParams)) {
-            return $this->replaceInternalReferences(mapper: $mapper, object: $mapper->find($pathParams['id']));
+            return $this->objectService->getOpenRegisters()->renderEntity(
+                entity: $this->replaceInternalReferences(mapper: $mapper, object: $mapper->find($pathParams['id'])),
+                extend: $parameters['_extend'] ?? $parameters['extend'] ?? null
+            );
 
 
         } else if (isset($pathParams['id']) === true) {
@@ -439,8 +442,8 @@ class EndpointService
             $main = $mapper->findByUuid($pathParams['id'])->getObject();
             $ids = $main[$property];
 
-            if (isset($main[$property]) === false) {
-                return $this->replaceInternalReferences(mapper: $mapper, object: $mapper->find($pathParams['id']));
+            if(isset($main[$property]) === false) {
+                return $this->objectService->getOpenRegisters()->renderEntity(entity: $this->replaceInternalReferences(mapper: $mapper, object: $mapper->find($pathParams['id'])));
             }
 
             if ($ids === null || empty($ids) === true) {
@@ -478,7 +481,7 @@ class EndpointService
         $result = $mapper->findAllPaginated(requestParams: $parameters);
 
         $result['results'] = array_map(function ($object) use ($mapper) {
-            return $this->replaceInternalReferences(mapper: $mapper, serializedObject: $object);
+            return $this->objectService->getOpenRegisters()->renderEntity(entity: $this->replaceInternalReferences(mapper: $mapper, object: $object));
         }, $result['results']);
 
         $returnArray = [
@@ -837,6 +840,9 @@ class EndpointService
                     'fileparts_create' => $this->processFilePartRule($rule, $data, $endpoint, $objectId),
                     'filepart_upload' => $this->processFilePartUploadRule(rule: $rule, data: $data, request: $request, objectId: $objectId),
                     'download' => $this->processDownloadRule($rule, $data, $objectId),
+                    'extend_input' => $this->processExtendInputRule(rule: $rule, data: $data),
+                    'audit_trail' => $this->processAuditTrailRule(rule: $rule, endpoint: $endpoint, data: $data, objectId: $objectId),
+                    'lock' => $this->processLockingRule(rule: $rule, data: $data, objectId: $objectId),
                     default => throw new Exception('Unsupported rule type: ' . $rule->getType()),
                 };
 
@@ -992,6 +998,110 @@ class EndpointService
         }
 
         $data['body'] = $this->mappingService->executeMapping($mapping, $data['body']);
+
+        return $data;
+    }
+
+    /**
+     * Extends input for performing business logic
+     *
+     * @param Rule $rule The rule containing the configuration which parameters could be extended
+     * @param array $data The data array containing the input parameters.
+     *
+     * @return array The data array with the extended parameters in the 'extendedParameters' key.
+     * @throws ContainerExceptionInterface
+     * @throws NotFoundExceptionInterface
+     */
+    private function processExtendInputRule(Rule $rule, array $data): array
+    {
+        $parameters = new Dot($data['parameters']);
+        $config = $rule->getConfiguration();
+        $extendedParameters = new Dot();
+
+        foreach ($config['extend_input']['properties'] as $property) {
+            $value = $parameters->get($property);
+
+            if(filter_var($value, FILTER_VALIDATE_URL) !== false) {
+                $exploded = explode(separator: '/', string: $value);
+                $value = end($exploded);
+            }
+
+            try {
+                $object = $this->objectService->getOpenRegisters()->getMapper('objectEntity')->find(identifier: $value);
+            } catch (DoesNotExistException $exception) {
+                continue;
+            }
+            $extendedParameters->add($property, $this->objectService->getOpenRegisters()->renderEntity($object->jsonSerialize()));
+
+        }
+
+        $data['extendedParameters'] = $extendedParameters->all();
+
+        return $data;
+    }
+
+    /**
+     * Fetches the audit trail for an object, returns a specific audit rule if the path parameter audittrail-id is specified.
+     *
+     * @param Rule $rule The rule to execute
+     * @param Endpoint $endpoint The endpoint on which the rule is executed
+     * @param array $data The data from the request.
+     * @param string $objectId The object id for which the request was done.
+     *
+     * @return array|Response The updated data array, or a json response with a not found error.
+     *
+     * @throws ContainerExceptionInterface
+     * @throws NotFoundExceptionInterface
+     */
+    private function processAuditTrailRule(Rule $rule, Endpoint $endpoint, array $data, string $objectId): array|Response
+    {
+
+        $pathParameters = $this->getPathParameters(endpointArray: $endpoint->getEndpointArray(), path: $data['path']);
+
+        if(isset($pathParameters['audittrail-id']) === true) {
+            $auditrule = $this->objectService->getOpenRegisters()->getPaginatedAuditTrail($objectId, requestParams: ['uuid' => $pathParameters['audittrail-id']]);
+
+            if(count($auditrule) === 1) {
+                $data['body'] = $auditrule[0];
+                return $data;
+            }
+
+            return new JSONResponse(data: ['error' => 'Not found', 'reason' => 'The resource you are looking for does not exist'], statusCode: HTTP::STATUS_NOT_FOUND);
+
+        }
+        $audittrail = $this->objectService->getOpenRegisters()->getPaginatedAuditTrail($objectId);
+
+        $data['body'] = $audittrail['results'];
+
+
+        return $data;
+    }
+
+    /**
+     * Process a locking rule, either locking or unlocking a resource.
+     *
+     * @param Rule $rule Rule containing configuration for the execution of the rule.
+     * @param array $data The data to update
+     * @param string $objectId The object id of the object to lock or unlock
+     *
+     * @return array The updated data array.
+     *
+     * @throws ContainerExceptionInterface
+     * @throws NotFoundExceptionInterface
+     * @throws \OCP\Files\NotFoundException
+     */
+    private function processLockingRule(Rule $rule, array $data, string $objectId): array
+    {
+        $config = $rule->getConfiguration();
+
+        if($config['locking']['action'] === 'lock') {
+            $process = (Uuid::v4())->jsonSerialize();
+            $object = $this->objectService->getOpenRegisters()->lockObject(identifier: $objectId, process: $process, duration: $config['locking']['duration'] ?? 3600);
+        } else if ($config['locking']['action'] === 'unlock') {
+            $object = $this->objectService->getOpenRegisters()->unlockObject(identifier: $objectId);
+        }
+
+        $data['body'] = $this->objectService->getOpenRegisters()->renderEntity(entity: $object->jsonSerialize());
 
         return $data;
     }
