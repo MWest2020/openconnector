@@ -841,6 +841,8 @@ class EndpointService
                     'filepart_upload' => $this->processFilePartUploadRule(rule: $rule, data: $data, request: $request, objectId: $objectId),
                     'download' => $this->processDownloadRule($rule, $data, $objectId),
                     'extend_input' => $this->processExtendInputRule(rule: $rule, data: $data),
+                    'audit_trail' => $this->processAuditTrailRule(rule: $rule, endpoint: $endpoint, data: $data, objectId: $objectId),
+                    'lock' => $this->processLockingRule(rule: $rule, data: $data, objectId: $objectId),
                     default => throw new Exception('Unsupported rule type: ' . $rule->getType()),
                 };
 
@@ -1038,6 +1040,71 @@ class EndpointService
         return $data;
     }
 
+    /**
+     * Fetches the audit trail for an object, returns a specific audit rule if the path parameter audittrail-id is specified.
+     *
+     * @param Rule $rule The rule to execute
+     * @param Endpoint $endpoint The endpoint on which the rule is executed
+     * @param array $data The data from the request.
+     * @param string $objectId The object id for which the request was done.
+     *
+     * @return array|Response The updated data array, or a json response with a not found error.
+     *
+     * @throws ContainerExceptionInterface
+     * @throws NotFoundExceptionInterface
+     */
+    private function processAuditTrailRule(Rule $rule, Endpoint $endpoint, array $data, string $objectId): array|Response
+    {
+
+        $pathParameters = $this->getPathParameters(endpointArray: $endpoint->getEndpointArray(), path: $data['path']);
+
+        if(isset($pathParameters['audittrail-id']) === true) {
+            $auditrule = $this->objectService->getOpenRegisters()->getPaginatedAuditTrail($objectId, requestParams: ['uuid' => $pathParameters['audittrail-id']]);
+
+            if(count($auditrule) === 1) {
+                $data['body'] = $auditrule[0];
+                return $data;
+            }
+
+            return new JSONResponse(data: ['error' => 'Not found', 'reason' => 'The resource you are looking for does not exist'], statusCode: HTTP::STATUS_NOT_FOUND);
+
+        }
+        $audittrail = $this->objectService->getOpenRegisters()->getPaginatedAuditTrail($objectId);
+
+        $data['body'] = $audittrail['results'];
+
+
+        return $data;
+    }
+
+    /**
+     * Process a locking rule, either locking or unlocking a resource.
+     *
+     * @param Rule $rule Rule containing configuration for the execution of the rule.
+     * @param array $data The data to update
+     * @param string $objectId The object id of the object to lock or unlock
+     *
+     * @return array The updated data array.
+     *
+     * @throws ContainerExceptionInterface
+     * @throws NotFoundExceptionInterface
+     * @throws \OCP\Files\NotFoundException
+     */
+    private function processLockingRule(Rule $rule, array $data, string $objectId): array
+    {
+        $config = $rule->getConfiguration();
+
+        if($config['locking']['action'] === 'lock') {
+            $process = (Uuid::v4())->jsonSerialize();
+            $object = $this->objectService->getOpenRegisters()->lockObject(identifier: $objectId, process: $process, duration: $config['locking']['duration'] ?? 3600);
+        } else if ($config['locking']['action'] === 'unlock') {
+            $object = $this->objectService->getOpenRegisters()->unlockObject(identifier: $objectId);
+        }
+
+        $data['body'] = $this->objectService->getOpenRegisters()->renderEntity(entity: $object->jsonSerialize());
+
+        return $data;
+    }
 
     /**
      * Processes a synchronization rule
