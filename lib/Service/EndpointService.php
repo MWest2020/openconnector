@@ -1095,10 +1095,10 @@ class EndpointService
     {
         $config = $rule->getConfiguration();
 
-        if($config['locking']['function'] === 'lock') {
+        if($config['locking']['action'] === 'lock') {
             $process = (Uuid::v4())->jsonSerialize();
             $object = $this->objectService->getOpenRegisters()->lockObject(identifier: $objectId, process: $process, duration: $config['locking']['duration'] ?? 3600);
-        } else if ($config['locking']['function'] === 'unlock') {
+        } else if ($config['locking']['action'] === 'unlock') {
             $object = $this->objectService->getOpenRegisters()->unlockObject(identifier: $objectId);
         }
 
