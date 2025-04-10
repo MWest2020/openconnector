@@ -46,6 +46,7 @@ import { endpointStore, navigationStore, searchStore } from '../../store/store.j
 					<template #icon>
 						<Api :class="endpointStore.endpointItem?.id === endpoint.id && 'selectedEndpointIcon'"
 							disable-menu
+							:fill-color="getEndpointColor(endpoint.method)"
 							:size="44" />
 					</template>
 					<template #subname>
@@ -123,6 +124,24 @@ export default {
 	},
 	mounted() {
 		endpointStore.refreshEndpointList()
+	},
+	methods: {
+		getEndpointColor(method) {
+			switch (method) {
+			case 'GET':
+				return '#4e7f3d'
+			case 'POST':
+				return '#466eaa'
+			case 'PUT':
+				return '#87547a'
+			case 'PATCH':
+				return '#a95d2e'
+			case 'DELETE':
+				return '#b13f3a'
+			default:
+				return '#000'
+			}
+		},
 	},
 }
 </script>
