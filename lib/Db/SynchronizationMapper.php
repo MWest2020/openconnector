@@ -152,7 +152,8 @@ class SynchronizationMapper extends QBMapper
             ->where(
                 $qb->expr()->andX(
                     $qb->expr()->eq('target_type', $qb->createNamedParameter('register/schema')),
-                    $qb->expr()->eq('target_id', $qb->createNamedParameter($registerId, IQueryBuilder::PARAM_INT))
+                    // Use LIKE to match the part before the '/' in target_id
+                    $qb->expr()->like('target_id', $qb->createNamedParameter($registerId . '/%'))
                 )
             );
 
