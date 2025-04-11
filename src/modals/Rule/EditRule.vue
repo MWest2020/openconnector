@@ -224,248 +224,248 @@ import { Rule } from '../../entities/index.js'
 							:clearable="true"
 							placeholder="Select groups who can access" />
 					</template>
+				</template>
 
-					<!-- Download Configuration -->
-					<template v-if="typeOptions.value?.id === 'download'">
-						<NcTextField
-							label="File ID Position"
-							type="number"
-							:min="0"
-							:value.sync="ruleItem.configuration.download.fileIdPosition"
-							placeholder="Position of file ID in URL path (e.g. 2)" />
+				<!-- Download Configuration -->
+				<template v-if="typeOptions.value?.id === 'download'">
+					<NcTextField
+						label="File ID Position"
+						type="number"
+						:min="0"
+						:value.sync="ruleItem.configuration.download.fileIdPosition"
+						placeholder="Position of file ID in URL path (e.g. 2)" />
 
-						<div class="info-text">
-							<p>The system will automatically check if the authenticated user has access rights to the requested file.</p>
+					<div class="info-text">
+						<p>The system will automatically check if the authenticated user has access rights to the requested file.</p>
+					</div>
+				</template>
+
+				<!-- Upload Configuration -->
+				<template v-if="typeOptions.value?.id === 'upload'">
+					<NcTextField
+						label="Upload Path"
+						:value.sync="ruleItem.configuration.upload.path"
+						placeholder="/path/to/upload/directory" />
+
+					<NcTextField
+						label="Allowed File Types"
+						:value.sync="ruleItem.configuration.upload.allowedTypes"
+						placeholder="jpg,png,pdf" />
+
+					<NcInputField
+						type="number"
+						label="Max File Size (MB)"
+						:min="1"
+						:value.sync="ruleItem.configuration.upload.maxSize"
+						placeholder="10" />
+
+					<div class="info-text">
+						<p>Configure file upload settings including path, allowed types and maximum file size.</p>
+					</div>
+				</template>
+
+				<!-- Locking Configuration -->
+				<template v-if="typeOptions.value?.id === 'locking'">
+					<NcSelect
+						v-model="ruleItem.configuration.locking.action"
+						:options="[
+							{ label: 'Lock Resource', value: 'lock' },
+							{ label: 'Unlock Resource', value: 'unlock' }
+						]"
+						input-label="Lock Action" />
+
+					<NcInputField
+						type="number"
+						label="Lock Timeout (minutes)"
+						:min="1"
+						:value.sync="ruleItem.configuration.locking.timeout"
+						placeholder="30" />
+
+					<div class="info-text">
+						<p>Lock or unlock resources for exclusive access by the current user.</p>
+					</div>
+				</template>
+
+				<!-- Fetch File Configuration -->
+				<template v-if="typeOptions.value?.id === 'fetch_file'">
+					<NcSelect
+						v-bind="sourceOptions"
+						v-model="sourceOptions.sourceValue"
+						required
+						:loading="sourcesLoading"
+						input-label="Source ID *" />
+
+					<NcSelect
+						v-bind="methodOptions"
+						v-model="methodOptions.value"
+						input-label="Method" />
+
+					<NcSelect v-model="ruleItem.configuration.fetch_file.tags"
+						:taggable="true"
+						:multiple="true"
+						input-label="Tags">
+						<template #no-options>
+							type to add tags
+						</template>
+					</NcSelect>
+
+					<NcTextField
+						label="File Path"
+						required
+						:value.sync="ruleItem.configuration.fetch_file.filePath"
+						placeholder="path.to.fetch.file" />
+
+					<NcTextField
+						label="File path in sub object(s) (optional)"
+						:value.sync="ruleItem.configuration.fetch_file.subObjectFilepath"
+						placeholder="path.to.fetch.file.objects" />
+
+					<NcTextField
+						label="Object id path (optional)"
+						:value.sync="ruleItem.configuration.fetch_file.objectIdPath"
+						placeholder="path.to.fetch.file.objects" />
+
+					<NcCheckboxRadioSwitch
+						type="checkbox"
+						label="Auto Share"
+						:checked.sync="ruleItem.configuration.fetch_file.autoShare">
+						Auto share
+					</NcCheckboxRadioSwitch>
+
+					<div class="json-editor">
+						<label>Source Configuration (JSON)</label>
+						<div :class="`codeMirrorContainer ${getTheme()}`">
+							<CodeMirror v-model="ruleItem.configuration.fetch_file.sourceConfiguration"
+								:basic="true"
+								placeholder="[]"
+								:dark="getTheme() === 'dark'"
+								:linter="jsonParseLinter()"
+								:lang="json()"
+								:tab-size="2" />
+
+							<NcButton class="format-json-button"
+								type="secondary"
+								size="small"
+								@click="formatJSONSourceConfiguration">
+								Format JSON
+							</NcButton>
 						</div>
-					</template>
+						<span v-if="!isValidJson(ruleItem.configuration.fetch_file.sourceConfiguration)" class="error-message">
+							Invalid JSON format
+						</span>
+					</div>
+				</template>
 
-					<!-- Upload Configuration -->
-					<template v-if="typeOptions.value?.id === 'upload'">
-						<NcTextField
-							label="Upload Path"
-							:value.sync="ruleItem.configuration.upload.path"
-							placeholder="/path/to/upload/directory" />
+				<!-- Write File Configuration -->
+				<template v-if="typeOptions.value?.id === 'write_file'">
+					<NcTextField
+						label="File Path"
+						required
+						:value.sync="ruleItem.configuration.write_file.filePath"
+						placeholder="path.to.file.content" />
+					<NcTextField
+						label="File Name Path"
+						required
+						:value.sync="ruleItem.configuration.write_file.fileNamePath"
+						placeholder="path.to.file.name" />
 
-						<NcTextField
-							label="Allowed File Types"
-							:value.sync="ruleItem.configuration.upload.allowedTypes"
-							placeholder="jpg,png,pdf" />
+					<NcSelect v-model="ruleItem.configuration.write_file.tags"
+						:taggable="true"
+						:multiple="true"
+						input-label="Tags">
+						<template #no-options>
+							type to add tags
+						</template>
+					</NcSelect>
 
-						<NcInputField
-							type="number"
-							label="Max File Size (MB)"
-							:min="1"
-							:value.sync="ruleItem.configuration.upload.maxSize"
-							placeholder="10" />
+					<NcCheckboxRadioSwitch
+						type="checkbox"
+						label="Auto Share"
+						:checked.sync="ruleItem.configuration.write_file.autoShare">
+						Auto share
+					</NcCheckboxRadioSwitch>
+				</template>
 
-						<div class="info-text">
-							<p>Configure file upload settings including path, allowed types and maximum file size.</p>
-						</div>
-					</template>
+				<!-- Fileparts Create Configuration -->
+				<template v-if="typeOptions.value?.id === 'fileparts_create'">
+					<NcTextField
+						label="Size Location"
+						required
+						:value.sync="ruleItem.configuration.fileparts_create.sizeLocation"
+						placeholder="path.to.size.location" />
 
-					<!-- Locking Configuration -->
-					<template v-if="typeOptions.value?.id === 'locking'">
-						<NcSelect
-							v-model="ruleItem.configuration.locking.action"
-							:options="[
-								{ label: 'Lock Resource', value: 'lock' },
-								{ label: 'Unlock Resource', value: 'unlock' }
-							]"
-							input-label="Lock Action" />
-
-						<NcInputField
-							type="number"
-							label="Lock Timeout (minutes)"
-							:min="1"
-							:value.sync="ruleItem.configuration.locking.timeout"
-							placeholder="30" />
-
-						<div class="info-text">
-							<p>Lock or unlock resources for exclusive access by the current user.</p>
-						</div>
-					</template>
-
-					<!-- Fetch File Configuration -->
-					<template v-if="typeOptions.value?.id === 'fetch_file'">
-						<NcSelect
-							v-bind="sourceOptions"
-							v-model="sourceOptions.sourceValue"
-							required
-							:loading="sourcesLoading"
-							input-label="Source ID *" />
-
-						<NcSelect
-							v-bind="methodOptions"
-							v-model="methodOptions.value"
-							input-label="Method" />
-
-						<NcSelect v-model="ruleItem.configuration.fetch_file.tags"
-							:taggable="true"
-							:multiple="true"
-							input-label="Tags">
-							<template #no-options>
-								type to add tags
-							</template>
-						</NcSelect>
-
-						<NcTextField
-							label="File Path"
-							required
-							:value.sync="ruleItem.configuration.fetch_file.filePath"
-							placeholder="path.to.fetch.file" />
-
-						<NcTextField
-							label="File path in sub object(s) (optional)"
-							:value.sync="ruleItem.configuration.fetch_file.subObjectFilepath"
-							placeholder="path.to.fetch.file.objects" />
-
-						<NcTextField
-							label="Object id path (optional)"
-							:value.sync="ruleItem.configuration.fetch_file.objectIdPath"
-							placeholder="path.to.fetch.file.objects" />
-
-						<NcCheckboxRadioSwitch
-							type="checkbox"
-							label="Auto Share"
-							:checked.sync="ruleItem.configuration.fetch_file.autoShare">
-							Auto share
-						</NcCheckboxRadioSwitch>
-
-						<div class="json-editor">
-							<label>Source Configuration (JSON)</label>
-							<div :class="`codeMirrorContainer ${getTheme()}`">
-								<CodeMirror v-model="ruleItem.configuration.fetch_file.sourceConfiguration"
-									:basic="true"
-									placeholder="[]"
-									:dark="getTheme() === 'dark'"
-									:linter="jsonParseLinter()"
-									:lang="json()"
-									:tab-size="2" />
-
-								<NcButton class="format-json-button"
-									type="secondary"
-									size="small"
-									@click="formatJSONSourceConfiguration">
-									Format JSON
-								</NcButton>
-							</div>
-							<span v-if="!isValidJson(ruleItem.configuration.fetch_file.sourceConfiguration)" class="error-message">
-								Invalid JSON format
-							</span>
-						</div>
-					</template>
-
-					<!-- Write File Configuration -->
-					<template v-if="typeOptions.value?.id === 'write_file'">
-						<NcTextField
-							label="File Path"
-							required
-							:value.sync="ruleItem.configuration.write_file.filePath"
-							placeholder="path.to.file.content" />
-						<NcTextField
-							label="File Name Path"
-							required
-							:value.sync="ruleItem.configuration.write_file.fileNamePath"
-							placeholder="path.to.file.name" />
-
-						<NcSelect v-model="ruleItem.configuration.write_file.tags"
-							:taggable="true"
-							:multiple="true"
-							input-label="Tags">
-							<template #no-options>
-								type to add tags
-							</template>
-						</NcSelect>
-
-						<NcCheckboxRadioSwitch
-							type="checkbox"
-							label="Auto Share"
-							:checked.sync="ruleItem.configuration.write_file.autoShare">
-							Auto share
-						</NcCheckboxRadioSwitch>
-					</template>
-
-					<!-- Fileparts Create Configuration -->
-					<template v-if="typeOptions.value?.id === 'fileparts_create'">
-						<NcTextField
-							label="Size Location"
-							required
-							:value.sync="ruleItem.configuration.fileparts_create.sizeLocation"
-							placeholder="path.to.size.location" />
-
-						<NcSelect v-bind="schemaOptions"
-							v-model="schemaOptions.value"
-							input-label="Schema *"
-							:loading="schemasLoading"
-							:disabled="!openRegister.isInstalled"
-							required>
-							<template #no-options="{ loading: schemasTemplateLoading }">
-								<p v-if="schemasTemplateLoading">
-									Loading...
-								</p>
-								<p v-if="!schemasTemplateLoading && !schemaOptions.options?.length">
-									Er zijn geen schemas beschikbaar
-								</p>
-							</template>
-							<template #option="{ id, label, fullSchema, removeStyle }">
-								<div :key="id" :class="removeStyle !== true && 'schema-option'">
-									<!-- custom style is enabled -->
-									<FileTreeOutline v-if="!removeStyle" :size="25" />
-									<span v-if="!removeStyle">
-										<h6 style="margin: 0">
-											{{ label }}
-										</h6>
-										{{ fullSchema.summary }}
-									</span>
-									<!-- custom style is disabled -->
-									<p v-if="removeStyle">
+					<NcSelect v-bind="schemaOptions"
+						v-model="schemaOptions.value"
+						input-label="Schema *"
+						:loading="schemasLoading"
+						:disabled="!openRegister.isInstalled"
+						required>
+						<template #no-options="{ loading: schemasTemplateLoading }">
+							<p v-if="schemasTemplateLoading">
+								Loading...
+							</p>
+							<p v-if="!schemasTemplateLoading && !schemaOptions.options?.length">
+								Er zijn geen schemas beschikbaar
+							</p>
+						</template>
+						<template #option="{ id, label, fullSchema, removeStyle }">
+							<div :key="id" :class="removeStyle !== true && 'schema-option'">
+								<!-- custom style is enabled -->
+								<FileTreeOutline v-if="!removeStyle" :size="25" />
+								<span v-if="!removeStyle">
+									<h6 style="margin: 0">
 										{{ label }}
-									</p>
-								</div>
-							</template>
-						</NcSelect>
+									</h6>
+									{{ fullSchema.summary }}
+								</span>
+								<!-- custom style is disabled -->
+								<p v-if="removeStyle">
+									{{ label }}
+								</p>
+							</div>
+						</template>
+					</NcSelect>
 
-						<NcTextField
-							label="Filename Location"
-							:value.sync="ruleItem.configuration.fileparts_create.filenameLocation"
-							placeholder="path.to.filename.location" />
+					<NcTextField
+						label="Filename Location"
+						:value.sync="ruleItem.configuration.fileparts_create.filenameLocation"
+						placeholder="path.to.filename.location" />
 
-						<NcTextField
-							label="Filepart Location"
-							:value.sync="ruleItem.configuration.fileparts_create.filePartLocation"
-							placeholder="path.to.filepart.location" />
+					<NcTextField
+						label="Filepart Location"
+						:value.sync="ruleItem.configuration.fileparts_create.filePartLocation"
+						placeholder="path.to.filepart.location" />
 
-						<NcSelect
-							v-bind="filepartsCreateMappingOptions"
-							v-model="filepartsCreateMappingOptions.value"
-							:loading="mappingOptions.loading"
-							input-label="Mapping ID" />
-					</template>
+					<NcSelect
+						v-bind="filepartsCreateMappingOptions"
+						v-model="filepartsCreateMappingOptions.value"
+						:loading="mappingOptions.loading"
+						input-label="Mapping ID" />
+				</template>
 
-                    <!-- Filepart Upload Configuration -->
-                    <template v-if="typeOptions.value?.id === 'filepart_upload'">
-                        <NcSelect
-                            v-bind="filepartUploadMappingOptions"
-                            v-model="filepartUploadMappingOptions.value"
-                            required
-                            :loading="mappingOptions.loading"
-                            input-label="Mapping ID*" />
-                    </template>
+				<!-- Filepart Upload Configuration -->
+				<template v-if="typeOptions.value?.id === 'filepart_upload'">
+					<NcSelect
+						v-bind="filepartUploadMappingOptions"
+						v-model="filepartUploadMappingOptions.value"
+						required
+						:loading="mappingOptions.loading"
+						input-label="Mapping ID*" />
+				</template>
 
-                    <!-- Save object Configuration -->
-                    <template v-if="typeOptions.value?.id === 'save_object'">
-                        <NcTextField
-							label="Register"
-							:value.sync="ruleItem.configuration.save_object.register"
-							placeholder="id of register" 
-                            required/>
+				<!-- Save object Configuration -->
+				<template v-if="typeOptions.value?.id === 'save_object'">
+					<NcTextField
+						label="Register"
+						:value.sync="ruleItem.configuration.save_object.register"
+						placeholder="id of register"
+						required />
 
-                        <NcTextField
-							label="Schema"
-							:value.sync="ruleItem.configuration.save_object.schema"
-							placeholder="id of schema" 
-                            required/>
-                    </template>
+					<NcTextField
+						label="Schema"
+						:value.sync="ruleItem.configuration.save_object.schema"
+						placeholder="id of schema"
+						required />
 				</template>
 			</form>
 
