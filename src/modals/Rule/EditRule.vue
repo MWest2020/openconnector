@@ -125,7 +125,7 @@ import { Rule } from '../../entities/index.js'
 					input-label="Type" />
 
 				<!-- Add mapping select -->
-				<NcSelect v-if="typeOptions.value?.id === 'mapping'"
+				<NcSelect v-if="typeOptions.value?.id === 'mapping' || typeOptions.value?.id === 'save_object'"
 					v-bind="mappingOptions"
 					v-model="mappingOptions.value"
 					:loading="mappingOptions.loading"
@@ -466,14 +466,6 @@ import { Rule } from '../../entities/index.js'
 						:value.sync="ruleItem.configuration.save_object.schema"
 						placeholder="id of schema"
 						required />
-
-                    <NcSelect
-                        v-bind="mappingOptions"
-                        v-model="mappingOptions.value"
-                        :loading="mappingOptions.loading"
-                        input-label="Select Mapping"
-                        :multiple="false"
-                        :clearable="false" />
 				</template>
 			</form>
 
