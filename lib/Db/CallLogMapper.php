@@ -12,11 +12,24 @@ use OCP\DB\QueryBuilder\IQueryBuilder;
 use OCP\IDBConnection;
 use Symfony\Component\Uid\Uuid;
 
+/**
+ * Class CallLogMapper
+ *
+ * This class is responsible for mapping CallLog entities to the database.
+ * It provides methods for finding, creating, and updating CallLog objects.
+ *
+ * @package OCA\OpenConnector\Db
+ */
 class CallLogMapper extends QBMapper
 {
+    /**
+     * The name of the database table for call logs
+     */
+    private const TABLE_NAME = 'openconnector_call_logs';
+
     public function __construct(IDBConnection $db)
     {
-        parent::__construct($db, 'openconnector_call_logs');
+        parent::__construct($db, self::TABLE_NAME);
     }
 
     public function find(int $id): CallLog
@@ -24,7 +37,7 @@ class CallLogMapper extends QBMapper
         $qb = $this->db->getQueryBuilder();
 
         $qb->select('*')
-            ->from('openconnector_call_logs')
+            ->from(self::TABLE_NAME)
             ->where(
                 $qb->expr()->eq('id', $qb->createNamedParameter($id, IQueryBuilder::PARAM_INT))
             );
@@ -37,7 +50,7 @@ class CallLogMapper extends QBMapper
         $qb = $this->db->getQueryBuilder();
 
         $qb->select('*')
-            ->from('openconnector_call_logs')
+            ->from(self::TABLE_NAME)
             ->setMaxResults($limit)
             ->setFirstResult($offset);
 
@@ -64,41 +77,41 @@ class CallLogMapper extends QBMapper
     public function createFromArray(array $object): CallLog
     {
         $obj = new CallLog();
-		$obj->hydrate($object);
-		// Set uuid
-		if ($obj->getUuid() === null) {
-			$obj->setUuid(Uuid::v4());
-		}
+        $obj->hydrate($object);
+        // Set uuid
+        if ($obj->getUuid() === null) {
+            $obj->setUuid(Uuid::v4());
+        }
         return $this->insert($obj);
     }
 
     public function updateFromArray(int $id, array $object): CallLog
     {
         $obj = $this->find($id);
-		$obj->hydrate($object);;
-		// Set uuid
-		if ($obj->getUuid() === null) {
-			$obj->setUuid(Uuid::v4());
-		}
+        $obj->hydrate($object);
+        // Set uuid
+        if ($obj->getUuid() === null) {
+            $obj->setUuid(Uuid::v4());
+        }
 
         return $this->update($obj);
     }
 
-	/**
-	 * Clear expired logs from the database.
-	 *
-	 * This method deletes all call logs that have expired (i.e., their 'expired' date is earlier than the current date and time).
-	 *
-	 * @return bool True if any logs were deleted, false otherwise.
-	 * @throws Exception
-	 */
+    /**
+     * Clear expired logs from the database.
+     *
+     * This method deletes all call logs that have expired (i.e., their 'expired' date is earlier than the current date and time).
+     *
+     * @return bool True if any logs were deleted, false otherwise.
+     * @throws Exception
+     */
     public function clearLogs(): bool
     {
         // Get the query builder
         $qb = $this->db->getQueryBuilder();
 
         // Build the delete query
-        $qb->delete('openconnector_call_logs')
+        $qb->delete(self::TABLE_NAME)
            ->where($qb->expr()->lt('expires', $qb->createFunction('NOW()')));
 
         // Execute the query and get the number of affected rows
@@ -108,19 +121,19 @@ class CallLogMapper extends QBMapper
         return $result > 0;
     }
 
-	/**
-	 * Get call log counts grouped by creation date.
-	 *
-	 * @return array An associative array where the key is the creation date and the value is the count of calls created on that date.
-	 * @throws Exception
-	 */
+    /**
+     * Get call log counts grouped by creation date.
+     *
+     * @return array An associative array where the key is the creation date and the value is the count of calls created on that date.
+     * @throws Exception
+     */
     public function getCallCountsByDate(): array
     {
         $qb = $this->db->getQueryBuilder();
 
         // Select the date part of the created timestamp and count of logs
         $qb->select($qb->createFunction('DATE(created) as date'), $qb->createFunction('COUNT(*) as count'))
-           ->from('openconnector_call_logs')
+           ->from(self::TABLE_NAME)
            ->groupBy('date')
            ->orderBy('date', 'ASC');
 
@@ -135,19 +148,19 @@ class CallLogMapper extends QBMapper
         return $counts;
     }
 
-	/**
-	 * Get call log counts grouped by creation time (hour).
-	 *
-	 * @return array An associative array where the key is the creation time (hour) and the value is the count of calls created at that time.
-	 * @throws Exception
-	 */
+    /**
+     * Get call log counts grouped by creation time (hour).
+     *
+     * @return array An associative array where the key is the creation time (hour) and the value is the count of calls created at that time.
+     * @throws Exception
+     */
     public function getCallCountsByTime(): array
     {
         $qb = $this->db->getQueryBuilder();
 
         // Select the hour part of the created timestamp and count of logs
         $qb->select($qb->createFunction('HOUR(created) as hour'), $qb->createFunction('COUNT(*) as count'))
-           ->from('openconnector_call_logs')
+           ->from(self::TABLE_NAME)
            ->groupBy('hour')
            ->orderBy('hour', 'ASC');
 
@@ -162,19 +175,19 @@ class CallLogMapper extends QBMapper
         return $counts;
     }
 
-	/**
-	 * Get the total count of all call logs.
-	 *
-	 * @return int The total number of call logs in the database.
-	 * @throws Exception
-	 */
+    /**
+     * Get the total count of all call logs.
+     *
+     * @return int The total number of call logs in the database.
+     * @throws Exception
+     */
     public function getTotalCallCount(): int
     {
         $qb = $this->db->getQueryBuilder();
 
         // Select count of all logs
         $qb->select($qb->createFunction('COUNT(*) as count'))
-           ->from('openconnector_call_logs');
+           ->from(self::TABLE_NAME);
 
         $result = $qb->execute();
         $row = $result->fetch();
@@ -183,19 +196,19 @@ class CallLogMapper extends QBMapper
         return (int)$row['count'];
     }
 
-	/**
-	 * Get the last call log.
-	 *
-	 * @return CallLog|null The last call log or null if no logs exist.
-	 * @throws Exception
-	 * @throws MultipleObjectsReturnedException
-	 */
+    /**
+     * Get the last call log.
+     *
+     * @return CallLog|null The last call log or null if no logs exist.
+     * @throws Exception
+     * @throws MultipleObjectsReturnedException
+     */
     public function getLastCallLog(): ?CallLog
     {
         $qb = $this->db->getQueryBuilder();
 
         $qb->select('*')
-           ->from('openconnector_call_logs')
+           ->from(self::TABLE_NAME)
            ->orderBy('created', 'DESC')
            ->setMaxResults(1);
 
@@ -206,15 +219,15 @@ class CallLogMapper extends QBMapper
         }
     }
 
-	/**
-	 * Get call statistics grouped by date for a specific date range
-	 *
-	 * @param DateTime $from Start date
-	 * @param DateTime $to End date
-	 *
-	 * @return array Array of daily statistics with success and error counts
-	 * @throws Exception
-	 */
+    /**
+     * Get call statistics grouped by date for a specific date range
+     *
+     * @param DateTime $from Start date
+     * @param DateTime $to End date
+     *
+     * @return array Array of daily statistics with success and error counts
+     * @throws Exception
+     */
     public function getCallStatsByDateRange(DateTime $from, DateTime $to): array
     {
         $qb = $this->db->getQueryBuilder();
@@ -225,7 +238,7 @@ class CallLogMapper extends QBMapper
                 $qb->createFunction('SUM(CASE WHEN status_code >= 200 AND status_code < 300 THEN 1 ELSE 0 END) as success'),
                 $qb->createFunction('SUM(CASE WHEN status_code < 200 OR status_code >= 300 THEN 1 ELSE 0 END) as error')
             )
-            ->from('openconnector_call_logs')
+            ->from(self::TABLE_NAME)
             ->where($qb->expr()->gte('created', $qb->createNamedParameter($from->format('Y-m-d H:i:s'))))
             ->andWhere($qb->expr()->lte('created', $qb->createNamedParameter($to->format('Y-m-d H:i:s'))))
             ->groupBy('date')
@@ -261,15 +274,15 @@ class CallLogMapper extends QBMapper
         return $stats;
     }
 
-	/**
-	 * Get call statistics grouped by hour for a specific date range
-	 *
-	 * @param DateTime $from Start date
-	 * @param DateTime $to End date
-	 *
-	 * @return array Array of hourly statistics with success and error counts
-	 * @throws Exception
-	 */
+    /**
+     * Get call statistics grouped by hour for a specific date range
+     *
+     * @param DateTime $from Start date
+     * @param DateTime $to End date
+     *
+     * @return array Array of hourly statistics with success and error counts
+     * @throws Exception
+     */
     public function getCallStatsByHourRange(DateTime $from, DateTime $to): array
     {
         $qb = $this->db->getQueryBuilder();
@@ -279,7 +292,7 @@ class CallLogMapper extends QBMapper
                 $qb->createFunction('SUM(CASE WHEN status_code >= 200 AND status_code < 300 THEN 1 ELSE 0 END) as success'),
                 $qb->createFunction('SUM(CASE WHEN status_code < 200 OR status_code >= 300 THEN 1 ELSE 0 END) as error')
             )
-            ->from('openconnector_call_logs')
+            ->from(self::TABLE_NAME)
             ->where($qb->expr()->gte('created', $qb->createNamedParameter($from->format('Y-m-d H:i:s'))))
             ->andWhere($qb->expr()->lte('created', $qb->createNamedParameter($to->format('Y-m-d H:i:s'))))
             ->groupBy('hour')

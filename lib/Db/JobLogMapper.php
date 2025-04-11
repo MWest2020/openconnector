@@ -12,11 +12,24 @@ use OCP\DB\QueryBuilder\IQueryBuilder;
 use OCP\IDBConnection;
 use Symfony\Component\Uid\Uuid;
 
+/**
+ * Class JobLogMapper
+ *
+ * This class is responsible for mapping JobLog entities to the database.
+ * It provides methods for finding, creating, and updating JobLog objects.
+ *
+ * @package OCA\OpenConnector\Db
+ */
 class JobLogMapper extends QBMapper
 {
+    /**
+     * The name of the database table for job logs
+     */
+    private const TABLE_NAME = 'openconnector_job_logs';
+
     public function __construct(IDBConnection $db)
     {
-        parent::__construct($db, 'openconnector_job_logs');
+        parent::__construct($db, self::TABLE_NAME);
     }
 
     public function find(int $id): JobLog
@@ -24,7 +37,7 @@ class JobLogMapper extends QBMapper
         $qb = $this->db->getQueryBuilder();
 
         $qb->select('*')
-            ->from('openconnector_job_logs')
+            ->from(self::TABLE_NAME)
             ->where(
                 $qb->expr()->eq('id', $qb->createNamedParameter($id, IQueryBuilder::PARAM_INT))
             );
@@ -37,7 +50,7 @@ class JobLogMapper extends QBMapper
         $qb = $this->db->getQueryBuilder();
 
         $qb->select('*')
-            ->from('openconnector_job_logs')
+            ->from(self::TABLE_NAME)
             ->setMaxResults($limit)
             ->setFirstResult($offset);
 
@@ -51,7 +64,7 @@ class JobLogMapper extends QBMapper
             }
         }
 
-		if (empty($searchConditions) === false) {
+        if (empty($searchConditions) === false) {
             $qb->andWhere('(' . implode(' OR ', $searchConditions) . ')');
             foreach ($searchParams as $param => $value) {
                 $qb->setParameter($param, $value);
@@ -61,21 +74,38 @@ class JobLogMapper extends QBMapper
         return $this->findEntities($qb);
     }
 
-	public function createForJob(Job $job, array $object): JobLog
-	{
-		$jobObject = [
-			'jobId'         => $job->getId(),
-			'jobClass'      => $job->getJobClass(),
-			'jobListId'     => $job->getJobListId(),
-			'arguments'     => $job->getArguments(),
-			'lastRun'       => $job->getLastRun(),
-			'nextRun'       => $job->getNextRun(),
-		];
+    public function createForJob(Job $job, array $object): JobLog
+    {
+        $obj = new JobLog();
+        $obj->hydrate($object);
+        // Set uuid
+        if ($obj->getUuid() === null) {
+            $obj->setUuid(Uuid::v4());
+        }
+        // Set job_id
+        $obj->setJobId($job->getId());
+        return $this->insert(entity: $obj);
+    }
 
-		$object = array_merge($jobObject, $object);
+    /**
+     * Get the total count of all job logs.
+     *
+     * @return int The total number of job logs in the database.
+     */
+    public function getTotalCallCount(): int
+    {
+        $qb = $this->db->getQueryBuilder();
 
-		return $this->createFromArray($object);
-	}
+        // Select count of all job logs
+        $qb->select($qb->createFunction('COUNT(*) as count'))
+           ->from(self::TABLE_NAME);
+
+        $result = $qb->execute();
+        $row = $result->fetch();
+
+        // Return the total count
+        return (int)$row['count'];
+    }
 
     public function createFromArray(array $object): JobLog
     {
@@ -115,7 +145,7 @@ class JobLogMapper extends QBMapper
         $qb = $this->db->getQueryBuilder();
 
         $qb->select('*')
-           ->from('openconnector_job_logs')
+           ->from(self::TABLE_NAME)
            ->orderBy('created', 'DESC')
            ->setMaxResults(1);
 
@@ -146,7 +176,7 @@ class JobLogMapper extends QBMapper
                 $qb->createFunction('SUM(CASE WHEN level = \'ERROR\' THEN 1 ELSE 0 END) as error'),
                 $qb->createFunction('SUM(CASE WHEN level = \'DEBUG\' THEN 1 ELSE 0 END) as debug')
             )
-            ->from('openconnector_job_logs')
+            ->from(self::TABLE_NAME)
             ->where($qb->expr()->gte('created', $qb->createNamedParameter($from->format('Y-m-d H:i:s'))))
             ->andWhere($qb->expr()->lte('created', $qb->createNamedParameter($to->format('Y-m-d H:i:s'))))
             ->groupBy('date')
@@ -206,7 +236,7 @@ class JobLogMapper extends QBMapper
                 $qb->createFunction('SUM(CASE WHEN level = \'ERROR\' THEN 1 ELSE 0 END) as error'),
                 $qb->createFunction('SUM(CASE WHEN level = \'DEBUG\' THEN 1 ELSE 0 END) as debug')
             )
-            ->from('openconnector_job_logs')
+            ->from(self::TABLE_NAME)
             ->where($qb->expr()->gte('created', $qb->createNamedParameter($from->format('Y-m-d H:i:s'))))
             ->andWhere($qb->expr()->lte('created', $qb->createNamedParameter($to->format('Y-m-d H:i:s'))))
             ->groupBy('hour')

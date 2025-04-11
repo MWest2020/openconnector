@@ -13,9 +13,16 @@ use Symfony\Component\Uid\Uuid;
  * Mapper class for Event entities
  *
  * Handles database operations for events including CRUD operations
+ *
+ * @package OCA\OpenConnector\Db
  */
 class EventMapper extends QBMapper
 {
+	/**
+	 * The name of the database table for events
+	 */
+	private const TABLE_NAME = 'openconnector_events';
+
 	/**
 	 * Constructor
 	 *
@@ -23,7 +30,7 @@ class EventMapper extends QBMapper
 	 */
 	public function __construct(IDBConnection $db)
 	{
-		parent::__construct($db, 'openconnector_events');
+		parent::__construct($db, self::TABLE_NAME);
 	}
 
 	/**
@@ -37,7 +44,7 @@ class EventMapper extends QBMapper
 		$qb = $this->db->getQueryBuilder();
 
 		$qb->select('*')
-			->from('openconnector_events')
+			->from(self::TABLE_NAME)
 			->where(
 				$qb->expr()->eq('id', $qb->createNamedParameter($id, IQueryBuilder::PARAM_INT))
 			);
@@ -60,11 +67,11 @@ class EventMapper extends QBMapper
 		$qb = $this->db->getQueryBuilder();
 
 		$qb->select('*')
-			->from('openconnector_events')
+			->from(self::TABLE_NAME)
 			->setMaxResults($limit)
 			->setFirstResult($offset);
 
-        foreach ($filters as $filter => $value) {
+		foreach ($filters as $filter => $value) {
 			if ($value === 'IS NOT NULL') {
 				$qb->andWhere($qb->expr()->isNotNull($filter));
 			} elseif ($value === 'IS NULL') {
@@ -72,14 +79,14 @@ class EventMapper extends QBMapper
 			} else {
 				$qb->andWhere($qb->expr()->eq($filter, $qb->createNamedParameter($value)));
 			}
-        }
+		}
 
 		if (empty($searchConditions) === false) {
-            $qb->andWhere('(' . implode(' OR ', $searchConditions) . ')');
-            foreach ($searchParams as $param => $value) {
-                $qb->setParameter($param, $value);
-            }
-        }
+			$qb->andWhere('(' . implode(' OR ', $searchConditions) . ')');
+			foreach ($searchParams as $param => $value) {
+				$qb->setParameter($param, $value);
+			}
+		}
 
 		return $this->findEntities(query: $qb);
 	}
@@ -136,23 +143,23 @@ class EventMapper extends QBMapper
 		return $this->update($obj);
 	}
 
-    /**
-     * Get the total count of all events
-     *
-     * @return int The total number of events in the database
-     */
-    public function getTotalCount(): int
-    {
-        $qb = $this->db->getQueryBuilder();
+	/**
+	 * Get the total count of all events
+	 *
+	 * @return int The total number of events in the database
+	 */
+	public function getTotalCount(): int
+	{
+		$qb = $this->db->getQueryBuilder();
 
-        // Select count of all events
-        $qb->select($qb->createFunction('COUNT(*) as count'))
-           ->from('openconnector_events');
+		// Select count of all events
+		$qb->select($qb->createFunction('COUNT(*) as count'))
+			->from(self::TABLE_NAME);
 
-        $result = $qb->execute();
-        $row = $result->fetch();
+		$result = $qb->execute();
+		$row = $result->fetch();
 
-        // Return the total count
-        return (int)$row['count'];
-    }
+		// Return the total count
+		return (int)$row['count'];
+	}
 }

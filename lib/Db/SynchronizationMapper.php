@@ -9,11 +9,24 @@ use OCP\DB\QueryBuilder\IQueryBuilder;
 use OCP\IDBConnection;
 use Symfony\Component\Uid\Uuid;
 
+/**
+ * Class SynchronizationMapper
+ *
+ * This class is responsible for mapping Synchronization entities to the database.
+ * It provides methods for finding, creating, and updating Synchronization objects.
+ *
+ * @package OCA\OpenConnector\Db
+ */
 class SynchronizationMapper extends QBMapper
 {
+	/**
+	 * The name of the database table for synchronizations
+	 */
+	private const TABLE_NAME = 'openconnector_synchronizations';
+
 	public function __construct(IDBConnection $db)
 	{
-		parent::__construct($db, 'openconnector_synchronizations');
+		parent::__construct($db, self::TABLE_NAME);
 	}
 
 	public function find(int $id): Synchronization
@@ -21,7 +34,7 @@ class SynchronizationMapper extends QBMapper
 		$qb = $this->db->getQueryBuilder();
 
 		$qb->select('*')
-			->from('openconnector_synchronizations')
+			->from(self::TABLE_NAME)
 			->where(
 				$qb->expr()->eq('id', $qb->createNamedParameter($id, IQueryBuilder::PARAM_INT))
 			);
@@ -34,7 +47,7 @@ class SynchronizationMapper extends QBMapper
 		$qb = $this->db->getQueryBuilder();
 
 		$qb->select('*')
-			->from('openconnector_synchronizations')
+			->from(self::TABLE_NAME)
 			->where(
 				$qb->expr()->eq('reference', $qb->createNamedParameter($reference))
 			);
@@ -47,11 +60,11 @@ class SynchronizationMapper extends QBMapper
 		$qb = $this->db->getQueryBuilder();
 
 		$qb->select('*')
-			->from('openconnector_synchronizations')
+			->from(self::TABLE_NAME)
 			->setMaxResults($limit)
 			->setFirstResult($offset);
 
-        foreach ($filters as $filter => $value) {
+		foreach ($filters as $filter => $value) {
 			if ($value === 'IS NOT NULL') {
 				$qb->andWhere($qb->expr()->isNotNull($filter));
 			} elseif ($value === 'IS NULL') {
@@ -59,14 +72,14 @@ class SynchronizationMapper extends QBMapper
 			} else {
 				$qb->andWhere($qb->expr()->eq($filter, $qb->createNamedParameter($value)));
 			}
-        }
+		}
 
 		if (empty($searchConditions) === false) {
-            $qb->andWhere('(' . implode(' OR ', $searchConditions) . ')');
-            foreach ($searchParams as $param => $value) {
-                $qb->setParameter($param, $value);
-            }
-        }
+			$qb->andWhere('(' . implode(' OR ', $searchConditions) . ')');
+			foreach ($searchParams as $param => $value) {
+				$qb->setParameter($param, $value);
+			}
+		}
 
 		return $this->findEntities(query: $qb);
 	}
@@ -110,46 +123,46 @@ class SynchronizationMapper extends QBMapper
 		return $this->update($obj);
 	}
 
-    /**
-     * Get the total count of all call logs.
-     *
-     * @return int The total number of call logs in the database.
-     */
-    public function getTotalCallCount(): int
-    {
-        $qb = $this->db->getQueryBuilder();
+	/**
+	 * Get the total count of all synchronizations.
+	 *
+	 * @return int The total number of synchronizations in the database.
+	 */
+	public function getTotalCallCount(): int
+	{
+		$qb = $this->db->getQueryBuilder();
 
-        // Select count of all logs
-        $qb->select($qb->createFunction('COUNT(*) as count'))
-           ->from('openconnector_synchronizations');
+		// Select count of all synchronizations
+		$qb->select($qb->createFunction('COUNT(*) as count'))
+			->from(self::TABLE_NAME);
 
-        $result = $qb->execute();
-        $row = $result->fetch();
+		$result = $qb->execute();
+		$row = $result->fetch();
 
-        // Return the total count
-        return (int)$row['count'];
-    }
+		// Return the total count
+		return (int)$row['count'];
+	}
 
-    /**
-     * Find synchronizations that are linked to a specific register
-     *
-     * @param int $registerId The ID of the register to find synchronizations for
-     *
-     * @return array<Synchronization> Array of Synchronization entities linked to the register
-     */
-    public function getByRegister(int $registerId): array
-    {
-        $qb = $this->db->getQueryBuilder();
+	/**
+	 * Find synchronizations that are linked to a specific register
+	 *
+	 * @param int $registerId The ID of the register to find synchronizations for
+	 *
+	 * @return array<Synchronization> Array of Synchronization entities linked to the register
+	 */
+	public function getByRegister(int $registerId): array
+	{
+		$qb = $this->db->getQueryBuilder();
 
-        $qb->select('*')
-            ->from('openconnector_synchronizations')
-            ->where(
-                $qb->expr()->andX(
-                    $qb->expr()->eq('target_type', $qb->createNamedParameter('register/schema')),
-                    $qb->expr()->eq('target_id', $qb->createNamedParameter($registerId, IQueryBuilder::PARAM_INT))
-                )
-            );
+		$qb->select('*')
+			->from(self::TABLE_NAME)
+			->where(
+				$qb->expr()->andX(
+					$qb->expr()->eq('target_type', $qb->createNamedParameter('register/schema')),
+					$qb->expr()->eq('target_id', $qb->createNamedParameter($registerId, IQueryBuilder::PARAM_INT))
+				)
+			);
 
-        return $this->findEntities(query: $qb);
-    }
+		return $this->findEntities(query: $qb);
+	}
 }

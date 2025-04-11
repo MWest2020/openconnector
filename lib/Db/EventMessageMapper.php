@@ -18,13 +18,18 @@ use Symfony\Component\Uid\Uuid;
 class EventMessageMapper extends QBMapper
 {
     /**
+     * The name of the database table for event messages
+     */
+    private const TABLE_NAME = 'openconnector_event_messages';
+
+    /**
      * Constructor
      *
      * @param IDBConnection $db Database connection
      */
     public function __construct(IDBConnection $db)
     {
-        parent::__construct($db, 'openconnector_event_messages');
+        parent::__construct($db, self::TABLE_NAME);
     }
 
     /**
@@ -38,7 +43,7 @@ class EventMessageMapper extends QBMapper
         $qb = $this->db->getQueryBuilder();
 
         $qb->select('*')
-            ->from('openconnector_event_messages')
+            ->from(self::TABLE_NAME)
             ->where(
                 $qb->expr()->eq('id', $qb->createNamedParameter($id, IQueryBuilder::PARAM_INT))
             );
@@ -59,7 +64,7 @@ class EventMessageMapper extends QBMapper
         $qb = $this->db->getQueryBuilder();
 
         $qb->select('*')
-            ->from('openconnector_event_messages')
+            ->from(self::TABLE_NAME)
             ->setMaxResults($limit)
             ->setFirstResult($offset);
 
@@ -87,7 +92,7 @@ class EventMessageMapper extends QBMapper
         $qb = $this->db->getQueryBuilder();
 
         $qb->select('*')
-            ->from('openconnector_event_messages')
+            ->from(self::TABLE_NAME)
             ->where(
                 $qb->expr()->eq('status', $qb->createNamedParameter('pending')),
                 $qb->expr()->lt('retry_count', $qb->createNamedParameter($maxRetries, IQueryBuilder::PARAM_INT)),
@@ -177,5 +182,25 @@ class EventMessageMapper extends QBMapper
             'lastAttempt' => $message->getLastAttempt(),
             'nextAttempt' => $message->getNextAttempt()
         ]);
+    }
+
+    /**
+     * Get the total count of all event messages.
+     *
+     * @return int The total number of event messages in the database.
+     */
+    public function getTotalCallCount(): int
+    {
+        $qb = $this->db->getQueryBuilder();
+
+        // Select count of all event messages
+        $qb->select($qb->createFunction('COUNT(*) as count'))
+           ->from(self::TABLE_NAME);
+
+        $result = $qb->execute();
+        $row = $result->fetch();
+
+        // Return the total count
+        return (int)$row['count'];
     }
 } 

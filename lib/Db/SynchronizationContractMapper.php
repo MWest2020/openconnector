@@ -25,13 +25,18 @@ use Symfony\Component\Uid\Uuid;
 class SynchronizationContractMapper extends QBMapper
 {
     /**
+     * The name of the database table for synchronization contracts
+     */
+    private const TABLE_NAME = 'openconnector_synchronization_contracts';
+
+    /**
      * Constructor for SynchronizationContractMapper
      *
      * @param IDBConnection $db Database connection instance
      */
     public function __construct(IDBConnection $db)
     {
-        parent::__construct($db, 'openconnector_synchronization_contracts');
+        parent::__construct($db, self::TABLE_NAME);
     }
 
     /**
@@ -48,7 +53,7 @@ class SynchronizationContractMapper extends QBMapper
 
         // Build select query with ID filter
         $qb->select('*')
-            ->from('openconnector_synchronization_contracts')
+            ->from(self::TABLE_NAME)
             ->where(
                 $qb->expr()->eq('id', $qb->createNamedParameter($id, IQueryBuilder::PARAM_INT))
             );
@@ -73,7 +78,7 @@ class SynchronizationContractMapper extends QBMapper
 
         // Build select query with synchronization and origin ID filters
         $qb->select('*')
-            ->from('openconnector_synchronization_contracts')
+            ->from(self::TABLE_NAME)
             ->where(
                 $qb->expr()->eq('synchronization_id', $qb->createNamedParameter($synchronizationId))
             )
@@ -102,7 +107,7 @@ class SynchronizationContractMapper extends QBMapper
 
         // Build select query with synchronization and target ID filters
         $qb->select('*')
-            ->from('openconnector_synchronization_contracts')
+            ->from(self::TABLE_NAME)
             ->where(
                 $qb->expr()->eq('synchronization_id', $qb->createNamedParameter($synchronization))
             )
@@ -131,7 +136,7 @@ class SynchronizationContractMapper extends QBMapper
 
         // Build select query with synchronization and target ID filters
         $qb->select('*')
-            ->from('openconnector_synchronization_contracts')
+            ->from(self::TABLE_NAME)
             ->where(
                 $qb->expr()->eq('origin_id', $qb->createNamedParameter($originId))
             )
@@ -160,7 +165,7 @@ class SynchronizationContractMapper extends QBMapper
 
         // Build select query with synchronization ID and schema filter
         $qb->select('c.*')
-            ->from('openconnector_synchronization_contracts', 'c')
+            ->from(self::TABLE_NAME, 'c')
             ->innerJoin(
                 'c',
                 'oc_openregister_objects',
@@ -197,7 +202,7 @@ class SynchronizationContractMapper extends QBMapper
 
         // Build base select query with pagination
         $qb->select('*')
-            ->from('openconnector_synchronization_contracts')
+            ->from(self::TABLE_NAME)
             ->setMaxResults($limit)
             ->setFirstResult($offset);
 
@@ -291,7 +296,7 @@ class SynchronizationContractMapper extends QBMapper
 
         // Build query to find contract matching origin_id
         $qb->select('*')
-            ->from('openconnector_synchronization_contracts')
+            ->from(self::TABLE_NAME)
             ->where(
                 $qb->expr()->eq('origin_id', $qb->createNamedParameter($originId))
             )
@@ -318,7 +323,7 @@ class SynchronizationContractMapper extends QBMapper
 
         // Build query to find contract matching origin_id
         $qb->select('*')
-            ->from('openconnector_synchronization_contracts')
+            ->from(self::TABLE_NAME)
             ->where(
                 $qb->expr()->eq('target_id', $qb->createNamedParameter($targetId))
             ); // Ensure only one result is returned
@@ -345,7 +350,7 @@ class SynchronizationContractMapper extends QBMapper
 
         // Build query to find contracts matching type/id as either source or target
         $qb->select('*')
-            ->from('openconnector_synchronization_contracts')
+            ->from(self::TABLE_NAME)
             ->where(
                 $qb->expr()->orX(
                     $qb->expr()->andX(
@@ -374,7 +379,7 @@ class SynchronizationContractMapper extends QBMapper
 
         // Build count query
         $qb->select($qb->createFunction('COUNT(*) as count'))
-           ->from('openconnector_synchronization_contracts');
+           ->from(self::TABLE_NAME);
 
         $result = $qb->execute();
         $row = $result->fetch();
@@ -399,7 +404,7 @@ class SynchronizationContractMapper extends QBMapper
             // Find contracts where object ID matches either origin or target
             $qb = $this->db->getQueryBuilder();
             $qb->select('*')
-               ->from('openconnector_synchronization_contracts')
+               ->from(self::TABLE_NAME)
                ->where(
                    $qb->expr()->orX(
                        $qb->expr()->eq('origin_id', $qb->createNamedParameter($objectIdentifier)),

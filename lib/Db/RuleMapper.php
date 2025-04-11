@@ -18,11 +18,16 @@ use Symfony\Component\Uid\Uuid;
 class RuleMapper extends QBMapper
 {
 	/**
+	 * The name of the database table for rules
+	 */
+	private const TABLE_NAME = 'openconnector_rules';
+
+	/**
 	 * @param IDBConnection $db
 	 */
 	public function __construct(IDBConnection $db)
 	{
-		parent::__construct($db, 'openconnector_rules');
+		parent::__construct($db, self::TABLE_NAME);
 	}
 
 	/**
@@ -36,7 +41,7 @@ class RuleMapper extends QBMapper
 		$qb = $this->db->getQueryBuilder();
 
 		$qb->select('*')
-			->from('openconnector_rules')
+			->from(self::TABLE_NAME)
 			->where(
 				$qb->expr()->eq('id', $qb->createNamedParameter($id, IQueryBuilder::PARAM_INT))
 			);
@@ -55,7 +60,7 @@ class RuleMapper extends QBMapper
 		$qb = $this->db->getQueryBuilder();
 
 		$qb->select('*')
-			->from('openconnector_rules')
+			->from(self::TABLE_NAME)
 			->where(
 				$qb->expr()->eq('reference', $qb->createNamedParameter($reference))
 			);
@@ -78,8 +83,7 @@ class RuleMapper extends QBMapper
 		$qb = $this->db->getQueryBuilder();
 
 		$qb->select('*')
-			->from('openconnector_rules')
-			->orderBy('order', 'ASC')
+			->from(self::TABLE_NAME)
 			->setMaxResults($limit)
 			->setFirstResult($offset);
 
@@ -100,7 +104,7 @@ class RuleMapper extends QBMapper
 			}
 		}
 
-		return $this->findEntities($qb);
+		return $this->findEntities(query: $qb);
 	}
 
 	/**
@@ -171,7 +175,7 @@ class RuleMapper extends QBMapper
 	{
 		$qb = $this->db->getQueryBuilder();
 		$qb->select($qb->createFunction('COALESCE(MAX(`order`), 0) as max_order'))
-		   ->from('openconnector_rules');
+		   ->from(self::TABLE_NAME);
 
 		$result = $qb->execute();
 		$row = $result->fetch();
@@ -190,7 +194,7 @@ class RuleMapper extends QBMapper
 		$qb = $this->db->getQueryBuilder();
 
 		$qb->select($qb->createFunction('COUNT(*) as count'))
-		   ->from('openconnector_rules');
+		   ->from(self::TABLE_NAME);
 
 		$result = $qb->execute();
 		$row = $result->fetch();
@@ -208,7 +212,7 @@ class RuleMapper extends QBMapper
 	{
 		foreach ($orderMap as $ruleId => $newOrder) {
 			$qb = $this->db->getQueryBuilder();
-			$qb->update('openconnector_rules')
+			$qb->update(self::TABLE_NAME)
 			   ->set('order', $qb->createNamedParameter($newOrder, IQueryBuilder::PARAM_INT))
 			   ->where($qb->expr()->eq('id', $qb->createNamedParameter($ruleId, IQueryBuilder::PARAM_INT)))
 			   ->execute();

@@ -9,11 +9,24 @@ use OCP\DB\QueryBuilder\IQueryBuilder;
 use OCP\IDBConnection;
 use Symfony\Component\Uid\Uuid;
 
+/**
+ * Class JobMapper
+ *
+ * This class is responsible for mapping Job entities to the database.
+ * It provides methods for finding, creating, and updating Job objects.
+ *
+ * @package OCA\OpenConnector\Db
+ */
 class JobMapper extends QBMapper
 {
+	/**
+	 * The name of the database table for jobs
+	 */
+	private const TABLE_NAME = 'openconnector_jobs';
+
 	public function __construct(IDBConnection $db)
 	{
-		parent::__construct($db, 'openconnector_jobs');
+		parent::__construct($db, self::TABLE_NAME);
 	}
 
 	public function find(int $id): Job
@@ -21,7 +34,7 @@ class JobMapper extends QBMapper
 		$qb = $this->db->getQueryBuilder();
 
 		$qb->select('*')
-			->from('openconnector_jobs')
+			->from(self::TABLE_NAME)
 			->where(
 				$qb->expr()->eq('id', $qb->createNamedParameter($id, IQueryBuilder::PARAM_INT))
 			);
@@ -34,7 +47,7 @@ class JobMapper extends QBMapper
 		$qb = $this->db->getQueryBuilder();
 
 		$qb->select('*')
-			->from('openconnector_jobs')
+			->from(self::TABLE_NAME)
 			->where(
 				$qb->expr()->eq('reference', $qb->createNamedParameter($reference))
 			);
@@ -47,11 +60,11 @@ class JobMapper extends QBMapper
 		$qb = $this->db->getQueryBuilder();
 
 		$qb->select('*')
-			->from('openconnector_jobs')
+			->from(self::TABLE_NAME)
 			->setMaxResults($limit)
 			->setFirstResult($offset);
 
-        foreach ($filters as $filter => $value) {
+		foreach ($filters as $filter => $value) {
 			if ($value === 'IS NOT NULL') {
 				$qb->andWhere($qb->expr()->isNotNull($filter));
 			} elseif ($value === 'IS NULL') {
@@ -59,14 +72,14 @@ class JobMapper extends QBMapper
 			} else {
 				$qb->andWhere($qb->expr()->eq($filter, $qb->createNamedParameter($value)));
 			}
-        }
+		}
 
 		if (empty($searchConditions) === false) {
-            $qb->andWhere('(' . implode(' OR ', $searchConditions) . ')');
-            foreach ($searchParams as $param => $value) {
-                $qb->setParameter($param, $value);
-            }
-        }
+			$qb->andWhere('(' . implode(' OR ', $searchConditions) . ')');
+			foreach ($searchParams as $param => $value) {
+				$qb->setParameter($param, $value);
+			}
+		}
 
 		return $this->findEntities(query: $qb);
 	}
@@ -110,23 +123,23 @@ class JobMapper extends QBMapper
 		return $this->update($obj);
 	}
 
-    /**
-     * Get the total count of all call logs.
-     *
-     * @return int The total number of call logs in the database.
-     */
-    public function getTotalCallCount(): int
-    {
-        $qb = $this->db->getQueryBuilder();
+	/**
+	 * Get the total count of all jobs.
+	 *
+	 * @return int The total number of jobs in the database.
+	 */
+	public function getTotalCallCount(): int
+	{
+		$qb = $this->db->getQueryBuilder();
 
-        // Select count of all logs
-        $qb->select($qb->createFunction('COUNT(*) as count'))
-           ->from('openconnector_jobs');
+		// Select count of all jobs
+		$qb->select($qb->createFunction('COUNT(*) as count'))
+		   ->from(self::TABLE_NAME);
 
-        $result = $qb->execute();
-        $row = $result->fetch();
+		$result = $qb->execute();
+		$row = $result->fetch();
 
-        // Return the total count
-        return (int)$row['count'];
-    }
+		// Return the total count
+		return (int)$row['count'];
+	}
 }

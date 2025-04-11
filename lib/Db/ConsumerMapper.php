@@ -20,13 +20,18 @@ use Symfony\Component\Uid\Uuid;
 class ConsumerMapper extends QBMapper
 {
 	/**
+	 * The name of the database table for consumers
+	 */
+	private const TABLE_NAME = 'openconnector_consumers';
+
+	/**
 	 * ConsumerMapper constructor.
 	 *
 	 * @param IDBConnection $db The database connection
 	 */
 	public function __construct(IDBConnection $db)
 	{
-		parent::__construct($db, 'openconnector_consumers');
+		parent::__construct($db, self::TABLE_NAME);
 	}
 
 	/**
@@ -40,7 +45,7 @@ class ConsumerMapper extends QBMapper
 		$qb = $this->db->getQueryBuilder();
 
 		$qb->select('*')
-			->from('openconnector_consumers')
+			->from(self::TABLE_NAME)
 			->where(
 				$qb->expr()->eq('id', $qb->createNamedParameter($id, IQueryBuilder::PARAM_INT))
 			);
@@ -63,7 +68,7 @@ class ConsumerMapper extends QBMapper
 		$qb = $this->db->getQueryBuilder();
 
 		$qb->select('*')
-			->from('openconnector_consumers')
+			->from(self::TABLE_NAME)
 			->setMaxResults($limit)
 			->setFirstResult($offset);
 
@@ -128,17 +133,17 @@ class ConsumerMapper extends QBMapper
 	}
 
     /**
-     * Get the total count of all call logs.
+     * Get the total count of all consumers.
      *
-     * @return int The total number of call logs in the database.
+     * @return int The total number of consumers in the database.
      */
     public function getTotalCallCount(): int
     {
         $qb = $this->db->getQueryBuilder();
 
-        // Select count of all logs
+        // Select count of all consumers
         $qb->select($qb->createFunction('COUNT(*) as count'))
-           ->from('openconnector_consumers');
+           ->from(self::TABLE_NAME);
 
         $result = $qb->execute();
         $row = $result->fetch();

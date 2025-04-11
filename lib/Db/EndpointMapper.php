@@ -11,12 +11,19 @@ use Symfony\Component\Uid\Uuid;
 
 /**
  * Mapper class for handling Endpoint database operations
+ *
+ * @package OCA\OpenConnector\Db
  */
 class EndpointMapper extends QBMapper
 {
+	/**
+	 * The name of the database table for endpoints
+	 */
+	private const TABLE_NAME = 'openconnector_endpoints';
+
 	public function __construct(IDBConnection $db)
 	{
-		parent::__construct($db, 'openconnector_endpoints');
+		parent::__construct($db, self::TABLE_NAME);
 	}
 
 	public function find(int $id): Endpoint
@@ -24,7 +31,7 @@ class EndpointMapper extends QBMapper
 		$qb = $this->db->getQueryBuilder();
 
 		$qb->select('*')
-			->from('openconnector_endpoints')
+			->from(self::TABLE_NAME)
 			->where(
 				$qb->expr()->eq('id', $qb->createNamedParameter($id, IQueryBuilder::PARAM_INT))
 			);
@@ -37,7 +44,7 @@ class EndpointMapper extends QBMapper
 		$qb = $this->db->getQueryBuilder();
 
 		$qb->select('*')
-			->from('openconnector_endpoints')
+			->from(self::TABLE_NAME)
 			->where(
 				$qb->expr()->eq('reference', $qb->createNamedParameter($reference))
 			);
@@ -50,11 +57,11 @@ class EndpointMapper extends QBMapper
 		$qb = $this->db->getQueryBuilder();
 
 		$qb->select('*')
-			->from('openconnector_endpoints')
+			->from(self::TABLE_NAME)
 			->setMaxResults($limit)
 			->setFirstResult($offset);
 
-        foreach ($filters as $filter => $value) {
+		foreach ($filters as $filter => $value) {
 			if ($value === 'IS NOT NULL') {
 				$qb->andWhere($qb->expr()->isNotNull($filter));
 			} elseif ($value === 'IS NULL') {
@@ -62,14 +69,14 @@ class EndpointMapper extends QBMapper
 			} else {
 				$qb->andWhere($qb->expr()->eq($filter, $qb->createNamedParameter($value)));
 			}
-        }
+		}
 
 		if (empty($searchConditions) === false) {
-            $qb->andWhere('(' . implode(' OR ', $searchConditions) . ')');
-            foreach ($searchParams as $param => $value) {
-                $qb->setParameter($param, $value);
-            }
-        }
+			$qb->andWhere('(' . implode(' OR ', $searchConditions) . ')');
+			foreach ($searchParams as $param => $value) {
+				$qb->setParameter($param, $value);
+			}
+		}
 
 		return $this->findEntities(query: $qb);
 	}
@@ -145,74 +152,74 @@ class EndpointMapper extends QBMapper
 		return $this->update($obj);
 	}
 
-    /**
-     * Get the total count of all call logs.
-     *
-     * @return int The total number of call logs in the database.
-     */
-    public function getTotalCallCount(): int
-    {
-        $qb = $this->db->getQueryBuilder();
+	/**
+	 * Get the total count of all call logs.
+	 *
+	 * @return int The total number of call logs in the database.
+	 */
+	public function getTotalCallCount(): int
+	{
+		$qb = $this->db->getQueryBuilder();
 
-        // Select count of all logs
-        $qb->select($qb->createFunction('COUNT(*) as count'))
-           ->from('openconnector_endpoints');
+		// Select count of all logs
+		$qb->select($qb->createFunction('COUNT(*) as count'))
+		   ->from(self::TABLE_NAME);
 
-        $result = $qb->execute();
-        $row = $result->fetch();
+		$result = $qb->execute();
+		$row = $result->fetch();
 
-        // Return the total count
-        return (int)$row['count'];
-    }
+		// Return the total count
+		return (int)$row['count'];
+	}
 
-    /**
-     * Find endpoints that match a given path and method using regex comparison
-     *
-     * @param string $path The path to match against endpoint regex patterns
-     * @param string $method The HTTP method to filter by (GET, POST, etc)
-     * @return array Array of matching Endpoint entities
-     */
-    public function findByPathRegex(string $path, string $method): array
-    {
-        // Get all endpoints first since we need to do regex comparison
-        $endpoints = $this->findAll();
+	/**
+	 * Find endpoints that match a given path and method using regex comparison
+	 *
+	 * @param string $path The path to match against endpoint regex patterns
+	 * @param string $method The HTTP method to filter by (GET, POST, etc)
+	 * @return array Array of matching Endpoint entities
+	 */
+	public function findByPathRegex(string $path, string $method): array
+	{
+		// Get all endpoints first since we need to do regex comparison
+		$endpoints = $this->findAll();
 
-        // Filter endpoints where both path matches regex pattern and method matches
-        return array_filter($endpoints, function(Endpoint $endpoint) use ($path, $method) {
-            // Get the regex pattern from the endpoint
-            $pattern = $endpoint->getEndpointRegex();
+		// Filter endpoints where both path matches regex pattern and method matches
+		return array_filter($endpoints, function(Endpoint $endpoint) use ($path, $method) {
+			// Get the regex pattern from the endpoint
+			$pattern = $endpoint->getEndpointRegex();
 
-            // Skip if no regex pattern is set
-            if (empty($pattern) === true) {
-                return false;
-            }
+			// Skip if no regex pattern is set
+			if (empty($pattern) === true) {
+				return false;
+			}
 
-            // Check if both path matches the regex pattern and method matches
-            return preg_match($pattern, $path) === 1 &&
-                   $endpoint->getMethod() === $method;
-        });
-    }
+			// Check if both path matches the regex pattern and method matches
+			return preg_match($pattern, $path) === 1 &&
+				   $endpoint->getMethod() === $method;
+		});
+	}
 
-    /**
-     * Find endpoints that are linked to a specific register
-     *
-     * @param int $registerId The ID of the register to find endpoints for
-     *
-     * @return array<Endpoint> Array of Endpoint entities linked to the register
-     */
-    public function getByRegister(int $registerId): array
-    {
-        $qb = $this->db->getQueryBuilder();
+	/**
+	 * Find endpoints that are linked to a specific register
+	 *
+	 * @param int $registerId The ID of the register to find endpoints for
+	 *
+	 * @return array<Endpoint> Array of Endpoint entities linked to the register
+	 */
+	public function getByRegister(int $registerId): array
+	{
+		$qb = $this->db->getQueryBuilder();
 
-        $qb->select('*')
-            ->from('openconnector_endpoints')
-            ->where(
-                $qb->expr()->andX(
-                    $qb->expr()->eq('target_type', $qb->createNamedParameter('register/schema')),
-                    $qb->expr()->eq('target_id', $qb->createNamedParameter($registerId, IQueryBuilder::PARAM_INT))
-                )
-            );
+		$qb->select('*')
+			->from(self::TABLE_NAME)
+			->where(
+				$qb->expr()->andX(
+					$qb->expr()->eq('target_type', $qb->createNamedParameter('register/schema')),
+					$qb->expr()->eq('target_id', $qb->createNamedParameter($registerId, IQueryBuilder::PARAM_INT))
+				)
+			);
 
-        return $this->findEntities(query: $qb);
-    }
+		return $this->findEntities(query: $qb);
+	}
 }

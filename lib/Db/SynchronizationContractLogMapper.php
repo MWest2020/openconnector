@@ -19,16 +19,24 @@ use OCP\Session\Exceptions\SessionNotAvailableException;
 /**
  * Class SynchronizationContractLogMapper
  *
- * Mapper class for handling SynchronizationContractLog entities
+ * This class is responsible for mapping SynchronizationContractLog entities to the database.
+ * It provides methods for finding, creating, and updating SynchronizationContractLog objects.
+ *
+ * @package OCA\OpenConnector\Db
  */
 class SynchronizationContractLogMapper extends QBMapper
 {
+	/**
+	 * The name of the database table for synchronization contract logs
+	 */
+	private const TABLE_NAME = 'openconnector_synchronization_contract_logs';
+
 	public function __construct(
 		IDBConnection $db,
 		private readonly IUserSession $userSession,
 		private readonly ISession $session
 	) {
-		parent::__construct($db, 'openconnector_synchronization_contract_logs');
+		parent::__construct($db, self::TABLE_NAME);
 	}
 
 	public function find(int $id): SynchronizationContractLog
@@ -36,12 +44,12 @@ class SynchronizationContractLogMapper extends QBMapper
 		$qb = $this->db->getQueryBuilder();
 
 		$qb->select('*')
-			->from('openconnector_synchronization_contract_logs')
+			->from(self::TABLE_NAME)
 			->where(
 				$qb->expr()->eq('id', $qb->createNamedParameter($id, IQueryBuilder::PARAM_INT))
 			);
 
-		return $this->findEntity(query: $qb);
+		return $this->findEntity($qb);
 	}
 
 	public function findOnSynchronizationId(string $synchronizationId): ?SynchronizationContractLog
@@ -49,7 +57,7 @@ class SynchronizationContractLogMapper extends QBMapper
 		$qb = $this->db->getQueryBuilder();
 
 		$qb->select('*')
-			->from('openconnector_synchronization_contract_logs')
+			->from(self::TABLE_NAME)
 			->where(
 				$qb->expr()->eq('synchronization_id', $qb->createNamedParameter($synchronizationId))
 			);
@@ -61,16 +69,22 @@ class SynchronizationContractLogMapper extends QBMapper
 		}
 	}
 
-	public function findAll(?int $limit = null, ?int $offset = null, ?array $filters = [], ?array $searchConditions = [], ?array $searchParams = []): array
-	{
+	public function findAll(
+		?int $limit = null, 
+		?int $offset = null, 
+		?array $filters = [], 
+		?array $searchConditions = [], 
+		?array $searchParams = []
+	): array {
 		$qb = $this->db->getQueryBuilder();
 
 		$qb->select('*')
-			->from('openconnector_synchronization_contract_logs')
+			->from(self::TABLE_NAME)
+			->orderBy('created', 'DESC')
 			->setMaxResults($limit)
 			->setFirstResult($offset);
 
-        foreach ($filters as $filter => $value) {
+		foreach ($filters as $filter => $value) {
 			if ($value === 'IS NOT NULL') {
 				$qb->andWhere($qb->expr()->isNotNull($filter));
 			} elseif ($value === 'IS NULL') {
@@ -78,16 +92,16 @@ class SynchronizationContractLogMapper extends QBMapper
 			} else {
 				$qb->andWhere($qb->expr()->eq($filter, $qb->createNamedParameter($value)));
 			}
-        }
+		}
 
-        if (empty($searchConditions) === false) {
-            $qb->andWhere('(' . implode(' OR ', $searchConditions) . ')');
-            foreach ($searchParams as $param => $value) {
-                $qb->setParameter($param, $value);
-            }
-        }
+		if (empty($searchConditions) === false) {
+			$qb->andWhere('(' . implode(' OR ', $searchConditions) . ')');
+			foreach ($searchParams as $param => $value) {
+				$qb->setParameter($param, $value);
+			}
+		}
 
-		return $this->findEntities(query: $qb);
+		return $this->findEntities($qb);
 	}
 
 	public function createFromArray(array $object): SynchronizationContractLog
@@ -148,7 +162,7 @@ class SynchronizationContractLogMapper extends QBMapper
 				$qb->createFunction('DATE(created) as date'),
 				$qb->createFunction('COUNT(*) as executions')
 			)
-			->from('openconnector_synchronization_contract_logs')
+			->from(self::TABLE_NAME)
 			->where($qb->expr()->gte('created', $qb->createNamedParameter($from->format('Y-m-d H:i:s'))))
 			->andWhere($qb->expr()->lte('created', $qb->createNamedParameter($to->format('Y-m-d H:i:s'))))
 			->groupBy('date')
@@ -195,7 +209,7 @@ class SynchronizationContractLogMapper extends QBMapper
 				$qb->createFunction('HOUR(created) as hour'),
 				$qb->createFunction('COUNT(*) as executions')
 			)
-			->from('openconnector_synchronization_contract_logs')
+			->from(self::TABLE_NAME)
 			->where($qb->expr()->gte('created', $qb->createNamedParameter($from->format('Y-m-d H:i:s'))))
 			->andWhere($qb->expr()->lte('created', $qb->createNamedParameter($to->format('Y-m-d H:i:s'))))
 			->groupBy('hour')
@@ -209,5 +223,40 @@ class SynchronizationContractLogMapper extends QBMapper
 		}
 
 		return $stats;
+	}
+
+	/**
+	 * Get the total count of all synchronization contract logs.
+	 *
+	 * @return int The total number of synchronization contract logs in the database.
+	 */
+	public function getTotalCallCount(): int
+	{
+		$qb = $this->db->getQueryBuilder();
+
+		// Select count of all synchronization contract logs
+		$qb->select($qb->createFunction('COUNT(*) as count'))
+		   ->from(self::TABLE_NAME);
+
+		$result = $qb->execute();
+		$row = $result->fetch();
+
+		// Return the total count
+		return (int)$row['count'];
+	}
+
+	/**
+	 * Cleans up expired log entries
+	 *
+	 * @return int Number of deleted entries
+	 */
+	public function cleanupExpired(): int
+	{
+		$qb = $this->db->getQueryBuilder();
+
+		$qb->delete(self::TABLE_NAME)
+			->where($qb->expr()->lt('expires', $qb->createNamedParameter(new DateTime(), IQueryBuilder::PARAM_DATE)));
+
+		return $qb->executeStatement();
 	}
 }
