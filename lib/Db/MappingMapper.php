@@ -5,6 +5,9 @@ namespace OCA\OpenConnector\Db;
 use OCA\OpenConnector\Db\Mapping;
 use OCP\AppFramework\Db\Entity;
 use OCP\AppFramework\Db\QBMapper;
+use OCP\AppFramework\Db\DoesNotExistException;
+use OCP\AppFramework\Db\MultipleObjectsReturnedException;
+use OCP\DB\QueryBuilder\IQueryBuilder;
 use OCP\IDBConnection;
 use Symfony\Component\Uid\Uuid;
 
@@ -55,5 +58,25 @@ class MappingMapper extends QBMapper
 
     }//end createEntity()
 
+    /**
+     * Find a mapping by ID
+     *
+     * @param int $id The ID of the mapping to find
+     * @return Mapping The found mapping entity
+     * @throws DoesNotExistException If the mapping doesn't exist
+     * @throws MultipleObjectsReturnedException If multiple mappings match the criteria
+     */
+    public function find(int $id): Mapping
+    {
+        $qb = $this->db->getQueryBuilder();
+
+        $qb->select('*')
+            ->from($this->getTableName())
+            ->where(
+                $qb->expr()->eq('id', $qb->createNamedParameter($id, IQueryBuilder::PARAM_INT))
+            );
+
+        return $this->findEntity($qb);
+    }//end find()
 
 }//end class

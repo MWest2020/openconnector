@@ -213,10 +213,10 @@ class ConfigurationService
 
             // Collect mapping IDs from endpoint mappings
             if ($endpoint->getInputMapping() !== null) {
-                $mappingIds[] = $endpoint->getInputMapping();
+                $mappingIds[] = (int) $endpoint->getInputMapping();
             }
             if ($endpoint->getOutputMapping() !== null) {
-                $mappingIds[] = $endpoint->getOutputMapping();
+                $mappingIds[] = (int) $endpoint->getOutputMapping();
             }
         }
 
@@ -262,26 +262,27 @@ class ConfigurationService
 
             // Collect mapping IDs from synchronization mappings
             if ($synchronization->getSourceTargetMapping() !== null) {
-                $mappingIds[] = $synchronization->getSourceTargetMapping();
+                $mappingIds[] = (int) $synchronization->getSourceTargetMapping();
             }
             if ($synchronization->getTargetSourceMapping() !== null) {
-                $mappingIds[] = $synchronization->getTargetSourceMapping();
+                $mappingIds[] = (int) $synchronization->getTargetSourceMapping();
             }
         }
 
-        // Get all jobs that target this register
-        $jobs = $this->jobMapper->findAll(null, null, [
-            'targetType' => 'register/schema',
-            'targetId' => $registerId,
-        ]);
+        // @todo: fix this:
+        // // Get all jobs that target this register
+        // $jobs = $this->jobMapper->findAll(null, null, [
+        //     'targetType' => 'register/schema',
+        //     'targetId' => $registerId,
+        // ]);
 
-        foreach ($jobs as $job) {
-            // Store job in map by ID for reference
-            $this->jobsMap[$job->getId()] = $job;
+        // foreach ($jobs as $job) {
+        //     // Store job in map by ID for reference
+        //     $this->jobsMap[$job->getId()] = $job;
 
-            // Export the job
-            $openApiSpec['components']['jobs'][$job->getUuid()] = $this->exportJob($job);
-        }
+        //     // Export the job
+        //     $openApiSpec['components']['jobs'][$job->getUuid()] = $this->exportJob($job);
+        // }
 
         // Get and export all collected rules
         $ruleIds = array_unique($ruleIds);
@@ -300,7 +301,13 @@ class ConfigurationService
         $mappingIds = array_unique($mappingIds);
         foreach ($mappingIds as $mappingId) {
             try {
-                $mapping = $this->mappingMapper->find($mappingId);
+                // Skip if not a valid integer ID
+                if (is_numeric($mappingId) === false || empty($mappingId) === true) {
+                    $this->logger->warning('Invalid mapping ID: ' . $mappingId);
+                    continue;
+                }
+                
+                $mapping = $this->mappingMapper->find((int)$mappingId);
                 if ($mapping !== null) {
                     $openApiSpec['components']['mappings'][$mapping->getUuid()] = $this->exportMapping($mapping);
                 }

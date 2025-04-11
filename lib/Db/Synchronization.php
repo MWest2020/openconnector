@@ -85,7 +85,12 @@ class Synchronization extends Entity implements JsonSerializable
     // The date and time the synchronization was created
     protected ?DateTime $updated = null;
 
-    // The date and time the synchronization was updated    protected array $conditions = [];    protected array $followUps = [];    protected array $actions = [];
+    // The date and time the synchronization was updated
+    protected array $conditions = [];
+
+    protected array $followUps = [];
+
+    protected array $actions = [];
 
 
     /**
