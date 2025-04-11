@@ -442,15 +442,30 @@ import { Rule } from '../../entities/index.js'
 							input-label="Mapping ID" />
 					</template>
 
-					<!-- Filepart Upload Configuration -->
-					<template v-if="typeOptions.value?.id === 'filepart_upload'">
-						<NcSelect
-							v-bind="filepartUploadMappingOptions"
-							v-model="filepartUploadMappingOptions.value"
-							required
-							:loading="mappingOptions.loading"
-							input-label="Mapping ID*" />
-					</template>
+                    <!-- Filepart Upload Configuration -->
+                    <template v-if="typeOptions.value?.id === 'filepart_upload'">
+                        <NcSelect
+                            v-bind="filepartUploadMappingOptions"
+                            v-model="filepartUploadMappingOptions.value"
+                            required
+                            :loading="mappingOptions.loading"
+                            input-label="Mapping ID*" />
+                    </template>
+
+                    <!-- Save object Configuration -->
+                    <template v-if="typeOptions.value?.id === 'save_object'">
+                        <NcTextField
+							label="Register"
+							:value.sync="ruleItem.configuration.save_object.register"
+							placeholder="id of register" 
+                            required/>
+
+                        <NcTextField
+							label="Schema"
+							:value.sync="ruleItem.configuration.save_object.schema"
+							placeholder="id of schema" 
+                            required/>
+                    </template>
 				</template>
 			</form>
 
@@ -459,6 +474,7 @@ import { Rule } from '../../entities/index.js'
 					|| !ruleItem.name
 					|| !isValidJson(ruleItem.conditions)
 					|| typeOptions.value?.id === 'fetch_file' && (!ruleItem.configuration.fetch_file.filePath || !sourceOptions.sourceValue)
+					|| typeOptions.value?.id === 'save_object' && (!ruleItem.configuration.save_object.schema || !!ruleItem.configuration.save_object.register)
 					|| typeOptions.value?.id === 'write_file' && (!ruleItem.configuration.write_file.filePath || !ruleItem.configuration.write_file.fileNamePath)
 					|| typeOptions.value?.id === 'fileparts_create' && (!schemaOptions.value || !ruleItem.configuration.fileparts_create.sizeLocation)
 					|| typeOptions.value?.id === 'filepart_upload' && !filepartUploadMappingOptions.value"
@@ -643,6 +659,7 @@ export default {
 					{ label: 'Write File', id: 'write_file' },
 					{ label: 'Fileparts Create', id: 'fileparts_create' },
 					{ label: 'Filepart Upload', id: 'filepart_upload' },
+					{ label: 'Save object', id: 'save_object' },
 				],
 				value: { label: 'Error', id: 'error' },
 			},
