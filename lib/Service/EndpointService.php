@@ -1042,8 +1042,13 @@ class EndpointService
             $force = false;
         }
 
+        $object = null;
+        if (isset($data['body']) === true) {
+            $object = $data['body'];
+        }
+
         // Run synchronization.
-        $data['body'] = $this->synchronizationService->synchronize(synchronization: $synchronization, isTest: $test, force: $force);
+        $data['body'] = $this->synchronizationService->synchronize(synchronization: $synchronization, isTest: $test, force: $force, object: $object);
         return $data;
     }
 
