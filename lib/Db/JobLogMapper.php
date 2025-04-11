@@ -6,7 +6,8 @@ use DateInterval;
 use DatePeriod;
 use DateTime;
 use OCP\AppFramework\Db\MultipleObjectsReturnedException;
-use OCP\AppFramework\Db\QBMapper;
+use OCP\AppFramework\Db\BaseMapper;
+use OCP\AppFramework\Db\Entity;
 use OCP\DB\Exception;
 use OCP\DB\QueryBuilder\IQueryBuilder;
 use OCP\IDBConnection;
@@ -19,8 +20,9 @@ use Symfony\Component\Uid\Uuid;
  * It provides methods for finding, creating, and updating JobLog objects.
  *
  * @package OCA\OpenConnector\Db
+ * @extends BaseMapper<JobLog>
  */
-class JobLogMapper extends QBMapper
+class JobLogMapper extends BaseMapper
 {
     /**
      * The name of the database table for job logs
@@ -32,46 +34,24 @@ class JobLogMapper extends QBMapper
         parent::__construct($db, self::TABLE_NAME);
     }
 
-    public function find(int $id): JobLog
+    /**
+     * Get the name of the database table
+     *
+     * @return string The table name
+     */
+    protected function getTableName(): string
     {
-        $qb = $this->db->getQueryBuilder();
-
-        $qb->select('*')
-            ->from(self::TABLE_NAME)
-            ->where(
-                $qb->expr()->eq('id', $qb->createNamedParameter($id, IQueryBuilder::PARAM_INT))
-            );
-
-        return $this->findEntity($qb);
+        return self::TABLE_NAME;
     }
 
-    public function findAll(?int $limit = null, ?int $offset = null, ?array $filters = [], ?array $searchConditions = [], ?array $searchParams = []): array
+    /**
+     * Create a new JobLog entity instance
+     *
+     * @return JobLog A new JobLog instance
+     */
+    protected function createEntity(): Entity
     {
-        $qb = $this->db->getQueryBuilder();
-
-        $qb->select('*')
-            ->from(self::TABLE_NAME)
-            ->setMaxResults($limit)
-            ->setFirstResult($offset);
-
-        foreach ($filters as $filter => $value) {
-            if ($value === 'IS NOT NULL') {
-                $qb->andWhere($qb->expr()->isNotNull($filter));
-            } elseif ($value === 'IS NULL') {
-                $qb->andWhere($qb->expr()->isNull($filter));
-            } else {
-                $qb->andWhere($qb->expr()->eq($filter, $qb->createNamedParameter($value)));
-            }
-        }
-
-        if (empty($searchConditions) === false) {
-            $qb->andWhere('(' . implode(' OR ', $searchConditions) . ')');
-            foreach ($searchParams as $param => $value) {
-                $qb->setParameter($param, $value);
-            }
-        }
-
-        return $this->findEntities($qb);
+        return new JobLog();
     }
 
     public function createForJob(Job $job, array $object): JobLog
@@ -84,59 +64,13 @@ class JobLogMapper extends QBMapper
         }
         // Set job_id
         $obj->setJobId($job->getId());
-        return $this->insert(entity: $obj);
-    }
-
-    /**
-     * Get the total count of all job logs.
-     *
-     * @return int The total number of job logs in the database.
-     */
-    public function getTotalCallCount(): int
-    {
-        $qb = $this->db->getQueryBuilder();
-
-        // Select count of all job logs
-        $qb->select($qb->createFunction('COUNT(*) as count'))
-           ->from(self::TABLE_NAME);
-
-        $result = $qb->execute();
-        $row = $result->fetch();
-
-        // Return the total count
-        return (int)$row['count'];
-    }
-
-    public function createFromArray(array $object): JobLog
-    {
-		if (isset($object['executionTime']) === false) {
-			$object['executionTime'] = 0;
-		}
-
-        $obj = new JobLog();
-		$obj->hydrate($object);
-		// Set uuid
-		if ($obj->getUuid() === null) {
-			$obj->setUuid(Uuid::v4());
-		}
         return $this->insert($obj);
-    }
-
-    public function updateFromArray(int $id, array $object): JobLog
-    {
-        $obj = $this->find($id);
-		$obj->hydrate($object);
-		if ($obj->getUuid() === null) {
-			$obj->setUuid(Uuid::v4());
-		}
-
-        return $this->update($obj);
     }
 
 	/**
 	 * Get the last call log.
 	 *
-	 * @return CallLog|null The last call log or null if no logs exist.
+	 * @return JobLog|null The last call log or null if no logs exist.
 	 * @throws MultipleObjectsReturnedException
 	 * @throws Exception
 	 */
@@ -145,7 +79,7 @@ class JobLogMapper extends QBMapper
         $qb = $this->db->getQueryBuilder();
 
         $qb->select('*')
-           ->from(self::TABLE_NAME)
+           ->from($this->getTableName())
            ->orderBy('created', 'DESC')
            ->setMaxResults(1);
 
@@ -176,7 +110,7 @@ class JobLogMapper extends QBMapper
                 $qb->createFunction('SUM(CASE WHEN level = \'ERROR\' THEN 1 ELSE 0 END) as error'),
                 $qb->createFunction('SUM(CASE WHEN level = \'DEBUG\' THEN 1 ELSE 0 END) as debug')
             )
-            ->from(self::TABLE_NAME)
+            ->from($this->getTableName())
             ->where($qb->expr()->gte('created', $qb->createNamedParameter($from->format('Y-m-d H:i:s'))))
             ->andWhere($qb->expr()->lte('created', $qb->createNamedParameter($to->format('Y-m-d H:i:s'))))
             ->groupBy('date')
@@ -236,7 +170,7 @@ class JobLogMapper extends QBMapper
                 $qb->createFunction('SUM(CASE WHEN level = \'ERROR\' THEN 1 ELSE 0 END) as error'),
                 $qb->createFunction('SUM(CASE WHEN level = \'DEBUG\' THEN 1 ELSE 0 END) as debug')
             )
-            ->from(self::TABLE_NAME)
+            ->from($this->getTableName())
             ->where($qb->expr()->gte('created', $qb->createNamedParameter($from->format('Y-m-d H:i:s'))))
             ->andWhere($qb->expr()->lte('created', $qb->createNamedParameter($to->format('Y-m-d H:i:s'))))
             ->groupBy('hour')

@@ -4,7 +4,7 @@ namespace OCA\OpenConnector\Db;
 
 use OCA\OpenConnector\Db\Endpoint;
 use OCP\AppFramework\Db\Entity;
-use OCP\AppFramework\Db\QBMapper;
+use OCP\AppFramework\Db\BaseMapper;
 use OCP\DB\QueryBuilder\IQueryBuilder;
 use OCP\IDBConnection;
 use Symfony\Component\Uid\Uuid;
@@ -13,8 +13,9 @@ use Symfony\Component\Uid\Uuid;
  * Mapper class for handling Endpoint database operations
  *
  * @package OCA\OpenConnector\Db
+ * @extends BaseMapper<Endpoint>
  */
-class EndpointMapper extends QBMapper
+class EndpointMapper extends BaseMapper
 {
 	/**
 	 * The name of the database table for endpoints
@@ -26,59 +27,24 @@ class EndpointMapper extends QBMapper
 		parent::__construct($db, self::TABLE_NAME);
 	}
 
-	public function find(int $id): Endpoint
+	/**
+	 * Get the name of the database table
+	 *
+	 * @return string The table name
+	 */
+	protected function getTableName(): string
 	{
-		$qb = $this->db->getQueryBuilder();
-
-		$qb->select('*')
-			->from(self::TABLE_NAME)
-			->where(
-				$qb->expr()->eq('id', $qb->createNamedParameter($id, IQueryBuilder::PARAM_INT))
-			);
-
-		return $this->findEntity(query: $qb);
+		return self::TABLE_NAME;
 	}
 
-	public function findByRef(string $reference): array
+	/**
+	 * Create a new Endpoint entity instance
+	 *
+	 * @return Endpoint A new Endpoint instance
+	 */
+	protected function createEntity(): Entity
 	{
-		$qb = $this->db->getQueryBuilder();
-
-		$qb->select('*')
-			->from(self::TABLE_NAME)
-			->where(
-				$qb->expr()->eq('reference', $qb->createNamedParameter($reference))
-			);
-
-		return $this->findEntities(query: $qb);
-	}
-
-	public function findAll(?int $limit = null, ?int $offset = null, ?array $filters = [], ?array $searchConditions = [], ?array $searchParams = []): array
-	{
-		$qb = $this->db->getQueryBuilder();
-
-		$qb->select('*')
-			->from(self::TABLE_NAME)
-			->setMaxResults($limit)
-			->setFirstResult($offset);
-
-		foreach ($filters as $filter => $value) {
-			if ($value === 'IS NOT NULL') {
-				$qb->andWhere($qb->expr()->isNotNull($filter));
-			} elseif ($value === 'IS NULL') {
-				$qb->andWhere($qb->expr()->isNull($filter));
-			} else {
-				$qb->andWhere($qb->expr()->eq($filter, $qb->createNamedParameter($value)));
-			}
-		}
-
-		if (empty($searchConditions) === false) {
-			$qb->andWhere('(' . implode(' OR ', $searchConditions) . ')');
-			foreach ($searchParams as $param => $value) {
-				$qb->setParameter($param, $value);
-			}
-		}
-
-		return $this->findEntities(query: $qb);
+		return new Endpoint();
 	}
 
 	private function createEndpointRegex(string $endpoint): string {
@@ -153,26 +119,6 @@ class EndpointMapper extends QBMapper
 	}
 
 	/**
-	 * Get the total count of all call logs.
-	 *
-	 * @return int The total number of call logs in the database.
-	 */
-	public function getTotalCallCount(): int
-	{
-		$qb = $this->db->getQueryBuilder();
-
-		// Select count of all logs
-		$qb->select($qb->createFunction('COUNT(*) as count'))
-		   ->from(self::TABLE_NAME);
-
-		$result = $qb->execute();
-		$row = $result->fetch();
-
-		// Return the total count
-		return (int)$row['count'];
-	}
-
-	/**
 	 * Find endpoints that match a given path and method using regex comparison
 	 *
 	 * @param string $path The path to match against endpoint regex patterns
@@ -212,7 +158,7 @@ class EndpointMapper extends QBMapper
 		$qb = $this->db->getQueryBuilder();
 
 		$qb->select('*')
-			->from(self::TABLE_NAME)
+			->from($this->getTableName())
 			->where(
 				$qb->expr()->andX(
 					$qb->expr()->eq('target_type', $qb->createNamedParameter('register/schema')),
@@ -220,6 +166,6 @@ class EndpointMapper extends QBMapper
 				)
 			);
 
-		return $this->findEntities(query: $qb);
+		return $this->findEntities($qb);
 	}
 }

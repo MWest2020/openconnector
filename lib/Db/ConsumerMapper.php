@@ -4,8 +4,7 @@ namespace OCA\OpenConnector\Db;
 
 use OCA\OpenConnector\Db\Consumer;
 use OCP\AppFramework\Db\Entity;
-use OCP\AppFramework\Db\QBMapper;
-use OCP\DB\QueryBuilder\IQueryBuilder;
+use OCP\AppFramework\Db\BaseMapper;
 use OCP\IDBConnection;
 use Symfony\Component\Uid\Uuid;
 
@@ -16,8 +15,9 @@ use Symfony\Component\Uid\Uuid;
  * It provides methods for finding, creating, and updating Consumer objects.
  *
  * @package OCA\OpenConnector\Db
+ * @extends BaseMapper<Consumer>
  */
-class ConsumerMapper extends QBMapper
+class ConsumerMapper extends BaseMapper
 {
 	/**
 	 * The name of the database table for consumers
@@ -35,120 +35,22 @@ class ConsumerMapper extends QBMapper
 	}
 
 	/**
-	 * Find a Consumer by its ID.
+	 * Get the name of the database table
 	 *
-	 * @param int $id The ID of the Consumer
-	 * @return Consumer The found Consumer entity
+	 * @return string The table name
 	 */
-	public function find(int $id): Consumer
+	protected function getTableName(): string
 	{
-		$qb = $this->db->getQueryBuilder();
-
-		$qb->select('*')
-			->from(self::TABLE_NAME)
-			->where(
-				$qb->expr()->eq('id', $qb->createNamedParameter($id, IQueryBuilder::PARAM_INT))
-			);
-
-		return $this->findEntity(query: $qb);
+		return self::TABLE_NAME;
 	}
 
 	/**
-	 * Find all Consumers with optional filtering and pagination.
+	 * Create a new Consumer entity instance
 	 *
-	 * @param int|null $limit Maximum number of results to return
-	 * @param int|null $offset Number of results to skip
-	 * @param array|null $filters Associative array of filters
-	 * @param array|null $searchConditions Array of search conditions
-	 * @param array|null $searchParams Array of search parameters
-	 * @return array An array of Consumer entities
+	 * @return Consumer A new Consumer instance
 	 */
-	public function findAll(?int $limit = null, ?int $offset = null, ?array $filters = [], ?array $searchConditions = [], ?array $searchParams = []): array
+	protected function createEntity(): Entity
 	{
-		$qb = $this->db->getQueryBuilder();
-
-		$qb->select('*')
-			->from(self::TABLE_NAME)
-			->setMaxResults($limit)
-			->setFirstResult($offset);
-
-        foreach ($filters as $filter => $value) {
-			if ($value === 'IS NOT NULL') {
-				$qb->andWhere($qb->expr()->isNotNull($filter));
-			} elseif ($value === 'IS NULL') {
-				$qb->andWhere($qb->expr()->isNull($filter));
-			} else {
-				$qb->andWhere($qb->expr()->eq($filter, $qb->createNamedParameter($value)));
-			}
-        }
-
-		if (empty($searchConditions) === false) {
-            $qb->andWhere('(' . implode(' OR ', $searchConditions) . ')');
-            foreach ($searchParams as $param => $value) {
-                $qb->setParameter($param, $value);
-            }
-        }
-
-		return $this->findEntities(query: $qb);
+		return new Consumer();
 	}
-
-	/**
-	 * Create a new Consumer from an array of data.
-	 *
-	 * @param array $object An array of Consumer data
-	 * @return Consumer The newly created Consumer entity
-	 */
-	public function createFromArray(array $object): Consumer
-	{
-		$obj = new Consumer();
-		$obj->hydrate($object);
-		// Set uuid
-		if ($obj->getUuid() === null) {
-			$obj->setUuid(Uuid::v4());
-		}
-		return $this->insert(entity: $obj);
-	}
-
-	/**
-	 * Update an existing Consumer from an array of data.
-	 *
-	 * @param int $id The ID of the Consumer to update
-	 * @param array $object An array of updated Consumer data
-	 * @return Consumer The updated Consumer entity
-	 */
-	public function updateFromArray(int $id, array $object): Consumer
-	{
-		$obj = $this->find($id);
-		$obj->hydrate($object);
-
-		// @todo: does Consumer need a version? $version field does currently not exist.
-//		if (isset($object['version']) === false) {
-//			// Set or update the version
-//			$version = explode('.', $obj->getVersion());
-//			$version[2] = (int)$version[2] + 1;
-//			$obj->setVersion(implode('.', $version));
-//		}
-
-		return $this->update($obj);
-	}
-
-    /**
-     * Get the total count of all consumers.
-     *
-     * @return int The total number of consumers in the database.
-     */
-    public function getTotalCallCount(): int
-    {
-        $qb = $this->db->getQueryBuilder();
-
-        // Select count of all consumers
-        $qb->select($qb->createFunction('COUNT(*) as count'))
-           ->from(self::TABLE_NAME);
-
-        $result = $qb->execute();
-        $row = $result->fetch();
-
-        // Return the total count
-        return (int)$row['count'];
-    }
 }

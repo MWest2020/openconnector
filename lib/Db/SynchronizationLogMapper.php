@@ -4,7 +4,7 @@ namespace OCA\OpenConnector\Db;
 
 use DateTime;
 use OCP\AppFramework\Db\Entity;
-use OCP\AppFramework\Db\QBMapper;
+use OCP\AppFramework\Db\BaseMapper;
 use OCP\DB\QueryBuilder\IQueryBuilder;
 use OCP\IDBConnection;
 use OCP\ISession;
@@ -19,8 +19,9 @@ use OCP\Session\Exceptions\SessionNotAvailableException;
  * It provides methods for finding, creating, and updating SynchronizationLog objects.
  *
  * @package OCA\OpenConnector\Db
+ * @extends BaseMapper<SynchronizationLog>
  */
-class SynchronizationLogMapper extends QBMapper
+class SynchronizationLogMapper extends BaseMapper
 {
 	/**
 	 * The name of the database table for synchronization logs
@@ -36,68 +37,25 @@ class SynchronizationLogMapper extends QBMapper
 	}
 
 	/**
-	 * Find a synchronization log by its ID
+	 * Get the name of the database table
 	 *
-	 * @param int $id The ID of the synchronization log to find
-	 * @return SynchronizationLog The found synchronization log
+	 * @return string The table name
 	 */
-	public function find(int $id): SynchronizationLog
+	protected function getTableName(): string
 	{
-		$qb = $this->db->getQueryBuilder();
-
-		$qb->select('*')
-			->from(self::TABLE_NAME)
-			->where(
-				$qb->expr()->eq('id', $qb->createNamedParameter($id, IQueryBuilder::PARAM_INT))
-			);
-
-		return $this->findEntity($qb);
+		return self::TABLE_NAME;
 	}
 
 	/**
-	 * Find all synchronization logs with optional filtering and pagination
+	 * Create a new SynchronizationLog entity instance
 	 *
-	 * @param int|null $limit Maximum number of logs to return
-	 * @param int|null $offset Number of logs to skip
-	 * @param array $filters Additional filters to apply
-	 * @param array $searchConditions Search conditions for the query
-	 * @param array $searchParams Parameters for the search conditions
-	 * @return array Array of SynchronizationLog objects
+	 * @return SynchronizationLog A new SynchronizationLog instance
 	 */
-	public function findAll(
-		?int $limit = null, 
-		?int $offset = null, 
-		?array $filters = [], 
-		?array $searchConditions = [], 
-		?array $searchParams = []
-	): array {
-		$qb = $this->db->getQueryBuilder();
-
-		$qb->select('*')
-			->from(self::TABLE_NAME)
-			->orderBy('created', 'DESC')
-			->setMaxResults($limit)
-			->setFirstResult($offset);
-
-		foreach ($filters as $filter => $value) {
-			if ($value === 'IS NOT NULL') {
-				$qb->andWhere($qb->expr()->isNotNull($filter));
-			} elseif ($value === 'IS NULL') {
-				$qb->andWhere($qb->expr()->isNull($filter));
-			} else {
-				$qb->andWhere($qb->expr()->eq($filter, $qb->createNamedParameter($value)));
-			}
-		}
-
-		if (empty($searchConditions) === false) {
-			$qb->andWhere('(' . implode(' OR ', $searchConditions) . ')');
-			foreach ($searchParams as $param => $value) {
-				$qb->setParameter($param, $value);
-			}
-		}
-
-		return $this->findEntities($qb);
+	protected function createEntity(): Entity
+	{
+		return new SynchronizationLog();
 	}
+
 
 	/**
 	 * Process contracts array to ensure it only contains valid UUIDs
@@ -187,23 +145,6 @@ class SynchronizationLogMapper extends QBMapper
 		return $this->update($obj);
 	}
 
-	/**
-	 * Get the total count of all synchronization logs
-	 *
-	 * @return int The total number of synchronization logs in the database
-	 */
-	public function getTotalCallCount(): int
-	{
-		$qb = $this->db->getQueryBuilder();
-
-		$qb->select($qb->createFunction('COUNT(*) as count'))
-			->from(self::TABLE_NAME);
-
-		$result = $qb->execute();
-		$row = $result->fetch();
-
-		return (int)$row['count'];
-	}
 
 	/**
 	 * Clean up expired synchronization logs
@@ -214,7 +155,7 @@ class SynchronizationLogMapper extends QBMapper
 	{
 		$qb = $this->db->getQueryBuilder();
 
-		$qb->delete(self::TABLE_NAME)
+		$qb->delete($this->getTableName())
 			->where($qb->expr()->lt('expires', $qb->createNamedParameter(new DateTime(), IQueryBuilder::PARAM_DATE)));
 
 		return $qb->executeStatement();

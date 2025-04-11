@@ -11,6 +11,8 @@ use OCP\DB\Exception;
 use OCP\DB\QueryBuilder\IQueryBuilder;
 use OCP\IDBConnection;
 use Symfony\Component\Uid\Uuid;
+use OCP\AppFramework\Db\Entity;
+use OCP\AppFramework\Db\BaseMapper;
 
 /**
  * Class CallLogMapper
@@ -20,7 +22,7 @@ use Symfony\Component\Uid\Uuid;
  *
  * @package OCA\OpenConnector\Db
  */
-class CallLogMapper extends QBMapper
+class CallLogMapper extends BaseMapper
 {
     /**
      * The name of the database table for call logs
@@ -32,93 +34,156 @@ class CallLogMapper extends QBMapper
         parent::__construct($db, self::TABLE_NAME);
     }
 
-    public function find(int $id): CallLog
+    /**
+     * Get the name of the database table
+     *
+     * @return string The table name
+     */
+    protected function getTableName(): string
     {
-        $qb = $this->db->getQueryBuilder();
-
-        $qb->select('*')
-            ->from(self::TABLE_NAME)
-            ->where(
-                $qb->expr()->eq('id', $qb->createNamedParameter($id, IQueryBuilder::PARAM_INT))
-            );
-
-        return $this->findEntity($qb);
-    }
-
-    public function findAll(?int $limit = null, ?int $offset = null, ?array $filters = [], ?array $searchConditions = [], ?array $searchParams = []): array
-    {
-        $qb = $this->db->getQueryBuilder();
-
-        $qb->select('*')
-            ->from(self::TABLE_NAME)
-            ->setMaxResults($limit)
-            ->setFirstResult($offset);
-
-        foreach ($filters as $filter => $value) {
-            if ($value === 'IS NOT NULL') {
-                $qb->andWhere($qb->expr()->isNotNull($filter));
-            } elseif ($value === 'IS NULL') {
-                $qb->andWhere($qb->expr()->isNull($filter));
-            } else {
-                $qb->andWhere($qb->expr()->eq($filter, $qb->createNamedParameter($value)));
-            }
-        }
-
-        if (empty($searchConditions) === false) {
-            $qb->andWhere('(' . implode(' OR ', $searchConditions) . ')');
-            foreach ($searchParams as $param => $value) {
-                $qb->setParameter($param, $value);
-            }
-        }
-
-        return $this->findEntities($qb);
-    }
-
-    public function createFromArray(array $object): CallLog
-    {
-        $obj = new CallLog();
-        $obj->hydrate($object);
-        // Set uuid
-        if ($obj->getUuid() === null) {
-            $obj->setUuid(Uuid::v4());
-        }
-        return $this->insert($obj);
-    }
-
-    public function updateFromArray(int $id, array $object): CallLog
-    {
-        $obj = $this->find($id);
-        $obj->hydrate($object);
-        // Set uuid
-        if ($obj->getUuid() === null) {
-            $obj->setUuid(Uuid::v4());
-        }
-
-        return $this->update($obj);
+        return self::TABLE_NAME;
     }
 
     /**
-     * Clear expired logs from the database.
+     * Create a new CallLog entity instance
      *
-     * This method deletes all call logs that have expired (i.e., their 'expired' date is earlier than the current date and time).
-     *
-     * @return bool True if any logs were deleted, false otherwise.
-     * @throws Exception
+     * @return CallLog A new CallLog instance
      */
-    public function clearLogs(): bool
+    protected function createEntity(): Entity
     {
-        // Get the query builder
+        return new CallLog();
+    }
+
+    /**
+     * Get call statistics grouped by date for a specific date range
+     *
+     * @param DateTime $from Start date
+     * @param DateTime $to End date
+     * @return array Array of daily statistics with counts per log level
+     */
+    public function getCallStatsByDateRange(DateTime $from, DateTime $to): array
+    {
         $qb = $this->db->getQueryBuilder();
 
-        // Build the delete query
-        $qb->delete(self::TABLE_NAME)
-           ->where($qb->expr()->lt('expires', $qb->createFunction('NOW()')));
+        $qb->select(
+                $qb->createFunction('DATE(created) as date'),
+                $qb->createFunction('SUM(CASE WHEN level = \'INFO\' THEN 1 ELSE 0 END) as info'),
+                $qb->createFunction('SUM(CASE WHEN level = \'WARNING\' THEN 1 ELSE 0 END) as warning'),
+                $qb->createFunction('SUM(CASE WHEN level = \'ERROR\' THEN 1 ELSE 0 END) as error'),
+                $qb->createFunction('SUM(CASE WHEN level = \'DEBUG\' THEN 1 ELSE 0 END) as debug')
+            )
+            ->from(self::TABLE_NAME)
+            ->where($qb->expr()->gte('created', $qb->createNamedParameter($from->format('Y-m-d H:i:s'))))
+            ->andWhere($qb->expr()->lte('created', $qb->createNamedParameter($to->format('Y-m-d H:i:s'))))
+            ->groupBy('date')
+            ->orderBy('date', 'ASC');
 
-        // Execute the query and get the number of affected rows
         $result = $qb->execute();
+        $stats = [];
 
-        // Return true if any rows were affected (i.e., any logs were deleted)
-        return $result > 0;
+        // Create DatePeriod to iterate through all dates
+        $period = new DatePeriod(
+            $from,
+            new DateInterval('P1D'),
+            $to->modify('+1 day')
+        );
+
+        // Initialize all dates with zero values
+        foreach ($period as $date) {
+            $dateStr = $date->format('Y-m-d');
+            $stats[$dateStr] = [
+                'info' => 0,
+                'warning' => 0,
+                'error' => 0,
+                'debug' => 0
+            ];
+        }
+
+        // Fill in actual values where they exist
+        while ($row = $result->fetch()) {
+            $stats[$row['date']] = [
+                'info' => (int)$row['info'],
+                'warning' => (int)$row['warning'],
+                'error' => (int)$row['error'],
+                'debug' => (int)$row['debug']
+            ];
+        }
+
+        return $stats;
+    }
+
+    /**
+     * Get call statistics grouped by hour for a specific date range
+     *
+     * @param DateTime $from Start date
+     * @param DateTime $to End date
+     * @return array Array of hourly statistics with counts per log level
+     */
+    public function getCallStatsByHourRange(DateTime $from, DateTime $to): array
+    {
+        $qb = $this->db->getQueryBuilder();
+
+        $qb->select(
+                $qb->createFunction('HOUR(created) as hour'),
+                $qb->createFunction('SUM(CASE WHEN level = \'INFO\' THEN 1 ELSE 0 END) as info'),
+                $qb->createFunction('SUM(CASE WHEN level = \'WARNING\' THEN 1 ELSE 0 END) as warning'),
+                $qb->createFunction('SUM(CASE WHEN level = \'ERROR\' THEN 1 ELSE 0 END) as error'),
+                $qb->createFunction('SUM(CASE WHEN level = \'DEBUG\' THEN 1 ELSE 0 END) as debug')
+            )
+            ->from(self::TABLE_NAME)
+            ->where($qb->expr()->gte('created', $qb->createNamedParameter($from->format('Y-m-d H:i:s'))))
+            ->andWhere($qb->expr()->lte('created', $qb->createNamedParameter($to->format('Y-m-d H:i:s'))))
+            ->groupBy('hour')
+            ->orderBy('hour', 'ASC');
+
+        $result = $qb->execute();
+        $stats = [];
+
+        while ($row = $result->fetch()) {
+            $stats[$row['hour']] = [
+                'info' => (int)$row['info'],
+                'warning' => (int)$row['warning'],
+                'error' => (int)$row['error'],
+                'debug' => (int)$row['debug']
+            ];
+        }
+
+        return $stats;
+    }
+
+    /**
+     * Get the last call log
+     *
+     * @return CallLog|null The last call log or null if no logs exist
+     */
+    public function getLastCallLog(): ?CallLog
+    {
+        $qb = $this->db->getQueryBuilder();
+
+        $qb->select('*')
+           ->from(self::TABLE_NAME)
+           ->orderBy('created', 'DESC')
+           ->setMaxResults(1);
+
+        try {
+            return $this->findEntity($qb);
+        } catch (\OCP\AppFramework\Db\DoesNotExistException $e) {
+            return null;
+        }
+    }
+
+    /**
+     * Clear all call logs
+     *
+     * @return int Number of deleted entries
+     */
+    public function clearLogs(): int
+    {
+        $qb = $this->db->getQueryBuilder();
+
+        $qb->delete(self::TABLE_NAME);
+
+        return $qb->executeStatement();
     }
 
     /**
@@ -173,141 +238,5 @@ class CallLogMapper extends QBMapper
         }
 
         return $counts;
-    }
-
-    /**
-     * Get the total count of all call logs.
-     *
-     * @return int The total number of call logs in the database.
-     * @throws Exception
-     */
-    public function getTotalCallCount(): int
-    {
-        $qb = $this->db->getQueryBuilder();
-
-        // Select count of all logs
-        $qb->select($qb->createFunction('COUNT(*) as count'))
-           ->from(self::TABLE_NAME);
-
-        $result = $qb->execute();
-        $row = $result->fetch();
-
-        // Return the total count
-        return (int)$row['count'];
-    }
-
-    /**
-     * Get the last call log.
-     *
-     * @return CallLog|null The last call log or null if no logs exist.
-     * @throws Exception
-     * @throws MultipleObjectsReturnedException
-     */
-    public function getLastCallLog(): ?CallLog
-    {
-        $qb = $this->db->getQueryBuilder();
-
-        $qb->select('*')
-           ->from(self::TABLE_NAME)
-           ->orderBy('created', 'DESC')
-           ->setMaxResults(1);
-
-        try {
-            return $this->findEntity($qb);
-        } catch (\OCP\AppFramework\Db\DoesNotExistException $e) {
-            return null;
-        }
-    }
-
-    /**
-     * Get call statistics grouped by date for a specific date range
-     *
-     * @param DateTime $from Start date
-     * @param DateTime $to End date
-     *
-     * @return array Array of daily statistics with success and error counts
-     * @throws Exception
-     */
-    public function getCallStatsByDateRange(DateTime $from, DateTime $to): array
-    {
-        $qb = $this->db->getQueryBuilder();
-
-        // Get the actual data from database
-        $qb->select(
-                $qb->createFunction('DATE(created) as date'),
-                $qb->createFunction('SUM(CASE WHEN status_code >= 200 AND status_code < 300 THEN 1 ELSE 0 END) as success'),
-                $qb->createFunction('SUM(CASE WHEN status_code < 200 OR status_code >= 300 THEN 1 ELSE 0 END) as error')
-            )
-            ->from(self::TABLE_NAME)
-            ->where($qb->expr()->gte('created', $qb->createNamedParameter($from->format('Y-m-d H:i:s'))))
-            ->andWhere($qb->expr()->lte('created', $qb->createNamedParameter($to->format('Y-m-d H:i:s'))))
-            ->groupBy('date')
-            ->orderBy('date', 'ASC');
-
-        $result = $qb->execute();
-        $stats = [];
-
-        // Create DatePeriod to iterate through all dates
-        $period = new DatePeriod(
-            $from,
-            new DateInterval('P1D'),
-            $to->modify('+1 day')
-        );
-
-        // Initialize all dates with zero values
-        foreach ($period as $date) {
-            $dateStr = $date->format('Y-m-d');
-            $stats[$dateStr] = [
-                'success' => 0,
-                'error' => 0
-            ];
-        }
-
-        // Fill in actual values where they exist
-        while ($row = $result->fetch()) {
-            $stats[$row['date']] = [
-                'success' => (int)$row['success'],
-                'error' => (int)$row['error']
-            ];
-        }
-
-        return $stats;
-    }
-
-    /**
-     * Get call statistics grouped by hour for a specific date range
-     *
-     * @param DateTime $from Start date
-     * @param DateTime $to End date
-     *
-     * @return array Array of hourly statistics with success and error counts
-     * @throws Exception
-     */
-    public function getCallStatsByHourRange(DateTime $from, DateTime $to): array
-    {
-        $qb = $this->db->getQueryBuilder();
-
-        $qb->select(
-                $qb->createFunction('HOUR(created) as hour'),
-                $qb->createFunction('SUM(CASE WHEN status_code >= 200 AND status_code < 300 THEN 1 ELSE 0 END) as success'),
-                $qb->createFunction('SUM(CASE WHEN status_code < 200 OR status_code >= 300 THEN 1 ELSE 0 END) as error')
-            )
-            ->from(self::TABLE_NAME)
-            ->where($qb->expr()->gte('created', $qb->createNamedParameter($from->format('Y-m-d H:i:s'))))
-            ->andWhere($qb->expr()->lte('created', $qb->createNamedParameter($to->format('Y-m-d H:i:s'))))
-            ->groupBy('hour')
-            ->orderBy('hour', 'ASC');
-
-        $result = $qb->execute();
-        $stats = [];
-
-        while ($row = $result->fetch()) {
-            $stats[$row['hour']] = [
-                'success' => (int)$row['success'],
-                'error' => (int)$row['error']
-            ];
-        }
-
-        return $stats;
     }
 }

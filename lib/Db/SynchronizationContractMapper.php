@@ -5,7 +5,7 @@ namespace OCA\OpenConnector\Db;
 use OCA\OpenConnector\Db\SynchronizationContract;
 use OCP\AppFramework\Db\Entity;
 use OCP\AppFramework\Db\MultipleObjectsReturnedException;
-use OCP\AppFramework\Db\QBMapper;
+use OCP\AppFramework\Db\BaseMapper;
 use OCP\DB\Exception;
 use OCP\DB\QueryBuilder\IQueryBuilder;
 use OCP\IDBConnection;
@@ -17,12 +17,12 @@ use Symfony\Component\Uid\Uuid;
  * CRUD operations and specialized queries.
  *
  * @package OCA\OpenConnector\Db
- * @extends QBMapper<SynchronizationContract>
+ * @extends BaseMapper<SynchronizationContract>
  *
  * @psalm-suppress PropertyNotSetInConstructor
- * @phpstan-extends QBMapper<SynchronizationContract>
+ * @phpstan-extends BaseMapper<SynchronizationContract>
  */
-class SynchronizationContractMapper extends QBMapper
+class SynchronizationContractMapper extends BaseMapper
 {
     /**
      * The name of the database table for synchronization contracts
@@ -40,25 +40,23 @@ class SynchronizationContractMapper extends QBMapper
     }
 
     /**
-     * Find a synchronization contract by ID
+     * Get the name of the database table
      *
-     * @param int $id The ID of the contract to find
-     * @return SynchronizationContract The found contract entity
-     * @throws \OCP\AppFramework\Db\DoesNotExistException If contract not found
+     * @return string The table name
      */
-    public function find(int $id): SynchronizationContract
+    protected function getTableName(): string
     {
-        // Create query builder
-        $qb = $this->db->getQueryBuilder();
+        return self::TABLE_NAME;
+    }
 
-        // Build select query with ID filter
-        $qb->select('*')
-            ->from(self::TABLE_NAME)
-            ->where(
-                $qb->expr()->eq('id', $qb->createNamedParameter($id, IQueryBuilder::PARAM_INT))
-            );
-
-        return $this->findEntity(query: $qb);
+    /**
+     * Create a new SynchronizationContract entity instance
+     *
+     * @return SynchronizationContract A new SynchronizationContract instance
+     */
+    protected function createEntity(): Entity
+    {
+        return new SynchronizationContract();
     }
 
 	/**
@@ -185,48 +183,7 @@ class SynchronizationContractMapper extends QBMapper
             return [];
         }
     }
-    /**
-     * Find all synchronization contracts with optional filtering and pagination
-     *
-     * @param int|null $limit Maximum number of results to return
-     * @param int|null $offset Number of results to skip
-     * @param array|null $filters Associative array of field => value filters
-     * @param array|null $searchConditions Array of search conditions
-     * @param array|null $searchParams Array of search parameters
-     * @return array<SynchronizationContract> Array of found contracts
-     */
-    public function findAll(?int $limit = null, ?int $offset = null, ?array $filters = [], ?array $searchConditions = [], ?array $searchParams = []): array
-    {
-        // Create query builder
-        $qb = $this->db->getQueryBuilder();
-
-        // Build base select query with pagination
-        $qb->select('*')
-            ->from(self::TABLE_NAME)
-            ->setMaxResults($limit)
-            ->setFirstResult($offset);
-
-        // Add filters if provided
-        foreach ($filters as $filter => $value) {
-            if ($value === 'IS NOT NULL') {
-                $qb->andWhere($qb->expr()->isNotNull($filter));
-            } elseif ($value === 'IS NULL') {
-                $qb->andWhere($qb->expr()->isNull($filter));
-            } else {
-                $qb->andWhere($qb->expr()->eq($filter, $qb->createNamedParameter($value)));
-            }
-        }
-
-        // Add search conditions if provided
-		if (empty($searchConditions) === false) {
-            $qb->andWhere('(' . implode(' OR ', $searchConditions) . ')');
-            foreach ($searchParams as $param => $value) {
-                $qb->setParameter($param, $value);
-            }
-        }
-
-        return $this->findEntities(query: $qb);
-    }
+    
 
     /**
      * Create a new synchronization contract from array data
@@ -253,34 +210,7 @@ class SynchronizationContractMapper extends QBMapper
         return $this->insert(entity: $obj);
     }
 
-    /**
-     * Update an existing synchronization contract from array data
-     *
-     * @param int $id ID of contract to update
-     * @param array $object Array of updated contract data
-     * @return SynchronizationContract The updated contract entity
-     */
-    public function updateFromArray(int $id, array $object): SynchronizationContract
-    {
-        // Find and hydrate existing contract
-        $obj = $this->find($id);
-
-		// Set version
-		if (empty($obj->getVersion()) === true) {
-			$object['version'] = '0.0.1';
-		} else if (empty($object['version']) === true) {
-			// Update version
-			$version = explode('.', $obj->getVersion());
-			if (isset($version[2]) === true) {
-				$version[2] = (int) $version[2] + 1;
-				$object['version'] = implode('.', $version);
-			}
-		}
-
-		$obj->hydrate($object);
-
-        return $this->update($obj);
-    }
+ 
 
     /**
      * Find a synchronization contract by origin ID.
@@ -365,26 +295,6 @@ class SynchronizationContractMapper extends QBMapper
             );
 
         return $this->findEntities($qb);
-    }
-
-    /**
-     * Get total count of synchronization contracts
-     *
-     * @return int Total number of contracts
-     */
-    public function getTotalCallCount(): int
-    {
-        // Create query builder
-        $qb = $this->db->getQueryBuilder();
-
-        // Build count query
-        $qb->select($qb->createFunction('COUNT(*) as count'))
-           ->from(self::TABLE_NAME);
-
-        $result = $qb->execute();
-        $row = $result->fetch();
-
-        return (int)$row['count'];
     }
 
     /**

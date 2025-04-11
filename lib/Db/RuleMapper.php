@@ -3,7 +3,7 @@
 namespace OCA\OpenConnector\Db;
 
 use OCP\AppFramework\Db\Entity;
-use OCP\AppFramework\Db\QBMapper;
+use OCP\AppFramework\Db\BaseMapper;
 use OCP\DB\QueryBuilder\IQueryBuilder;
 use OCP\IDBConnection;
 use Symfony\Component\Uid\Uuid;
@@ -14,8 +14,9 @@ use Symfony\Component\Uid\Uuid;
  * Handles database operations for rules
  *
  * @package OCA\OpenConnector\Db
+ * @extends BaseMapper<Rule>
  */
-class RuleMapper extends QBMapper
+class RuleMapper extends BaseMapper
 {
 	/**
 	 * The name of the database table for rules
@@ -31,80 +32,23 @@ class RuleMapper extends QBMapper
 	}
 
 	/**
-	 * Find a rule by ID
+	 * Get the name of the database table
 	 *
-	 * @param int $id
-	 * @return Rule
+	 * @return string The table name
 	 */
-	public function find(int $id): Rule
+	protected function getTableName(): string
 	{
-		$qb = $this->db->getQueryBuilder();
-
-		$qb->select('*')
-			->from(self::TABLE_NAME)
-			->where(
-				$qb->expr()->eq('id', $qb->createNamedParameter($id, IQueryBuilder::PARAM_INT))
-			);
-
-		return $this->findEntity($qb);
+		return self::TABLE_NAME;
 	}
 
 	/**
-	 * Find a rule by reference
+	 * Create a new Rule entity instance
 	 *
-	 * @param int $id
-	 * @return Rule
+	 * @return Rule A new Rule instance
 	 */
-	public function findByRef(string $reference): array
+	protected function createEntity(): Entity
 	{
-		$qb = $this->db->getQueryBuilder();
-
-		$qb->select('*')
-			->from(self::TABLE_NAME)
-			->where(
-				$qb->expr()->eq('reference', $qb->createNamedParameter($reference))
-			);
-
-		return $this->findEntities(query: $qb);
-	}
-
-	/**
-	 * Find all rules with optional filtering
-	 *
-	 * @param int|null $limit
-	 * @param int|null $offset
-	 * @param array<string,mixed> $filters
-	 * @param array<string> $searchConditions
-	 * @param array<string,mixed> $searchParams
-	 * @return array<Rule>
-	 */
-	public function findAll(?int $limit = null, ?int $offset = null, ?array $filters = [], ?array $searchConditions = [], ?array $searchParams = []): array
-	{
-		$qb = $this->db->getQueryBuilder();
-
-		$qb->select('*')
-			->from(self::TABLE_NAME)
-			->setMaxResults($limit)
-			->setFirstResult($offset);
-
-		foreach ($filters as $filter => $value) {
-			if ($value === 'IS NOT NULL') {
-				$qb->andWhere($qb->expr()->isNotNull($filter));
-			} elseif ($value === 'IS NULL') {
-				$qb->andWhere($qb->expr()->isNull($filter));
-			} else {
-				$qb->andWhere($qb->expr()->eq($filter, $qb->createNamedParameter($value)));
-			}
-		}
-
-		if (empty($searchConditions) === false) {
-			$qb->andWhere('(' . implode(' OR ', $searchConditions) . ')');
-			foreach ($searchParams as $param => $value) {
-				$qb->setParameter($param, $value);
-			}
-		}
-
-		return $this->findEntities(query: $qb);
+		return new Rule();
 	}
 
 	/**
@@ -115,55 +59,18 @@ class RuleMapper extends QBMapper
 	 */
 	public function createFromArray(array $object): Rule
 	{
-		$obj = new Rule();
-		$obj->hydrate($object);
-
-		// Set uuid
-		if ($obj->getUuid() === null) {
-			$obj->setUuid(Uuid::v4());
-		}
-
-		// Set version
-		if (empty($obj->getVersion()) === true) {
-			$obj->setVersion('0.0.1');
-		}
+		// Create and hydrate new rule object
+		$obj = parent::createFromArray($object);
 
 		// Rule-specific logic
 		// If no order is specified, append to the end
 		if ($obj->getOrder() === null) {
 			$maxOrder = $this->getMaxOrder();
 			$obj->setOrder($maxOrder + 1);
+			$this->update($obj);
 		}
 
-		return $this->insert(entity: $obj);
-	}
-
-	/**
-	 * Update a rule from array data
-	 *
-	 * @param int $id
-	 * @param array<string,mixed> $object
-	 * @return Rule
-	 */
-	public function updateFromArray(int $id, array $object): Rule
-	{
-		$obj = $this->find($id);
-
-		// Set version
-		if (empty($obj->getVersion()) === true) {
-			$object['version'] = '0.0.1';
-		} else if (empty($object['version']) === true) {
-			// Update version
-			$version = explode('.', $obj->getVersion());
-			if (isset($version[2]) === true) {
-				$version[2] = (int) $version[2] + 1;
-				$object['version'] = implode('.', $version);
-			}
-		}
-
-		$obj->hydrate($object);
-
-		return $this->update($obj);
+		return $obj;
 	}
 
 	/**
@@ -175,31 +82,13 @@ class RuleMapper extends QBMapper
 	{
 		$qb = $this->db->getQueryBuilder();
 		$qb->select($qb->createFunction('COALESCE(MAX(`order`), 0) as max_order'))
-		   ->from(self::TABLE_NAME);
+		   ->from($this->getTableName());
 
 		$result = $qb->execute();
 		$row = $result->fetch();
 		$result->closeCursor();
 
 		return (int)($row['max_order']);
-	}
-
-	/**
-	 * Get the total count of all rules
-	 *
-	 * @return int The total number of rules in the database
-	 */
-	public function getTotalCount(): int
-	{
-		$qb = $this->db->getQueryBuilder();
-
-		$qb->select($qb->createFunction('COUNT(*) as count'))
-		   ->from(self::TABLE_NAME);
-
-		$result = $qb->execute();
-		$row = $result->fetch();
-
-		return (int)$row['count'];
 	}
 
 	/**
@@ -212,7 +101,7 @@ class RuleMapper extends QBMapper
 	{
 		foreach ($orderMap as $ruleId => $newOrder) {
 			$qb = $this->db->getQueryBuilder();
-			$qb->update(self::TABLE_NAME)
+			$qb->update($this->getTableName())
 			   ->set('order', $qb->createNamedParameter($newOrder, IQueryBuilder::PARAM_INT))
 			   ->where($qb->expr()->eq('id', $qb->createNamedParameter($ruleId, IQueryBuilder::PARAM_INT)))
 			   ->execute();

@@ -124,26 +124,6 @@ class SynchronizationMapper extends QBMapper
 	}
 
 	/**
-	 * Get the total count of all synchronizations.
-	 *
-	 * @return int The total number of synchronizations in the database.
-	 */
-	public function getTotalCallCount(): int
-	{
-		$qb = $this->db->getQueryBuilder();
-
-		// Select count of all synchronizations
-		$qb->select($qb->createFunction('COUNT(*) as count'))
-			->from(self::TABLE_NAME);
-
-		$result = $qb->execute();
-		$row = $result->fetch();
-
-		// Return the total count
-		return (int)$row['count'];
-	}
-
-	/**
 	 * Find synchronizations that are linked to a specific register
 	 *
 	 * @param int $registerId The ID of the register to find synchronizations for

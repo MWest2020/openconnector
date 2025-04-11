@@ -3,7 +3,8 @@
 namespace OCA\OpenConnector\Db;
 
 use DateTime;
-use OCP\AppFramework\Db\QBMapper;
+use OCP\AppFramework\Db\BaseMapper;
+use OCP\AppFramework\Db\Entity;
 use OCP\DB\QueryBuilder\IQueryBuilder;
 use OCP\IDBConnection;
 use Symfony\Component\Uid\Uuid;
@@ -14,8 +15,9 @@ use Symfony\Component\Uid\Uuid;
  * Handles database operations for event messages
  *
  * @package OCA\OpenConnector\Db
+ * @extends BaseMapper<EventMessage>
  */
-class EventMessageMapper extends QBMapper
+class EventMessageMapper extends BaseMapper
 {
     /**
      * The name of the database table for event messages
@@ -33,52 +35,23 @@ class EventMessageMapper extends QBMapper
     }
 
     /**
-     * Find a message by ID
+     * Get the name of the database table
      *
-     * @param int $id The message ID
-     * @return EventMessage
+     * @return string The table name
      */
-    public function find(int $id): EventMessage
+    protected function getTableName(): string
     {
-        $qb = $this->db->getQueryBuilder();
-
-        $qb->select('*')
-            ->from(self::TABLE_NAME)
-            ->where(
-                $qb->expr()->eq('id', $qb->createNamedParameter($id, IQueryBuilder::PARAM_INT))
-            );
-
-        return $this->findEntity($qb);
+        return self::TABLE_NAME;
     }
 
     /**
-     * Find all messages matching the given criteria
+     * Create a new EventMessage entity instance
      *
-     * @param int|null $limit Maximum number of results
-     * @param int|null $offset Number of records to skip
-     * @param array|null $filters Key-value pairs for filtering
-     * @return EventMessage[]
+     * @return EventMessage A new EventMessage instance
      */
-    public function findAll(?int $limit = null, ?int $offset = null, ?array $filters = []): array
+    protected function createEntity(): Entity
     {
-        $qb = $this->db->getQueryBuilder();
-
-        $qb->select('*')
-            ->from(self::TABLE_NAME)
-            ->setMaxResults($limit)
-            ->setFirstResult($offset);
-
-        foreach ($filters as $filter => $value) {
-            if ($value === 'IS NOT NULL') {
-                $qb->andWhere($qb->expr()->isNotNull($filter));
-            } elseif ($value === 'IS NULL') {
-                $qb->andWhere($qb->expr()->isNull($filter));
-            } else {
-                $qb->andWhere($qb->expr()->eq($filter, $qb->createNamedParameter($value)));
-            }
-        }
-
-        return $this->findEntities($qb);
+        return new EventMessage();
     }
 
     /**
@@ -92,7 +65,7 @@ class EventMessageMapper extends QBMapper
         $qb = $this->db->getQueryBuilder();
 
         $qb->select('*')
-            ->from(self::TABLE_NAME)
+            ->from($this->getTableName())
             ->where(
                 $qb->expr()->eq('status', $qb->createNamedParameter('pending')),
                 $qb->expr()->lt('retry_count', $qb->createNamedParameter($maxRetries, IQueryBuilder::PARAM_INT)),
@@ -103,47 +76,6 @@ class EventMessageMapper extends QBMapper
             );
 
         return $this->findEntities($qb);
-    }
-
-    /**
-     * Create a new message from array data
-     *
-     * @param array $data Message data
-     * @return EventMessage
-     */
-    public function createFromArray(array $data): EventMessage
-    {
-        $obj = new EventMessage();
-        $obj->hydrate($data);
-        
-        // Set uuid
-        if ($obj->getUuid() === null) {
-            $obj->setUuid(Uuid::v4());
-        }
-        
-        // Set timestamps
-        $obj->setCreated(new DateTime());
-        $obj->setUpdated(new DateTime());
-
-        return $this->insert(entity: $obj);
-    }
-
-    /**
-     * Update an existing message
-     *
-     * @param int $id Message ID
-     * @param array $data Updated message data
-     * @return EventMessage
-     */
-    public function updateFromArray(int $id, array $data): EventMessage
-    {
-        $obj = $this->find($id);
-        $obj->hydrate($data);
-        
-        // Update timestamp
-        $obj->setUpdated(new DateTime());
-
-        return $this->update($obj);
     }
 
     /**
@@ -182,25 +114,5 @@ class EventMessageMapper extends QBMapper
             'lastAttempt' => $message->getLastAttempt(),
             'nextAttempt' => $message->getNextAttempt()
         ]);
-    }
-
-    /**
-     * Get the total count of all event messages.
-     *
-     * @return int The total number of event messages in the database.
-     */
-    public function getTotalCallCount(): int
-    {
-        $qb = $this->db->getQueryBuilder();
-
-        // Select count of all event messages
-        $qb->select($qb->createFunction('COUNT(*) as count'))
-           ->from(self::TABLE_NAME);
-
-        $result = $qb->execute();
-        $row = $result->fetch();
-
-        // Return the total count
-        return (int)$row['count'];
     }
 } 
