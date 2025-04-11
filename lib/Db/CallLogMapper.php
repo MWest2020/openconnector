@@ -12,7 +12,6 @@ use OCP\DB\QueryBuilder\IQueryBuilder;
 use OCP\IDBConnection;
 use Symfony\Component\Uid\Uuid;
 use OCP\AppFramework\Db\Entity;
-use OCP\AppFramework\Db\BaseMapper;
 
 /**
  * Class CallLogMapper
@@ -22,7 +21,7 @@ use OCP\AppFramework\Db\BaseMapper;
  *
  * @package OCA\OpenConnector\Db
  */
-class CallLogMapper extends BaseMapper
+class CallLogMapper extends QBMapper
 {
     /**
      * The name of the database table for call logs
@@ -42,7 +41,7 @@ class CallLogMapper extends BaseMapper
      *
      * @return string The table name
      */
-    protected function getTableName(): string
+    public function getTableName(): string
     {
         return self::TABLE_NAME;
 

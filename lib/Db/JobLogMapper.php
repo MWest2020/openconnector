@@ -6,7 +6,7 @@ use DateInterval;
 use DatePeriod;
 use DateTime;
 use OCP\AppFramework\Db\MultipleObjectsReturnedException;
-use OCP\AppFramework\Db\BaseMapper;
+use OCP\AppFramework\Db\QBMapper;
 use OCP\AppFramework\Db\Entity;
 use OCP\DB\Exception;
 use OCP\DB\QueryBuilder\IQueryBuilder;
@@ -20,9 +20,9 @@ use Symfony\Component\Uid\Uuid;
  * It provides methods for finding, creating, and updating JobLog objects.
  *
  * @package OCA\OpenConnector\Db
- * @extends BaseMapper<JobLog>
+ * @extends QBMapper<JobLog>
  */
-class JobLogMapper extends BaseMapper
+class JobLogMapper extends QBMapper
 {
     /**
      * The name of the database table for job logs
@@ -42,7 +42,7 @@ class JobLogMapper extends BaseMapper
      *
      * @return string The table name
      */
-    protected function getTableName(): string
+    public function getTableName(): string
     {
         return self::TABLE_NAME;
 

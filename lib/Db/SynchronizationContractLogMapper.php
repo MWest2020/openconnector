@@ -7,7 +7,7 @@ use DatePeriod;
 use DateTime;
 use OCA\OpenConnector\Db\SynchronizationContractLog;
 use OCP\AppFramework\Db\Entity;
-use OCP\AppFramework\Db\BaseMapper;
+use OCP\AppFramework\Db\QBMapper;
 use OCP\DB\Exception;
 use OCP\DB\QueryBuilder\IQueryBuilder;
 use OCP\IDBConnection;
@@ -23,9 +23,9 @@ use OCP\Session\Exceptions\SessionNotAvailableException;
  * It provides methods for finding, creating, and updating SynchronizationContractLog objects.
  *
  * @package OCA\OpenConnector\Db
- * @extends BaseMapper<SynchronizationContractLog>
+ * @extends QBMapper<SynchronizationContractLog>
  */
-class SynchronizationContractLogMapper extends BaseMapper
+class SynchronizationContractLogMapper extends QBMapper
 {
 	/**
 	 * The name of the database table for synchronization contract logs
@@ -45,7 +45,7 @@ class SynchronizationContractLogMapper extends BaseMapper
 	 *
 	 * @return string The table name
 	 */
-	protected function getTableName(): string
+	public function getTableName(): string
 	{
 		return self::TABLE_NAME;
 	}

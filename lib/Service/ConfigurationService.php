@@ -24,12 +24,15 @@ use OCA\OpenConnector\Db\Endpoint;
 use OCA\OpenConnector\Db\EndpointMapper;
 use OCA\OpenConnector\Db\Job;
 use OCA\OpenConnector\Db\JobMapper;
+use OCA\OpenConnector\Db\Mapping;
+use OCA\OpenConnector\Db\MappingMapper;
 use OCA\OpenConnector\Db\Rule;
 use OCA\OpenConnector\Db\RuleMapper;
 use OCA\OpenConnector\Db\Source;
 use OCA\OpenConnector\Db\SourceMapper;
 use OCA\OpenConnector\Db\Synchronization;
 use OCA\OpenConnector\Db\SynchronizationMapper;
+use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\ILogger;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Uid\Uuid;
@@ -78,6 +81,13 @@ class ConfigurationService
      * @var SynchronizationMapper The synchronization mapper instance.
      */
     private readonly SynchronizationMapper $synchronizationMapper;
+
+    /**
+     * Mapping mapper instance for handling mapping operations.
+     *
+     * @var MappingMapper The mapping mapper instance.
+     */
+    private readonly MappingMapper $mappingMapper;
 
     /**
      * Logger instance for logging operations.
@@ -129,6 +139,7 @@ class ConfigurationService
      * @param RuleMapper           $ruleMapper           The rule mapper instance
      * @param SourceMapper         $sourceMapper         The source mapper instance
      * @param SynchronizationMapper $synchronizationMapper The synchronization mapper instance
+     * @param MappingMapper        $mappingMapper        The mapping mapper instance
      * @param LoggerInterface      $logger               The logger instance
      */
     public function __construct(
@@ -137,6 +148,7 @@ class ConfigurationService
         RuleMapper $ruleMapper,
         SourceMapper $sourceMapper,
         SynchronizationMapper $synchronizationMapper,
+        MappingMapper $mappingMapper,
         LoggerInterface $logger
     ) {
         $this->endpointMapper = $endpointMapper;
@@ -144,6 +156,7 @@ class ConfigurationService
         $this->ruleMapper = $ruleMapper;
         $this->sourceMapper = $sourceMapper;
         $this->synchronizationMapper = $synchronizationMapper;
+        $this->mappingMapper = $mappingMapper;
         $this->logger = $logger;
     }
 
@@ -170,12 +183,12 @@ class ConfigurationService
         $openApiSpec = [
             'openapi' => '3.0.0',
             'components' => [
-                'endpoints' => [],
-                'jobs' => [],
-                'rules' => [],
-                'sources' => [],
+                'endpoints'        => [],
+                'sources'          => [],
+                'mappings'         => [],
+                'jobs'             => [],
                 'synchronizations' => [],
-                'mappings' => [],
+                'rules'            => [],
             ],
         ];
 
@@ -257,7 +270,7 @@ class ConfigurationService
         }
 
         // Get all jobs that target this register
-        $jobs = $this->jobMapper->findAll([
+        $jobs = $this->jobMapper->findAll(null, null, [
             'targetType' => 'register/schema',
             'targetId' => $registerId,
         ]);
@@ -278,7 +291,7 @@ class ConfigurationService
                 if ($rule !== null) {
                     $openApiSpec['components']['rules'][$rule->getUuid()] = $this->exportRule($rule);
                 }
-            } catch (\OCP\AppFramework\Db\DoesNotExistException $e) {
+            } catch (DoesNotExistException $e) {
                 $this->logger->warning('Rule with ID ' . $ruleId . ' not found during export.');
             }
         }
@@ -291,7 +304,7 @@ class ConfigurationService
                 if ($mapping !== null) {
                     $openApiSpec['components']['mappings'][$mapping->getUuid()] = $this->exportMapping($mapping);
                 }
-            } catch (\OCP\AppFramework\Db\DoesNotExistException $e) {
+            } catch (DoesNotExistException $e) {
                 $this->logger->warning('Mapping with ID ' . $mappingId . ' not found during export.');
             }
         }
@@ -308,7 +321,11 @@ class ConfigurationService
      */
     private function exportEndpoint(Endpoint $endpoint): array
     {
-        return $endpoint->jsonSerialize();
+        $endpointArray = $endpoint->jsonSerialize();
+
+        unset($endpointArray['id'], $endpointArray['uuid']);
+
+        return $endpointArray;
     }
 
     /**
@@ -320,7 +337,11 @@ class ConfigurationService
      */
     private function exportJob(Job $job): array
     {
-        return $job->jsonSerialize();
+        $jobArray = $job->jsonSerialize();
+
+        unset($jobArray['id'], $jobArray['uuid']);
+
+        return $jobArray;
     }
 
     /**
@@ -332,7 +353,11 @@ class ConfigurationService
      */
     private function exportRule(Rule $rule): array
     {
-        return $rule->jsonSerialize();
+        $ruleArray = $rule->jsonSerialize();
+
+        unset($ruleArray['id'], $ruleArray['uuid']);
+
+        return $ruleArray;
     }
 
     /**
@@ -344,7 +369,16 @@ class ConfigurationService
      */
     private function exportSource(Source $source): array
     {
-        return $source->jsonSerialize();
+        $sourceArray = $source->jsonSerialize();
+
+        // @todo: maybe we should "set" instead of unset? To prevent new sensitive data from being added to exports in the future?
+        unset($sourceArray['id'], $sourceArray['uuid'], 
+        $sourceArray['authorizationHeader'], $sourceArray['auth'], $sourceArray['authenticationConfig'],
+        $sourceArray['authorizationPassthroughMethod'], $sourceArray['locale'], $sourceArray['accept'],
+        $sourceArray['jwt'], $sourceArray['jwtId'], $sourceArray['secret'], $sourceArray['password'],
+        $sourceArray['apikey'], $sourceArray['headers'], $sourceArray['configuration']);
+
+        return $sourceArray;
     }
 
     /**
@@ -356,7 +390,27 @@ class ConfigurationService
      */
     private function exportSynchronization(Synchronization $synchronization): array
     {
-        return $synchronization->jsonSerialize();
+        $synchronizationArray = $synchronization->jsonSerialize();
+
+        unset($synchronizationArray['id'], $synchronizationArray['uuid']);
+
+        return $synchronizationArray;
+    }
+
+    /**
+     * Export a mapping to OpenAPI format
+     *
+     * @param Mapping $mapping The mapping to export
+     *
+     * @return array The OpenAPI mapping specification
+     */
+    private function exportMapping(Mapping $mapping): array
+    {
+        $mappingArray = $mapping->jsonSerialize();
+
+        unset($mappingArray['id'], $mappingArray['uuid']);
+
+        return $mappingArray;
     }
 
     /**
@@ -395,11 +449,12 @@ class ConfigurationService
         }
 
         $result = [
-            'endpoints' => [],
-            'jobs' => [],
-            'rules' => [],
-            'sources' => [],
+            'endpoints'        => [],
+            'sources'          => [],
+            'mappings'         => [],
+            'jobs'             => [],
             'synchronizations' => [],
+            'rules'            => [],
         ];
 
         // Import sources first as they are referenced by synchronizations
@@ -490,7 +545,7 @@ class ConfigurationService
             $existingEndpoint = null;
             try {
                 $existingEndpoint = $this->endpointMapper->findByUuid($data['uuid']);
-            } catch (\OCP\AppFramework\Db\DoesNotExistException $e) {
+            } catch (DoesNotExistException $e) {
                 // Endpoint doesn't exist, we'll create a new one
             }
 
@@ -539,7 +594,7 @@ class ConfigurationService
             $existingSource = null;
             try {
                 $existingSource = $this->sourceMapper->findByUuid($data['uuid']);
-            } catch (\OCP\AppFramework\Db\DoesNotExistException $e) {
+            } catch (DoesNotExistException $e) {
                 // Source doesn't exist, we'll create a new one
             }
 
@@ -588,7 +643,7 @@ class ConfigurationService
             $existingRule = null;
             try {
                 $existingRule = $this->ruleMapper->findByUuid($data['uuid']);
-            } catch (\OCP\AppFramework\Db\DoesNotExistException $e) {
+            } catch (DoesNotExistException $e) {
                 // Rule doesn't exist, we'll create a new one
             }
 
@@ -637,7 +692,7 @@ class ConfigurationService
             $existingSynchronization = null;
             try {
                 $existingSynchronization = $this->synchronizationMapper->findByUuid($data['uuid']);
-            } catch (\OCP\AppFramework\Db\DoesNotExistException $e) {
+            } catch (DoesNotExistException $e) {
                 // Synchronization doesn't exist, we'll create a new one
             }
 
@@ -686,7 +741,7 @@ class ConfigurationService
             $existingJob = null;
             try {
                 $existingJob = $this->jobMapper->findByUuid($data['uuid']);
-            } catch (\OCP\AppFramework\Db\DoesNotExistException $e) {
+            } catch (DoesNotExistException $e) {
                 // Job doesn't exist, we'll create a new one
             }
 

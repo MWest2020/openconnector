@@ -5,7 +5,7 @@ namespace OCA\OpenConnector\Db;
 use OCA\OpenConnector\Db\SynchronizationContract;
 use OCP\AppFramework\Db\Entity;
 use OCP\AppFramework\Db\MultipleObjectsReturnedException;
-use OCP\AppFramework\Db\BaseMapper;
+use OCP\AppFramework\Db\QBMapper;
 use OCP\DB\Exception;
 use OCP\DB\QueryBuilder\IQueryBuilder;
 use OCP\IDBConnection;
@@ -17,12 +17,12 @@ use Symfony\Component\Uid\Uuid;
  * CRUD operations and specialized queries.
  *
  * @package OCA\OpenConnector\Db
- * @extends BaseMapper<SynchronizationContract>
+ * @extends QBMapper<SynchronizationContract>
  *
  * @psalm-suppress PropertyNotSetInConstructor
- * @phpstan-extends BaseMapper<SynchronizationContract>
+ * @phpstan-extends QBMapper<SynchronizationContract>
  */
-class SynchronizationContractMapper extends BaseMapper
+class SynchronizationContractMapper extends QBMapper
 {
     /**
      * The name of the database table for synchronization contracts
@@ -44,7 +44,7 @@ class SynchronizationContractMapper extends BaseMapper
      *
      * @return string The table name
      */
-    protected function getTableName(): string
+    public function getTableName(): string
     {
         return self::TABLE_NAME;
     }

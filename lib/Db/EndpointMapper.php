@@ -3,8 +3,10 @@
 namespace OCA\OpenConnector\Db;
 
 use OCA\OpenConnector\Db\Endpoint;
+use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\AppFramework\Db\Entity;
-use OCP\AppFramework\Db\BaseMapper;
+use OCP\AppFramework\Db\MultipleObjectsReturnedException;
+use OCP\AppFramework\Db\QBMapper;
 use OCP\DB\QueryBuilder\IQueryBuilder;
 use OCP\IDBConnection;
 use Symfony\Component\Uid\Uuid;
@@ -13,9 +15,9 @@ use Symfony\Component\Uid\Uuid;
  * Mapper class for handling Endpoint database operations
  *
  * @package OCA\OpenConnector\Db
- * @extends BaseMapper<Endpoint>
+ * @extends QBMapper<Endpoint>
  */
-class EndpointMapper extends BaseMapper
+class EndpointMapper extends QBMapper
 {
     /**
      * The name of the database table for endpoints
@@ -35,7 +37,7 @@ class EndpointMapper extends BaseMapper
      *
      * @return string The table name
      */
-    protected function getTableName(): string
+    public function getTableName(): string
     {
         return self::TABLE_NAME;
 
@@ -197,5 +199,78 @@ class EndpointMapper extends BaseMapper
 
     }//end getByRegister()
 
+
+    /**
+     * Find an endpoint by ID
+     *
+     * @param int $id The ID of the endpoint to find
+     * @return Endpoint The found endpoint entity
+     * @throws DoesNotExistException If the endpoint doesn't exist
+     * @throws MultipleObjectsReturnedException If multiple endpoints match the criteria
+     */
+    public function find(int $id): Endpoint
+    {
+        $qb = $this->db->getQueryBuilder();
+
+        $qb->select('*')
+            ->from($this->getTableName())
+            ->where(
+                $qb->expr()->eq('id', $qb->createNamedParameter($id, IQueryBuilder::PARAM_INT))
+            );
+
+        return $this->findEntity($qb);
+    }
+    
+    /**
+     * Find an endpoint by UUID
+     *
+     * @param string $uuid The UUID of the endpoint to find
+     * @return Endpoint The found endpoint entity
+     * @throws DoesNotExistException If the endpoint doesn't exist
+     * @throws MultipleObjectsReturnedException If multiple endpoints match the criteria
+     */
+    public function findByUuid(string $uuid): Endpoint
+    {
+        $qb = $this->db->getQueryBuilder();
+
+        $qb->select('*')
+            ->from($this->getTableName())
+            ->where(
+                $qb->expr()->eq('uuid', $qb->createNamedParameter($uuid))
+            );
+
+        return $this->findEntity($qb);
+    }
+
+    /**
+     * Find all endpoints with optional filtering and pagination
+     *
+     * @param int|null $limit Maximum number of results to return
+     * @param int|null $offset Number of results to skip
+     * @param array|null $filters Associative array of filter conditions (column => value)
+     * @return Endpoint[] Array of matching endpoint entities
+     */
+    public function findAll(?int $limit=null, ?int $offset=null, ?array $filters=[]): array
+    {
+        $qb = $this->db->getQueryBuilder();
+
+        $qb->select('*')
+            ->from($this->getTableName())
+            ->setMaxResults($limit)
+            ->setFirstResult($offset);
+
+        // Apply filters
+        foreach ($filters as $filter => $value) {
+            if ($value === 'IS NOT NULL') {
+                $qb->andWhere($qb->expr()->isNotNull($filter));
+            } else if ($value === 'IS NULL') {
+                $qb->andWhere($qb->expr()->isNull($filter));
+            } else {
+                $qb->andWhere($qb->expr()->eq($filter, $qb->createNamedParameter($value)));
+            }
+        }
+
+        return $this->findEntities($qb);
+    }
 
 }//end class

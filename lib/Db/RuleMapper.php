@@ -2,8 +2,10 @@
 
 namespace OCA\OpenConnector\Db;
 
+use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\AppFramework\Db\Entity;
-use OCP\AppFramework\Db\BaseMapper;
+use OCP\AppFramework\Db\MultipleObjectsReturnedException;
+use OCP\AppFramework\Db\QBMapper;
 use OCP\DB\QueryBuilder\IQueryBuilder;
 use OCP\IDBConnection;
 use Symfony\Component\Uid\Uuid;
@@ -14,9 +16,9 @@ use Symfony\Component\Uid\Uuid;
  * Handles database operations for rules
  *
  * @package OCA\OpenConnector\Db
- * @extends BaseMapper<Rule>
+ * @extends QBMapper<Rule>
  */
-class RuleMapper extends BaseMapper
+class RuleMapper extends QBMapper
 {
     /**
      * The name of the database table for rules
@@ -39,7 +41,7 @@ class RuleMapper extends BaseMapper
      *
      * @return string The table name
      */
-    protected function getTableName(): string
+    public function getTableName(): string
     {
         return self::TABLE_NAME;
 
@@ -59,6 +61,79 @@ class RuleMapper extends BaseMapper
 
 
     /**
+     * Find a rule by ID
+     *
+     * @param int $id The ID of the rule to find
+     * @return Rule The found rule entity
+     * @throws DoesNotExistException If the rule doesn't exist
+     * @throws MultipleObjectsReturnedException If multiple rules match the criteria
+     */
+    public function find(int $id): Rule
+    {
+        $qb = $this->db->getQueryBuilder();
+
+        $qb->select('*')
+            ->from($this->getTableName())
+            ->where(
+                $qb->expr()->eq('id', $qb->createNamedParameter($id, IQueryBuilder::PARAM_INT))
+            );
+
+        return $this->findEntity($qb);
+    }
+
+    /**
+     * Find a rule by UUID
+     *
+     * @param string $uuid The UUID of the rule to find
+     * @return Rule The found rule entity
+     * @throws DoesNotExistException If the rule doesn't exist
+     * @throws MultipleObjectsReturnedException If multiple rules match the criteria
+     */
+    public function findByUuid(string $uuid): Rule
+    {
+        $qb = $this->db->getQueryBuilder();
+
+        $qb->select('*')
+            ->from($this->getTableName())
+            ->where(
+                $qb->expr()->eq('uuid', $qb->createNamedParameter($uuid))
+            );
+
+        return $this->findEntity($qb);
+    }
+
+    /**
+     * Find all rules with optional filtering and pagination
+     *
+     * @param int|null $limit Maximum number of results to return
+     * @param int|null $offset Number of results to skip
+     * @param array|null $filters Associative array of filter conditions (column => value)
+     * @return Rule[] Array of matching rule entities
+     */
+    public function findAll(?int $limit=null, ?int $offset=null, ?array $filters=[]): array
+    {
+        $qb = $this->db->getQueryBuilder();
+
+        $qb->select('*')
+            ->from($this->getTableName())
+            ->setMaxResults($limit)
+            ->setFirstResult($offset);
+
+        // Apply filters
+        foreach ($filters as $filter => $value) {
+            if ($value === 'IS NOT NULL') {
+                $qb->andWhere($qb->expr()->isNotNull($filter));
+            } else if ($value === 'IS NULL') {
+                $qb->andWhere($qb->expr()->isNull($filter));
+            } else {
+                $qb->andWhere($qb->expr()->eq($filter, $qb->createNamedParameter($value)));
+            }
+        }
+
+        return $this->findEntities($qb);
+    }
+
+    /**
      * Create a new rule from array data
      *
      * @param  array<string,mixed> $object
@@ -67,7 +142,20 @@ class RuleMapper extends BaseMapper
     public function createFromArray(array $object): Rule
     {
         // Create and hydrate new rule object
-        $obj = parent::createFromArray($object);
+        $obj = new Rule();
+        $obj->hydrate($object);
+        
+        // Set uuid if not provided
+        if ($obj->getUuid() === null) {
+            $obj->setUuid(Uuid::v4());
+        }
+        
+        // Set version if not provided
+        if (empty($obj->getVersion()) === true) {
+            $obj->setVersion('0.0.1');
+        }
+        
+        $obj = $this->insert($obj);
 
         // Rule-specific logic
         // If no order is specified, append to the end

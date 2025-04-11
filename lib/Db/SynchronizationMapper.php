@@ -3,7 +3,9 @@
 namespace OCA\OpenConnector\Db;
 
 use OCA\OpenConnector\Db\Synchronization;
+use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\AppFramework\Db\Entity;
+use OCP\AppFramework\Db\MultipleObjectsReturnedException;
 use OCP\AppFramework\Db\QBMapper;
 use OCP\DB\QueryBuilder\IQueryBuilder;
 use OCP\IDBConnection;
@@ -60,6 +62,28 @@ class SynchronizationMapper extends QBMapper
         return $this->findEntities(query: $qb);
 
     }//end findByRef()
+
+
+    /**
+     * Find a synchronization by UUID
+     *
+     * @param string $uuid The UUID of the synchronization to find
+     * @return Synchronization The found synchronization entity
+     * @throws DoesNotExistException If the synchronization doesn't exist
+     * @throws MultipleObjectsReturnedException If multiple synchronizations match the criteria
+     */
+    public function findByUuid(string $uuid): Synchronization
+    {
+        $qb = $this->db->getQueryBuilder();
+
+        $qb->select('*')
+            ->from(self::TABLE_NAME)
+            ->where(
+                $qb->expr()->eq('uuid', $qb->createNamedParameter($uuid))
+            );
+
+        return $this->findEntity(query: $qb);
+    }
 
 
     public function findAll(?int $limit=null, ?int $offset=null, ?array $filters=[], ?array $searchConditions=[], ?array $searchParams=[]): array

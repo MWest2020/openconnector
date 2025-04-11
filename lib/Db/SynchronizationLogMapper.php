@@ -3,14 +3,16 @@
 namespace OCA\OpenConnector\Db;
 
 use DateTime;
+use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\AppFramework\Db\Entity;
-use OCP\AppFramework\Db\BaseMapper;
+use OCP\AppFramework\Db\MultipleObjectsReturnedException;
+use OCP\AppFramework\Db\QBMapper;
 use OCP\DB\QueryBuilder\IQueryBuilder;
 use OCP\IDBConnection;
 use OCP\ISession;
 use OCP\IUserSession;
-use Symfony\Component\Uid\Uuid;
 use OCP\Session\Exceptions\SessionNotAvailableException;
+use Symfony\Component\Uid\Uuid;
 
 /**
  * Class SynchronizationLogMapper
@@ -19,9 +21,9 @@ use OCP\Session\Exceptions\SessionNotAvailableException;
  * It provides methods for finding, creating, and updating SynchronizationLog objects.
  *
  * @package OCA\OpenConnector\Db
- * @extends BaseMapper<SynchronizationLog>
+ * @extends QBMapper<SynchronizationLog>
  */
-class SynchronizationLogMapper extends BaseMapper
+class SynchronizationLogMapper extends QBMapper
 {
 	/**
 	 * The name of the database table for synchronization logs
@@ -41,7 +43,7 @@ class SynchronizationLogMapper extends BaseMapper
 	 *
 	 * @return string The table name
 	 */
-	protected function getTableName(): string
+	public function getTableName(): string
 	{
 		return self::TABLE_NAME;
 	}
@@ -159,5 +161,26 @@ class SynchronizationLogMapper extends BaseMapper
 			->where($qb->expr()->lt('expires', $qb->createNamedParameter(new DateTime(), IQueryBuilder::PARAM_DATE)));
 
 		return $qb->executeStatement();
+	}
+
+	/**
+	 * Find a synchronization log by ID
+	 *
+	 * @param int $id The ID of the synchronization log to find
+	 * @return SynchronizationLog The found synchronization log entity
+	 * @throws DoesNotExistException If the log doesn't exist
+	 * @throws MultipleObjectsReturnedException If multiple logs match the criteria
+	 */
+	public function find(int $id): SynchronizationLog
+	{
+		$qb = $this->db->getQueryBuilder();
+
+		$qb->select('*')
+			->from($this->getTableName())
+			->where(
+				$qb->expr()->eq('id', $qb->createNamedParameter($id, IQueryBuilder::PARAM_INT))
+			);
+
+		return $this->findEntity($qb);
 	}
 }
