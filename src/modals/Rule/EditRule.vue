@@ -466,6 +466,14 @@ import { Rule } from '../../entities/index.js'
 						:value.sync="ruleItem.configuration.save_object.schema"
 						placeholder="id of schema"
 						required />
+
+                    <NcSelect
+                        v-bind="mappingOptions"
+                        v-model="mappingOptions.value"
+                        :loading="mappingOptions.loading"
+                        input-label="Select Mapping"
+                        :multiple="false"
+                        :clearable="false" />
 				</template>
 			</form>
 
@@ -638,6 +646,7 @@ export default {
 					save_object: {
 						register: '',
 						schema: '',
+						mapping: '',
 					},
 				},
 			},
@@ -752,6 +761,7 @@ export default {
 					save_object: {
 						register: ruleStore.ruleItem.configuration?.save_object?.register ?? '',
 						schema: ruleStore.ruleItem.configuration?.save_object?.schema ?? '',
+						mapping: ruleStore.ruleItem.configuration?.save_object?.mapping ?? '',
 					},
 				},
 				conditions: JSON.stringify(ruleStore.ruleItem.conditions, null, 2),
@@ -1300,6 +1310,7 @@ export default {
 				configuration.save_object = {
 					register: this.ruleItem.configuration.save_object.register,
 					schema: this.ruleItem.configuration.save_object.schema,
+                    mapping: this.mappingOptions.value?.value
 				}
 				break
 			}
