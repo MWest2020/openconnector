@@ -104,6 +104,7 @@ import Pencil from 'vue-material-design-icons/Pencil.vue'
 import TrashCanOutline from 'vue-material-design-icons/TrashCanOutline.vue'
 import FileExportOutline from 'vue-material-design-icons/FileExportOutline.vue'
 import FileImportOutline from 'vue-material-design-icons/FileImportOutline.vue'
+import { getTheme } from '../../services/getTheme.js'
 
 export default {
 	name: 'EndpointsList',
@@ -127,19 +128,38 @@ export default {
 	},
 	methods: {
 		getEndpointColor(method) {
-			switch (method) {
-			case 'GET':
-				return '#4e7f3d'
-			case 'POST':
-				return '#466eaa'
-			case 'PUT':
-				return '#87547a'
-			case 'PATCH':
-				return '#a95d2e'
-			case 'DELETE':
-				return '#b13f3a'
-			default:
-				return '#000'
+			const theme = getTheme()
+
+			if (theme === 'dark') {
+				switch (method) {
+				case 'GET':
+					return '#5c8d4a'
+				case 'POST':
+					return '#5d82c0'
+				case 'PUT':
+					return '#a46f96'
+				case 'PATCH':
+					return '#bc6d3d'
+				case 'DELETE':
+					return '#d25c53'
+				default:
+					return '#fff'
+				}
+			} else {
+				switch (method) {
+				case 'GET':
+					return '#4e7f3d'
+				case 'POST':
+					return '#466eaa'
+				case 'PUT':
+					return '#87547a'
+				case 'PATCH':
+					return '#a95d2e'
+				case 'DELETE':
+					return '#b13f3a'
+				default:
+					return '#000'
+				}
 			}
 		},
 	},
