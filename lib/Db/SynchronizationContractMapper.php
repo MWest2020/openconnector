@@ -17,12 +17,10 @@ use Symfony\Component\Uid\Uuid;
  * CRUD operations and specialized queries.
  *
  * @package OCA\OpenConnector\Db
- * @extends QBMapper<SynchronizationContract>
  *
  * @psalm-suppress PropertyNotSetInConstructor
- * @phpstan-extends QBMapper<SynchronizationContract>
  */
-class SynchronizationContractMapper extends QBMapper
+class SynchronizationContractMapper extends \OCA\OpenConnector\Db\BaseMapper
 {
     /**
      * The name of the database table for synchronization contracts
@@ -349,5 +347,27 @@ class SynchronizationContractMapper extends QBMapper
         } catch (Exception $e) {
             throw new Exception('Failed to handle object removal: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * Find all contracts with optional filtering and pagination
+     *
+     * @param int|null $limit Maximum number of results to return
+     * @param int|null $offset Number of results to skip
+     * @param array|null $filters Associative array of filter conditions (column => value)
+     * @param array|null $searchConditions Search conditions for the query
+     * @param array|null $searchParams Parameters for the search conditions
+     * @param array|null $ids List of IDs or UUIDs to search for
+     * @return array<SynchronizationContract> Array of matching contract entities
+     */
+    public function findAll(
+        ?int $limit=null,
+        ?int $offset=null,
+        ?array $filters=[],
+        ?array $searchConditions=[],
+        ?array $searchParams=[],
+        ?array $ids=null
+    ): array {
+        return parent::findAll($limit, $offset, $filters, $searchConditions, $searchParams, $ids);
     }
 }

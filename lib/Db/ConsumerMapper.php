@@ -4,7 +4,7 @@ namespace OCA\OpenConnector\Db;
 
 use OCA\OpenConnector\Db\Consumer;
 use OCP\AppFramework\Db\Entity;
-use OCP\AppFramework\Db\QBMapper;
+use OCP\AppFramework\Db\BaseMapper;
 use OCP\IDBConnection;
 use Symfony\Component\Uid\Uuid;
 
@@ -15,9 +15,8 @@ use Symfony\Component\Uid\Uuid;
  * It provides methods for finding, creating, and updating Consumer objects.
  *
  * @package OCA\OpenConnector\Db
- * @extends QBMapper<Consumer>
  */
-class ConsumerMapper extends QBMapper
+class ConsumerMapper extends \OCA\OpenConnector\Db\BaseMapper
 {
     /**
      * The name of the database table for consumers

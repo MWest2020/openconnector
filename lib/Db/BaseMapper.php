@@ -181,7 +181,7 @@ abstract class BaseMapper extends QBMapper
             $obj->setUuid(Uuid::v4());
         }
 
-        // Set version if not provided
+        // Set version
         if (empty($obj->getVersion()) === true) {
             $object['version'] = '0.0.1';
         } else if (empty($object['version']) === true) {
@@ -223,7 +223,7 @@ abstract class BaseMapper extends QBMapper
      *
      * @return string The table name
      */
-    abstract protected function getTableName(): string;
+    abstract public function getTableName(): string;
 
 
     /**

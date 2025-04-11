@@ -4,7 +4,6 @@ namespace OCA\OpenConnector\Db;
 
 use OCA\OpenConnector\Db\Mapping;
 use OCP\AppFramework\Db\Entity;
-use OCP\AppFramework\Db\QBMapper;
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\AppFramework\Db\MultipleObjectsReturnedException;
 use OCP\DB\QueryBuilder\IQueryBuilder;
@@ -18,9 +17,9 @@ use Symfony\Component\Uid\Uuid;
  * It provides methods for finding, creating, and updating Mapping objects.
  *
  * @package OCA\OpenConnector\Db
- * @extends QBMapper<Mapping>
+ * @extends BaseMapper<Mapping>
  */
-class MappingMapper extends QBMapper
+class MappingMapper extends \OCA\OpenConnector\Db\BaseMapper
 {
     /**
      * The name of the database table for mappings

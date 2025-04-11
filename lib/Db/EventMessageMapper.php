@@ -3,7 +3,6 @@
 namespace OCA\OpenConnector\Db;
 
 use DateTime;
-use OCP\AppFramework\Db\QBMapper;
 use OCP\AppFramework\Db\Entity;
 use OCP\DB\QueryBuilder\IQueryBuilder;
 use OCP\IDBConnection;
@@ -15,9 +14,9 @@ use Symfony\Component\Uid\Uuid;
  * Handles database operations for event messages
  *
  * @package OCA\OpenConnector\Db
- * @extends QBMapper<EventMessage>
+ * @extends BaseMapper<EventMessage>
  */
-class EventMessageMapper extends QBMapper
+class EventMessageMapper extends \OCA\OpenConnector\Db\BaseMapper
 {
     /**
      * The name of the database table for event messages

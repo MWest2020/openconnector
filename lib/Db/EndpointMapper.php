@@ -6,7 +6,6 @@ use OCA\OpenConnector\Db\Endpoint;
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\AppFramework\Db\Entity;
 use OCP\AppFramework\Db\MultipleObjectsReturnedException;
-use OCP\AppFramework\Db\QBMapper;
 use OCP\DB\QueryBuilder\IQueryBuilder;
 use OCP\IDBConnection;
 use Symfony\Component\Uid\Uuid;
@@ -15,9 +14,8 @@ use Symfony\Component\Uid\Uuid;
  * Mapper class for handling Endpoint database operations
  *
  * @package OCA\OpenConnector\Db
- * @extends QBMapper<Endpoint>
  */
-class EndpointMapper extends QBMapper
+class EndpointMapper extends \OCA\OpenConnector\Db\BaseMapper
 {
     /**
      * The name of the database table for endpoints
@@ -248,29 +246,20 @@ class EndpointMapper extends QBMapper
      * @param int|null $limit Maximum number of results to return
      * @param int|null $offset Number of results to skip
      * @param array|null $filters Associative array of filter conditions (column => value)
-     * @return Endpoint[] Array of matching endpoint entities
+     * @param array|null $searchConditions Search conditions for the query
+     * @param array|null $searchParams Parameters for the search conditions
+     * @param array|null $ids List of IDs or UUIDs to search for
+     * @return array<Endpoint> Array of matching endpoint entities
      */
-    public function findAll(?int $limit=null, ?int $offset=null, ?array $filters=[]): array
-    {
-        $qb = $this->db->getQueryBuilder();
-
-        $qb->select('*')
-            ->from($this->getTableName())
-            ->setMaxResults($limit)
-            ->setFirstResult($offset);
-
-        // Apply filters
-        foreach ($filters as $filter => $value) {
-            if ($value === 'IS NOT NULL') {
-                $qb->andWhere($qb->expr()->isNotNull($filter));
-            } else if ($value === 'IS NULL') {
-                $qb->andWhere($qb->expr()->isNull($filter));
-            } else {
-                $qb->andWhere($qb->expr()->eq($filter, $qb->createNamedParameter($value)));
-            }
-        }
-
-        return $this->findEntities($qb);
+    public function findAll(
+        ?int $limit=null,
+        ?int $offset=null,
+        ?array $filters=[],
+        ?array $searchConditions=[],
+        ?array $searchParams=[],
+        ?array $ids=null
+    ): array {
+        return parent::findAll($limit, $offset, $filters, $searchConditions, $searchParams, $ids);
     }
 
 }//end class

@@ -6,7 +6,6 @@ use DateInterval;
 use DatePeriod;
 use DateTime;
 use OCP\AppFramework\Db\MultipleObjectsReturnedException;
-use OCP\AppFramework\Db\QBMapper;
 use OCP\AppFramework\Db\Entity;
 use OCP\DB\Exception;
 use OCP\DB\QueryBuilder\IQueryBuilder;
@@ -20,9 +19,8 @@ use Symfony\Component\Uid\Uuid;
  * It provides methods for finding, creating, and updating JobLog objects.
  *
  * @package OCA\OpenConnector\Db
- * @extends QBMapper<JobLog>
  */
-class JobLogMapper extends QBMapper
+class JobLogMapper extends \OCA\OpenConnector\Db\BaseMapper
 {
     /**
      * The name of the database table for job logs
@@ -206,5 +204,27 @@ class JobLogMapper extends QBMapper
 
     }//end getJobStatsByHourRange()
 
+
+    /**
+     * Find all job logs with optional filtering and pagination
+     *
+     * @param int|null $limit Maximum number of results to return
+     * @param int|null $offset Number of results to skip
+     * @param array|null $filters Associative array of filter conditions (column => value)
+     * @param array|null $searchConditions Search conditions for the query
+     * @param array|null $searchParams Parameters for the search conditions
+     * @param array|null $ids List of IDs or UUIDs to search for
+     * @return array<JobLog> Array of matching job log entities
+     */
+    public function findAll(
+        ?int $limit=null,
+        ?int $offset=null,
+        ?array $filters=[],
+        ?array $searchConditions=[],
+        ?array $searchParams=[],
+        ?array $ids=null
+    ): array {
+        return parent::findAll($limit, $offset, $filters, $searchConditions, $searchParams, $ids);
+    }
 
 }//end class

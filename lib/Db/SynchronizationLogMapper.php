@@ -6,7 +6,6 @@ use DateTime;
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\AppFramework\Db\Entity;
 use OCP\AppFramework\Db\MultipleObjectsReturnedException;
-use OCP\AppFramework\Db\QBMapper;
 use OCP\DB\QueryBuilder\IQueryBuilder;
 use OCP\IDBConnection;
 use OCP\ISession;
@@ -21,9 +20,9 @@ use Symfony\Component\Uid\Uuid;
  * It provides methods for finding, creating, and updating SynchronizationLog objects.
  *
  * @package OCA\OpenConnector\Db
- * @extends QBMapper<SynchronizationLog>
+ * @extends BaseMapper<SynchronizationLog>
  */
-class SynchronizationLogMapper extends QBMapper
+class SynchronizationLogMapper extends \OCA\OpenConnector\Db\BaseMapper
 {
 	/**
 	 * The name of the database table for synchronization logs

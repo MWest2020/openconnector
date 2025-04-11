@@ -4,7 +4,7 @@ namespace OCA\OpenConnector\Db;
 
 use OCA\OpenConnector\Db\Event;
 use OCP\AppFramework\Db\Entity;
-use OCP\AppFramework\Db\QBMapper;
+use OCP\AppFramework\Db\BaseMapper;
 use OCP\DB\QueryBuilder\IQueryBuilder;
 use OCP\IDBConnection;
 use Symfony\Component\Uid\Uuid;
@@ -16,7 +16,7 @@ use Symfony\Component\Uid\Uuid;
  *
  * @package OCA\OpenConnector\Db
  */
-class EventMapper extends QBMapper
+class EventMapper extends \OCA\OpenConnector\Db\BaseMapper
 {
     /**
      * The name of the database table for events
@@ -58,6 +58,26 @@ class EventMapper extends QBMapper
 
 
     /**
+     * Get the name of the database table
+     *
+     * @return string The table name
+     */
+    public function getTableName(): string
+    {
+        return self::TABLE_NAME;
+    }
+
+    /**
+     * Create a new Event entity instance
+     *
+     * @return Event A new Event instance
+     */
+    protected function createEntity(): Entity
+    {
+        return new Event();
+    }
+
+    /**
      * Find all events with optional filtering and pagination
      *
      * @param  int|null   $limit            Maximum number of results
@@ -65,37 +85,19 @@ class EventMapper extends QBMapper
      * @param  array|null $filters          Key-value pairs for filtering
      * @param  array|null $searchConditions Search conditions
      * @param  array|null $searchParams     Search parameters
+     * @param  array|null $ids              List of IDs or UUIDs to search for
      * @return array Array of Event objects
      */
-    public function findAll(?int $limit=null, ?int $offset=null, ?array $filters=[], ?array $searchConditions=[], ?array $searchParams=[]): array
-    {
-        $qb = $this->db->getQueryBuilder();
-
-        $qb->select('*')
-            ->from(self::TABLE_NAME)
-            ->setMaxResults($limit)
-            ->setFirstResult($offset);
-
-        foreach ($filters as $filter => $value) {
-            if ($value === 'IS NOT NULL') {
-                $qb->andWhere($qb->expr()->isNotNull($filter));
-            } else if ($value === 'IS NULL') {
-                $qb->andWhere($qb->expr()->isNull($filter));
-            } else {
-                $qb->andWhere($qb->expr()->eq($filter, $qb->createNamedParameter($value)));
-            }
-        }
-
-        if (empty($searchConditions) === false) {
-            $qb->andWhere('('.implode(' OR ', $searchConditions).')');
-            foreach ($searchParams as $param => $value) {
-                $qb->setParameter($param, $value);
-            }
-        }
-
-        return $this->findEntities(query: $qb);
-
-    }//end findAll()
+    public function findAll(
+        ?int $limit=null,
+        ?int $offset=null,
+        ?array $filters=[],
+        ?array $searchConditions=[],
+        ?array $searchParams=[],
+        ?array $ids=null
+    ): array {
+        return parent::findAll($limit, $offset, $filters, $searchConditions, $searchParams, $ids);
+    }
 
 
     /**

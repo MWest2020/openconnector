@@ -6,7 +6,6 @@ use OCA\OpenConnector\Db\Synchronization;
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\AppFramework\Db\Entity;
 use OCP\AppFramework\Db\MultipleObjectsReturnedException;
-use OCP\AppFramework\Db\QBMapper;
 use OCP\DB\QueryBuilder\IQueryBuilder;
 use OCP\IDBConnection;
 use Symfony\Component\Uid\Uuid;
@@ -18,8 +17,9 @@ use Symfony\Component\Uid\Uuid;
  * It provides methods for finding, creating, and updating Synchronization objects.
  *
  * @package OCA\OpenConnector\Db
+ * @extends BaseMapper<Synchronization>
  */
-class SynchronizationMapper extends QBMapper
+class SynchronizationMapper extends \OCA\OpenConnector\Db\BaseMapper
 {
     /**
      * The name of the database table for synchronizations
@@ -33,6 +33,25 @@ class SynchronizationMapper extends QBMapper
 
     }//end __construct()
 
+    /**
+     * Get the name of the database table
+     *
+     * @return string The table name
+     */
+    public function getTableName(): string
+    {
+        return self::TABLE_NAME;
+    }
+
+    /**
+     * Create a new Synchronization entity instance
+     *
+     * @return Synchronization A new Synchronization instance
+     */
+    protected function createEntity(): Entity
+    {
+        return new Synchronization();
+    }
 
     public function find(int $id): Synchronization
     {
@@ -86,35 +105,16 @@ class SynchronizationMapper extends QBMapper
     }
 
 
-    public function findAll(?int $limit=null, ?int $offset=null, ?array $filters=[], ?array $searchConditions=[], ?array $searchParams=[]): array
-    {
-        $qb = $this->db->getQueryBuilder();
-
-        $qb->select('*')
-            ->from(self::TABLE_NAME)
-            ->setMaxResults($limit)
-            ->setFirstResult($offset);
-
-        foreach ($filters as $filter => $value) {
-            if ($value === 'IS NOT NULL') {
-                $qb->andWhere($qb->expr()->isNotNull($filter));
-            } else if ($value === 'IS NULL') {
-                $qb->andWhere($qb->expr()->isNull($filter));
-            } else {
-                $qb->andWhere($qb->expr()->eq($filter, $qb->createNamedParameter($value)));
-            }
-        }
-
-        if (empty($searchConditions) === false) {
-            $qb->andWhere('('.implode(' OR ', $searchConditions).')');
-            foreach ($searchParams as $param => $value) {
-                $qb->setParameter($param, $value);
-            }
-        }
-
-        return $this->findEntities(query: $qb);
-
-    }//end findAll()
+    public function findAll(
+        ?int $limit=null,
+        ?int $offset=null,
+        ?array $filters=[],
+        ?array $searchConditions=[],
+        ?array $searchParams=[],
+        ?array $ids=null
+    ): array {
+        return parent::findAll($limit, $offset, $filters, $searchConditions, $searchParams, $ids);
+    }
 
 
     public function createFromArray(array $object): Synchronization
