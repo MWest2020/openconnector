@@ -142,6 +142,21 @@ import { Rule } from '../../entities/index.js'
 					:multiple="false"
 					:clearable="false" />
 
+                <NcTextField  v-if="typeOptions.value?.id === 'synchronization'"
+                    label="Merge result of synchronization to key in object"
+                    maxlength="255"
+                    :value.sync="ruleItem.configuration.synchronization.mergeResultToKey"
+                    placeholder="key.in.synchronized.object"
+                    :disabled="ruleItem.configuration.synchronization.overwriteObjectWithResult === true" />
+                
+                <NcCheckboxRadioSwitch v-if="typeOptions.value?.id === 'synchronization'"
+                    type="checkbox"
+                    label="Overwrite synchronized object with result"
+                    :checked.sync="ruleItem.configuration.synchronization.overwriteObjectWithResult"
+                    :disabled="ruleItem.configuration.synchronization.mergeResultToKey !== ''">
+                    Overwrite synchronized object with result
+                </NcCheckboxRadioSwitch> 
+
 				<!-- Error Configuration -->
 				<template v-if="typeOptions.value?.id === 'error'">
 					<NcInputField
@@ -585,7 +600,11 @@ export default {
 				timing: '',
 				configuration: {
 					mapping: null,
-					synchronization: null,
+					synchronization: {
+                        id: '',
+                        mergeResultToKey: null,
+                        overwriteObjectWithResult: false,
+                    },
 					error: {
 						code: 500,
 						name: 'Something went wrong',
@@ -699,7 +718,11 @@ export default {
 				...ruleStore.ruleItem,
 				configuration: {
 					mapping: ruleStore.ruleItem.configuration?.mapping ?? null,
-					synchronization: ruleStore.ruleItem.configuration?.synchronization ?? null,
+					synchronization: {
+                        id: ruleStore.ruleItem.configuration?.synchronization?.id ?? '',
+                        mergeResultToKey: ruleStore.ruleItem.configuration?.synchronization?.mergeResultToKey ?? '',
+                        overwriteObjectWithResult: ruleStore.ruleItem.configuration?.synchronization?.overwriteObjectWithResult ?? false,
+                    },
 					error: {
 						code: ruleStore.ruleItem.configuration?.error?.code ?? 500,
 						name: ruleStore.ruleItem.configuration?.error?.name ?? 'Something went wrong',
@@ -764,7 +787,7 @@ export default {
 				option => option.id === this.ruleItem.type,
 			)
 			this.authenticationTypeOptions.value = this.authenticationTypeOptions.options.find(
-				option => option.value === ruleStore.ruleItem.configuration.authentication.type,
+				option => option.value === ruleStore.ruleItem.configuration?.authentication?.type,
 			)
 		}
 		if (!this.IS_EDIT) {
@@ -940,7 +963,7 @@ export default {
 					// Set active synchronization if editing
 					if (this.IS_EDIT && this.ruleItem.configuration?.synchronization) {
 						const activeSync = this.syncOptions.options.find(
-							option => option.value === this.ruleItem.configuration.synchronization,
+							option => option.value === this.ruleItem.configuration.synchronization.id,
 						)
 						if (activeSync) {
 							this.syncOptions.value = activeSync
@@ -1228,7 +1251,7 @@ export default {
 				configuration.mapping = this.mappingOptions.value?.value
 				break
 			case 'synchronization':
-				configuration.synchronization = this.syncOptions.value?.value
+				configuration.synchronization.id = this.syncOptions.value?.value
 				break
 			case 'javascript':
 				configuration.javascript = this.ruleItem.configuration.javascript

@@ -97,6 +97,8 @@ The synchronization rules take the following configuration options:
 - synchronization (required): The synchronization to run.
 - isTest (optional): if set to true, always treat the synchronization as if it is in test mode.
 - force (optional): if set to true, always force objects to be overwritten from the synchronization.
+- mergeResultToKey (optional): if set , merges the synchronization result to a key in the synchronized object. IF `#` is configured, will the result with the synchronizaiton object. Not compatible with `overwriteObjectWithResult` config option
+- overwriteObjectWithResult (optional): if set to true, overwrites result with synchronization result instead of synchronization object. Not compatible with `mergeResultToKey` config option
 
 The isTest and force options can also be overridden from the endpoint by setting the corresponding fields on the request body.
 
@@ -154,6 +156,14 @@ and if no additional data has been put into the folder where the parts are store
 The `filepart_upload` rule takes the following configuration:
 
 - `mappingId` (optional): If the file parts are in a specific format, the mapping to map the fileparts to the default format. (Usually this means that this is the inverse mapping of `mappingId` in the corresponding `fileparts_create` rule).
+
+### Save object Rules
+
+Save object rules allow saving a object on the moment of configuration of the specified Rule
+
+Will only work if `register` and `schema` are configured and if a object can be passed.
+
+Optionally a `mapping` can be configured to execute
 
 ### Locking Rules
 
