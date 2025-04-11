@@ -474,7 +474,7 @@ import { Rule } from '../../entities/index.js'
 					|| !ruleItem.name
 					|| !isValidJson(ruleItem.conditions)
 					|| typeOptions.value?.id === 'fetch_file' && (!ruleItem.configuration.fetch_file.filePath || !sourceOptions.sourceValue)
-					|| typeOptions.value?.id === 'save_object' && (!ruleItem.configuration.save_object.schema || !!ruleItem.configuration.save_object.register)
+					|| typeOptions.value?.id === 'save_object' && (!ruleItem.configuration.save_object.schema || !ruleItem.configuration.save_object.register)
 					|| typeOptions.value?.id === 'write_file' && (!ruleItem.configuration.write_file.filePath || !ruleItem.configuration.write_file.fileNamePath)
 					|| typeOptions.value?.id === 'fileparts_create' && (!schemaOptions.value || !ruleItem.configuration.fileparts_create.sizeLocation)
 					|| typeOptions.value?.id === 'filepart_upload' && !filepartUploadMappingOptions.value"
