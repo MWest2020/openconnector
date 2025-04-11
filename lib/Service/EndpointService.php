@@ -20,6 +20,7 @@ use OCA\OpenConnector\Service\MappingService;
 use OCA\OpenConnector\Service\ObjectService;
 use OCA\OpenConnector\Db\Source;
 use OCA\OpenConnector\Db\Endpoint;
+use OCA\OpenConnector\Db\Mapping;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\ClientException;
 use GuzzleHttp\Exception\GuzzleException;
@@ -792,6 +793,31 @@ class EndpointService
     }
 
     /**
+     * Saves object to OpenRegister
+     * 
+     * @param Rule $rule 
+     * @param array $data
+     * 
+     * @return array $data
+     */
+    private function processSaveObjectRule(Rule $rule, array $data): array
+    {
+        $configuration = $rule->getConfiguration();
+        $register = $configuration['register'];
+        $schema = $configuration['schema'];
+        $mapping = $configuration['mapping'] ?? null;
+
+        if (isset($mapping) === true) {
+            $data = $this->processMapping(rule: $rule, mapping: $mapping, data: $data);
+        }
+
+        $objectService = $this->containerInterface->get('OCA\OpenRegister\Service\ObjectService');
+        $data['body'] = $objectService->saveObject(register: $register, schema: $schema, object: $data['body']);
+
+        return $data;
+    }
+
+    /**
      * Processes rules for an endpoint request
      *
      * @param Endpoint $endpoint The endpoint being processed
@@ -807,7 +833,7 @@ class EndpointService
             return $data;
         }
 
-        try {
+        // try {
             // Get all rules at once and sort by order
             $ruleEntities = array_filter(
                 array_map(
@@ -833,6 +859,7 @@ class EndpointService
 
                 // Process rule based on type
                 $result = match ($rule->getType()) {
+                    'save_object' => $this->processSaveObjectRule($rule, $data),
                     'authentication' => $this->processAuthenticationRule($rule, $data),
                     'error' => $this->processErrorRule($rule),
                     'mapping' => $this->processMappingRule($rule, $data),
@@ -854,10 +881,10 @@ class EndpointService
             }
 
             return $data;
-        } catch (Exception $e) {
-            $this->logger->error('Error processing rules: ' . $e->getMessage());
-            return new JSONResponse(['error' => 'Rule processing failed: ' . $e->getMessage()], 500);
-        }
+        // } catch (Exception $e) {
+        //     $this->logger->error('Error processing rules: ' . $e->getMessage());
+        //     return new JSONResponse(['error' => 'Rule processing failed: ' . $e->getMessage()], 500);
+        // }
     }
 
     /**
@@ -967,22 +994,15 @@ class EndpointService
     }
 
     /**
-     * Processes a mapping rule
-     *
-     * @param Rule $rule The rule object containing mapping details
-     * @param array $data The data to be processed through the mapping rule
-     *
-     * @return array The processed data after applying the mapping rule
-     * @throws DoesNotExistException When the mapping configuration does not exist
-     * @throws MultipleObjectsReturnedException When multiple mapping objects are returned unexpectedly
-     * @throws LoaderError When there is an error loading the mapping
-     * @throws SyntaxError When there is a syntax error in the mapping configuration
+     * Executes mapping on data from endpoint flow
+     * 
+     * @param mapping $mapping
+     * @param array $data
+     * 
+     * @return array $data
      */
-    private function processMappingRule(Rule $rule, array $data): array
+    private function processMapping(Rule $rule, Mapping $mapping, array $data): array
     {
-        $config = $rule->getConfiguration();
-        $mapping = $this->mappingService->getMapping($config['mapping']);
-
         // Todo: We should just remove this if statement and use mapping to loop through results instead.
         if (isset($data['body']['results']) === true
             && strtolower($rule->getAction()) === 'get'
@@ -1001,6 +1021,28 @@ class EndpointService
     }
 
     /**
+     * Processes a mapping rule
+     *
+     * @param Rule $rule The rule object containing mapping details
+     * @param array $data The data to be processed through the mapping rule
+     *
+     * @return array The processed data after applying the mapping rule
+     * @throws DoesNotExistException When the mapping configuration does not exist
+     * @throws MultipleObjectsReturnedException When multiple mapping objects are returned unexpectedly
+     * @throws LoaderError When there is an error loading the mapping
+     * @throws SyntaxError When there is a syntax error in the mapping configuration
+     */
+    private function processMappingRule(Rule $rule, array $data): array
+    {
+        $config = $rule->getConfiguration();
+        $mapping = $this->mappingService->getMapping($config['mapping']);
+
+        $data = $this->processMapping(rule: $rule, mapping: $mapping, data: $data);
+
+        return $data;
+    }
+
+    /**
      * Processes a synchronization rule
      *
      * @param Rule $rule The rule object containing synchronization details
@@ -1013,15 +1055,15 @@ class EndpointService
         $config = $rule->getConfiguration();
 
         // Check if base requirement is in config.
-        if(isset($config['synchronization']) === false) {
+        if(isset($config['synchronization']['id']) === false) {
             return $data;
         }
 
         // Fetch the synchronization.
-        if (is_numeric($config['synchronization']) === true) {
-            $synchronization = $this->synchronizationService->getSynchronization(id: (int) $config['synchronization']);
+        if (is_numeric($config['synchronization']['id']) === true) {
+            $synchronization = $this->synchronizationService->getSynchronization(id: (int) $config['synchronization']['id']);
         } else {
-            $synchronization = $this->synchronizationService->getSynchronization(filters: ['reference' => $config['synchronization']]);
+            $synchronization = $this->synchronizationService->getSynchronization(filters: ['reference' => $config['synchronization']['id']]);
         }
 
         // Check if the synchronization should be in test mode.
@@ -1047,8 +1089,31 @@ class EndpointService
             $object = $data['body'];
         }
 
+        // Set $object to a different variable becuase we might update $object with reference and want to keep what we send to synchronize.
+        $sendObject = $object;
+
         // Run synchronization.
-        $data['body'] = $this->synchronizationService->synchronize(synchronization: $synchronization, isTest: $test, force: $force, object: $object);
+        $log = $this->synchronizationService->synchronize(synchronization: $synchronization, isTest: $test, force: $force, object: $object, returnResult: true);
+
+        // $object got updated through reference.
+        $returnedObject = $object;
+
+        if (isset($config['synchronization']['mergeResultToKey']) === true) {
+            // Merge result to root send object.
+            if ($config['synchronization']['mergeResultToKey'] === '#') {
+                $data['body'] = array_merge($sendObject, $returnedObject);
+            // Merge result to configured key in send object
+            } else {
+                $sendObject[$config['synchronization']['mergeResultToKey']] = $returnedObject;
+                $data['body'] = $sendObject;
+            }
+        // Overwrite body with result  
+        } else if (isset($config['synchronization']['overwriteObjectWithResult']) === true && filter_var($config['synchronization']['overwriteObjectWithResult'], FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) === true) {
+            $data['body'] = $returnedObject;
+        } else {
+            $data['body'] = $log;
+        }
+
         return $data;
     }
 
