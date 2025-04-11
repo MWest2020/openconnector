@@ -218,12 +218,13 @@ abstract class BaseMapper extends QBMapper
     }//end getTotal()
 
 
-    /**
-     * Get the name of the database table
-     *
-     * @return string The table name
-     */
-    abstract public function getTableName(): string;
+    // @todo: fix this:
+    // /**
+    //  * Get the name of the database table
+    //  *
+    //  * @return string The table name
+    //  */
+    // abstract public function getTableName(): string;
 
 
     /**
