@@ -192,4 +192,27 @@ class EndpointMapper extends QBMapper
                    $endpoint->getMethod() === $method;
         });
     }
+
+    /**
+     * Find endpoints that are linked to a specific register
+     *
+     * @param int $registerId The ID of the register to find endpoints for
+     *
+     * @return array<Endpoint> Array of Endpoint entities linked to the register
+     */
+    public function getByRegister(int $registerId): array
+    {
+        $qb = $this->db->getQueryBuilder();
+
+        $qb->select('*')
+            ->from('openconnector_endpoints')
+            ->where(
+                $qb->expr()->andX(
+                    $qb->expr()->eq('target_type', $qb->createNamedParameter('register/schema')),
+                    $qb->expr()->eq('target_id', $qb->createNamedParameter($registerId, IQueryBuilder::PARAM_INT))
+                )
+            );
+
+        return $this->findEntities(query: $qb);
+    }
 }

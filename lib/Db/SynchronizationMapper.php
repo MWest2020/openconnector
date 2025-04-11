@@ -129,4 +129,27 @@ class SynchronizationMapper extends QBMapper
         // Return the total count
         return (int)$row['count'];
     }
+
+    /**
+     * Find synchronizations that are linked to a specific register
+     *
+     * @param int $registerId The ID of the register to find synchronizations for
+     *
+     * @return array<Synchronization> Array of Synchronization entities linked to the register
+     */
+    public function getByRegister(int $registerId): array
+    {
+        $qb = $this->db->getQueryBuilder();
+
+        $qb->select('*')
+            ->from('openconnector_synchronizations')
+            ->where(
+                $qb->expr()->andX(
+                    $qb->expr()->eq('target_type', $qb->createNamedParameter('register/schema')),
+                    $qb->expr()->eq('target_id', $qb->createNamedParameter($registerId, IQueryBuilder::PARAM_INT))
+                )
+            );
+
+        return $this->findEntities(query: $qb);
+    }
 }
