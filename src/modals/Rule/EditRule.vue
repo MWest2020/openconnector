@@ -635,6 +635,10 @@ export default {
 					filepart_upload: {
 						mappingId: '',
 					},
+					save_object: {
+						register: '',
+						schema: '',
+					},
 				},
 			},
 
@@ -744,6 +748,10 @@ export default {
 					},
 					filepart_upload: {
 						mappingId: ruleStore.ruleItem.configuration?.filepart_upload?.mappingId ?? '',
+					},
+					save_object: {
+						register: ruleStore.ruleItem.configuration?.save_object?.register ?? '',
+						schema: ruleStore.ruleItem.configuration?.save_object?.schema ?? '',
 					},
 				},
 				conditions: JSON.stringify(ruleStore.ruleItem.conditions, null, 2),
@@ -1286,6 +1294,12 @@ export default {
 			case 'filepart_upload':
 				configuration.filepart_upload = {
 					mappingId: this.filepartUploadMappingOptions.value?.value,
+				}
+				break
+			case 'save_object':
+				configuration.save_object = {
+					register: this.ruleItem.configuration.save_object.register,
+					schema: this.ruleItem.configuration.save_object.schema,
 				}
 				break
 			}
