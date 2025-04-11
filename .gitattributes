@@ -15,9 +15,6 @@ bin/console text eol=lf
 *.ico binary
 *.png binary
 
-# Force main branch version of info.xml during merges
-appinfo/info.xml merge=ours -diff linguist-generated=true
-
 .github export-ignore
 .travis.yml export-ignore
 LICENSE export-ignore
