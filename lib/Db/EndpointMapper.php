@@ -17,155 +17,184 @@ use Symfony\Component\Uid\Uuid;
  */
 class EndpointMapper extends BaseMapper
 {
-	/**
-	 * The name of the database table for endpoints
-	 */
-	private const TABLE_NAME = 'openconnector_endpoints';
+    /**
+     * The name of the database table for endpoints
+     */
+    private const TABLE_NAME = 'openconnector_endpoints';
 
-	public function __construct(IDBConnection $db)
-	{
-		parent::__construct($db, self::TABLE_NAME);
-	}
 
-	/**
-	 * Get the name of the database table
-	 *
-	 * @return string The table name
-	 */
-	protected function getTableName(): string
-	{
-		return self::TABLE_NAME;
-	}
+    public function __construct(IDBConnection $db)
+    {
+        parent::__construct($db, self::TABLE_NAME);
 
-	/**
-	 * Create a new Endpoint entity instance
-	 *
-	 * @return Endpoint A new Endpoint instance
-	 */
-	protected function createEntity(): Entity
-	{
-		return new Endpoint();
-	}
+    }//end __construct()
 
-	private function createEndpointRegex(string $endpoint): string {
-		$regex = '#^' . preg_replace(
-			['#\/{{([^}}]+)}}\/#', '#\/{{([^}}]+)}}$#'],
-			['/([^/]+)/', '(/([^/]+))?'],
-			$endpoint
-		) . '#';
 
-		// Replace only the LAST occurrence of "(/([^/]+))?#" with "(?:/([^/]+))?$#"
-		$regex = preg_replace_callback(
-			'/\(\/\(\[\^\/\]\+\)\)\?#/',
-			function ($matches) {
-				return '(?:/([^/]+))?$#';
-			},
-			$regex,
-			1 // Limit to only one replacement
-		);
+    /**
+     * Get the name of the database table
+     *
+     * @return string The table name
+     */
+    protected function getTableName(): string
+    {
+        return self::TABLE_NAME;
 
-		if (str_ends_with($regex, '?#') === false && str_ends_with($regex, '$#') === false) {
-			$regex = substr($regex, 0, -1) . '$#';
-		}
+    }//end getTableName()
 
-		return $regex;
-	}
 
-	public function createFromArray(array $object): Endpoint
-	{
-		$obj = new Endpoint();
-		$obj->hydrate($object);
+    /**
+     * Create a new Endpoint entity instance
+     *
+     * @return Endpoint A new Endpoint instance
+     */
+    protected function createEntity(): Entity
+    {
+        return new Endpoint();
 
-		// Set uuid
-		if ($obj->getUuid() === null) {
-			$obj->setUuid(Uuid::v4());
-		}
+    }//end createEntity()
 
-		// Set version
-		if (empty($obj->getVersion()) === true) {
-			$obj->setVersion('0.0.1');
-		}
 
-		// Endpoint-specific logic
-		$obj->setEndpointRegex($this->createEndpointRegex($obj->getEndpoint()));
-		$obj->setEndpointArray(explode('/', $obj->getEndpoint()));
+    private function createEndpointRegex(string $endpoint): string
+    {
+        $regex = '#^'.preg_replace(
+            [
+                '#\/{{([^}}]+)}}\/#',
+                '#\/{{([^}}]+)}}$#',
+            ],
+            [
+                '/([^/]+)/',
+                '(/([^/]+))?',
+            ],
+            $endpoint
+        ).'#';
 
-		return $this->insert(entity: $obj);
-	}
+        // Replace only the LAST occurrence of "(/([^/]+))?#" with "(?:/([^/]+))?$#"
+        $regex = preg_replace_callback(
+            '/\(\/\(\[\^\/\]\+\)\)\?#/',
+            function ($matches) {
+                return '(?:/([^/]+))?$#';
+            },
+            $regex,
+            1
+            // Limit to only one replacement
+        );
 
-	public function updateFromArray(int $id, array $object): Endpoint
-	{
-		$obj = $this->find($id);
+        if (str_ends_with($regex, '?#') === false && str_ends_with($regex, '$#') === false) {
+            $regex = substr($regex, 0, -1).'$#';
+        }
 
-		// Set version
-		if (empty($obj->getVersion()) === true) {
-			$object['version'] = '0.0.1';
-		} else if (empty($object['version']) === true) {
-			// Update version
-			$version = explode('.', $obj->getVersion());
-			if (isset($version[2]) === true) {
-				$version[2] = (int) $version[2] + 1;
-				$object['version'] = implode('.', $version);
-			}
-		}
+        return $regex;
 
-		$obj->hydrate($object);
+    }//end createEndpointRegex()
 
-		// Endpoint-specific logic
-		$obj->setEndpointRegex($this->createEndpointRegex($obj->getEndpoint()));
-		$obj->setEndpointArray(explode('/', $obj->getEndpoint()));
 
-		return $this->update($obj);
-	}
+    public function createFromArray(array $object): Endpoint
+    {
+        $obj = new Endpoint();
+        $obj->hydrate($object);
 
-	/**
-	 * Find endpoints that match a given path and method using regex comparison
-	 *
-	 * @param string $path The path to match against endpoint regex patterns
-	 * @param string $method The HTTP method to filter by (GET, POST, etc)
-	 * @return array Array of matching Endpoint entities
-	 */
-	public function findByPathRegex(string $path, string $method): array
-	{
-		// Get all endpoints first since we need to do regex comparison
-		$endpoints = $this->findAll();
+        // Set uuid
+        if ($obj->getUuid() === null) {
+            $obj->setUuid(Uuid::v4());
+        }
 
-		// Filter endpoints where both path matches regex pattern and method matches
-		return array_filter($endpoints, function(Endpoint $endpoint) use ($path, $method) {
-			// Get the regex pattern from the endpoint
-			$pattern = $endpoint->getEndpointRegex();
+        // Set version
+        if (empty($obj->getVersion()) === true) {
+            $obj->setVersion('0.0.1');
+        }
 
-			// Skip if no regex pattern is set
-			if (empty($pattern) === true) {
-				return false;
-			}
+        // Endpoint-specific logic
+        $obj->setEndpointRegex($this->createEndpointRegex($obj->getEndpoint()));
+        $obj->setEndpointArray(explode('/', $obj->getEndpoint()));
 
-			// Check if both path matches the regex pattern and method matches
-			return preg_match($pattern, $path) === 1 &&
-				   $endpoint->getMethod() === $method;
-		});
-	}
+        return $this->insert(entity: $obj);
 
-	/**
-	 * Find endpoints that are linked to a specific register
-	 *
-	 * @param int $registerId The ID of the register to find endpoints for
-	 *
-	 * @return array<Endpoint> Array of Endpoint entities linked to the register
-	 */
-	public function getByRegister(int $registerId): array
-	{
-		$qb = $this->db->getQueryBuilder();
+    }//end createFromArray()
 
-		$qb->select('*')
-			->from($this->getTableName())
-			->where(
-				$qb->expr()->andX(
-					$qb->expr()->eq('target_type', $qb->createNamedParameter('register/schema')),
-					$qb->expr()->eq('target_id', $qb->createNamedParameter($registerId, IQueryBuilder::PARAM_INT))
-				)
-			);
 
-		return $this->findEntities($qb);
-	}
-}
+    public function updateFromArray(int $id, array $object): Endpoint
+    {
+        $obj = $this->find($id);
+
+        // Set version
+        if (empty($obj->getVersion()) === true) {
+            $object['version'] = '0.0.1';
+        } else if (empty($object['version']) === true) {
+            // Update version
+            $version = explode('.', $obj->getVersion());
+            if (isset($version[2]) === true) {
+                $version[2]        = ((int) $version[2] + 1);
+                $object['version'] = implode('.', $version);
+            }
+        }
+
+        $obj->hydrate($object);
+
+        // Endpoint-specific logic
+        $obj->setEndpointRegex($this->createEndpointRegex($obj->getEndpoint()));
+        $obj->setEndpointArray(explode('/', $obj->getEndpoint()));
+
+        return $this->update($obj);
+
+    }//end updateFromArray()
+
+
+    /**
+     * Find endpoints that match a given path and method using regex comparison
+     *
+     * @param  string $path   The path to match against endpoint regex patterns
+     * @param  string $method The HTTP method to filter by (GET, POST, etc)
+     * @return array Array of matching Endpoint entities
+     */
+    public function findByPathRegex(string $path, string $method): array
+    {
+        // Get all endpoints first since we need to do regex comparison
+        $endpoints = $this->findAll();
+
+        // Filter endpoints where both path matches regex pattern and method matches
+        return array_filter(
+            $endpoints,
+            function (Endpoint $endpoint) use ($path, $method) {
+                // Get the regex pattern from the endpoint
+                $pattern = $endpoint->getEndpointRegex();
+
+                // Skip if no regex pattern is set
+                if (empty($pattern) === true) {
+                    return false;
+                }
+
+                // Check if both path matches the regex pattern and method matches
+                return preg_match($pattern, $path) === 1 &&
+                       $endpoint->getMethod() === $method;
+            }
+        );
+
+    }//end findByPathRegex()
+
+
+    /**
+     * Find endpoints that are linked to a specific register
+     *
+     * @param int $registerId The ID of the register to find endpoints for
+     *
+     * @return array<Endpoint> Array of Endpoint entities linked to the register
+     */
+    public function getByRegister(int $registerId): array
+    {
+        $qb = $this->db->getQueryBuilder();
+
+        $qb->select('*')
+            ->from($this->getTableName())
+            ->where(
+                $qb->expr()->andX(
+                    $qb->expr()->eq('target_type', $qb->createNamedParameter('register/schema')),
+                    $qb->expr()->eq('target_id', $qb->createNamedParameter($registerId, IQueryBuilder::PARAM_INT))
+                )
+            );
+
+        return $this->findEntities($qb);
+
+    }//end getByRegister()
+
+
+}//end class

@@ -19,33 +19,41 @@ use Symfony\Component\Uid\Uuid;
  */
 class MappingMapper extends BaseMapper
 {
-	/**
-	 * The name of the database table for mappings
-	 */
-	private const TABLE_NAME = 'openconnector_mappings';
+    /**
+     * The name of the database table for mappings
+     */
+    private const TABLE_NAME = 'openconnector_mappings';
 
-	public function __construct(IDBConnection $db)
-	{
-		parent::__construct($db, self::TABLE_NAME);
-	}
 
-	/**
-	 * Get the name of the database table
-	 *
-	 * @return string The table name
-	 */
-	protected function getTableName(): string
-	{
-		return self::TABLE_NAME;
-	}
+    public function __construct(IDBConnection $db)
+    {
+        parent::__construct($db, self::TABLE_NAME);
 
-	/**
-	 * Create a new Mapping entity instance
-	 *
-	 * @return Mapping A new Mapping instance
-	 */
-	protected function createEntity(): Entity
-	{
-		return new Mapping();
-	}
-}
+    }//end __construct()
+
+
+    /**
+     * Get the name of the database table
+     *
+     * @return string The table name
+     */
+    protected function getTableName(): string
+    {
+        return self::TABLE_NAME;
+
+    }//end getTableName()
+
+
+    /**
+     * Create a new Mapping entity instance
+     *
+     * @return Mapping A new Mapping instance
+     */
+    protected function createEntity(): Entity
+    {
+        return new Mapping();
+
+    }//end createEntity()
+
+
+}//end class

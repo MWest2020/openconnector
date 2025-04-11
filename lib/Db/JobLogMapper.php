@@ -29,10 +29,13 @@ class JobLogMapper extends BaseMapper
      */
     private const TABLE_NAME = 'openconnector_job_logs';
 
+
     public function __construct(IDBConnection $db)
     {
         parent::__construct($db, self::TABLE_NAME);
-    }
+
+    }//end __construct()
+
 
     /**
      * Get the name of the database table
@@ -42,7 +45,9 @@ class JobLogMapper extends BaseMapper
     protected function getTableName(): string
     {
         return self::TABLE_NAME;
-    }
+
+    }//end getTableName()
+
 
     /**
      * Create a new JobLog entity instance
@@ -52,7 +57,9 @@ class JobLogMapper extends BaseMapper
     protected function createEntity(): Entity
     {
         return new JobLog();
-    }
+
+    }//end createEntity()
+
 
     public function createForJob(Job $job, array $object): JobLog
     {
@@ -62,54 +69,59 @@ class JobLogMapper extends BaseMapper
         if ($obj->getUuid() === null) {
             $obj->setUuid(Uuid::v4());
         }
+
         // Set job_id
         $obj->setJobId($job->getId());
         return $this->insert($obj);
-    }
 
-	/**
-	 * Get the last call log.
-	 *
-	 * @return JobLog|null The last call log or null if no logs exist.
-	 * @throws MultipleObjectsReturnedException
-	 * @throws Exception
-	 */
+    }//end createForJob()
+
+
+    /**
+     * Get the last call log.
+     *
+     * @return JobLog|null The last call log or null if no logs exist.
+     * @throws MultipleObjectsReturnedException
+     * @throws Exception
+     */
     public function getLastCallLog(): ?JobLog
     {
         $qb = $this->db->getQueryBuilder();
 
         $qb->select('*')
-           ->from($this->getTableName())
-           ->orderBy('created', 'DESC')
-           ->setMaxResults(1);
+            ->from($this->getTableName())
+            ->orderBy('created', 'DESC')
+            ->setMaxResults(1);
 
         try {
             return $this->findEntity($qb);
         } catch (\OCP\AppFramework\Db\DoesNotExistException $e) {
             return null;
         }
-    }
 
-	/**
-	 * Get job statistics grouped by date for a specific date range
-	 *
-	 * @param DateTime $from Start date
-	 * @param DateTime $to End date
-	 *
-	 * @return array Array of daily statistics with counts per log level
-	 * @throws Exception
-	 */
+    }//end getLastCallLog()
+
+
+    /**
+     * Get job statistics grouped by date for a specific date range
+     *
+     * @param DateTime $from Start date
+     * @param DateTime $to   End date
+     *
+     * @return array Array of daily statistics with counts per log level
+     * @throws Exception
+     */
     public function getJobStatsByDateRange(DateTime $from, DateTime $to): array
     {
         $qb = $this->db->getQueryBuilder();
 
         $qb->select(
-                $qb->createFunction('DATE(created) as date'),
-                $qb->createFunction('SUM(CASE WHEN level = \'INFO\' THEN 1 ELSE 0 END) as info'),
-                $qb->createFunction('SUM(CASE WHEN level = \'WARNING\' THEN 1 ELSE 0 END) as warning'),
-                $qb->createFunction('SUM(CASE WHEN level = \'ERROR\' THEN 1 ELSE 0 END) as error'),
-                $qb->createFunction('SUM(CASE WHEN level = \'DEBUG\' THEN 1 ELSE 0 END) as debug')
-            )
+            $qb->createFunction('DATE(created) as date'),
+            $qb->createFunction('SUM(CASE WHEN level = \'INFO\' THEN 1 ELSE 0 END) as info'),
+            $qb->createFunction('SUM(CASE WHEN level = \'WARNING\' THEN 1 ELSE 0 END) as warning'),
+            $qb->createFunction('SUM(CASE WHEN level = \'ERROR\' THEN 1 ELSE 0 END) as error'),
+            $qb->createFunction('SUM(CASE WHEN level = \'DEBUG\' THEN 1 ELSE 0 END) as debug')
+        )
             ->from($this->getTableName())
             ->where($qb->expr()->gte('created', $qb->createNamedParameter($from->format('Y-m-d H:i:s'))))
             ->andWhere($qb->expr()->lte('created', $qb->createNamedParameter($to->format('Y-m-d H:i:s'))))
@@ -117,7 +129,7 @@ class JobLogMapper extends BaseMapper
             ->orderBy('date', 'ASC');
 
         $result = $qb->execute();
-        $stats = [];
+        $stats  = [];
 
         // Create DatePeriod to iterate through all dates
         $period = new DatePeriod(
@@ -128,48 +140,50 @@ class JobLogMapper extends BaseMapper
 
         // Initialize all dates with zero values
         foreach ($period as $date) {
-            $dateStr = $date->format('Y-m-d');
+            $dateStr         = $date->format('Y-m-d');
             $stats[$dateStr] = [
-                'info' => 0,
+                'info'    => 0,
                 'warning' => 0,
-                'error' => 0,
-                'debug' => 0
+                'error'   => 0,
+                'debug'   => 0,
             ];
         }
 
         // Fill in actual values where they exist
         while ($row = $result->fetch()) {
             $stats[$row['date']] = [
-                'info' => (int)$row['info'],
-                'warning' => (int)$row['warning'],
-                'error' => (int)$row['error'],
-                'debug' => (int)$row['debug']
+                'info'    => (int) $row['info'],
+                'warning' => (int) $row['warning'],
+                'error'   => (int) $row['error'],
+                'debug'   => (int) $row['debug'],
             ];
         }
 
         return $stats;
-    }
 
-	/**
-	 * Get job statistics grouped by hour for a specific date range
-	 *
-	 * @param DateTime $from Start date
-	 * @param DateTime $to End date
-	 *
-	 * @return array Array of hourly statistics with counts per log level
-	 * @throws Exception
-	 */
+    }//end getJobStatsByDateRange()
+
+
+    /**
+     * Get job statistics grouped by hour for a specific date range
+     *
+     * @param DateTime $from Start date
+     * @param DateTime $to   End date
+     *
+     * @return array Array of hourly statistics with counts per log level
+     * @throws Exception
+     */
     public function getJobStatsByHourRange(DateTime $from, DateTime $to): array
     {
         $qb = $this->db->getQueryBuilder();
 
         $qb->select(
-                $qb->createFunction('HOUR(created) as hour'),
-                $qb->createFunction('SUM(CASE WHEN level = \'INFO\' THEN 1 ELSE 0 END) as info'),
-                $qb->createFunction('SUM(CASE WHEN level = \'WARNING\' THEN 1 ELSE 0 END) as warning'),
-                $qb->createFunction('SUM(CASE WHEN level = \'ERROR\' THEN 1 ELSE 0 END) as error'),
-                $qb->createFunction('SUM(CASE WHEN level = \'DEBUG\' THEN 1 ELSE 0 END) as debug')
-            )
+            $qb->createFunction('HOUR(created) as hour'),
+            $qb->createFunction('SUM(CASE WHEN level = \'INFO\' THEN 1 ELSE 0 END) as info'),
+            $qb->createFunction('SUM(CASE WHEN level = \'WARNING\' THEN 1 ELSE 0 END) as warning'),
+            $qb->createFunction('SUM(CASE WHEN level = \'ERROR\' THEN 1 ELSE 0 END) as error'),
+            $qb->createFunction('SUM(CASE WHEN level = \'DEBUG\' THEN 1 ELSE 0 END) as debug')
+        )
             ->from($this->getTableName())
             ->where($qb->expr()->gte('created', $qb->createNamedParameter($from->format('Y-m-d H:i:s'))))
             ->andWhere($qb->expr()->lte('created', $qb->createNamedParameter($to->format('Y-m-d H:i:s'))))
@@ -177,17 +191,20 @@ class JobLogMapper extends BaseMapper
             ->orderBy('hour', 'ASC');
 
         $result = $qb->execute();
-        $stats = [];
+        $stats  = [];
 
         while ($row = $result->fetch()) {
             $stats[$row['hour']] = [
-                'info' => (int)$row['info'],
-                'warning' => (int)$row['warning'],
-                'error' => (int)$row['error'],
-                'debug' => (int)$row['debug']
+                'info'    => (int) $row['info'],
+                'warning' => (int) $row['warning'],
+                'error'   => (int) $row['error'],
+                'debug'   => (int) $row['debug'],
             ];
         }
 
         return $stats;
-    }
-}
+
+    }//end getJobStatsByHourRange()
+
+
+}//end class

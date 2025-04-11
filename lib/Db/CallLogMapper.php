@@ -29,10 +29,13 @@ class CallLogMapper extends BaseMapper
      */
     private const TABLE_NAME = 'openconnector_call_logs';
 
+
     public function __construct(IDBConnection $db)
     {
         parent::__construct($db, self::TABLE_NAME);
-    }
+
+    }//end __construct()
+
 
     /**
      * Get the name of the database table
@@ -42,7 +45,9 @@ class CallLogMapper extends BaseMapper
     protected function getTableName(): string
     {
         return self::TABLE_NAME;
-    }
+
+    }//end getTableName()
+
 
     /**
      * Create a new CallLog entity instance
@@ -52,13 +57,15 @@ class CallLogMapper extends BaseMapper
     protected function createEntity(): Entity
     {
         return new CallLog();
-    }
+
+    }//end createEntity()
+
 
     /**
      * Get call statistics grouped by date for a specific date range
      *
-     * @param DateTime $from Start date
-     * @param DateTime $to End date
+     * @param  DateTime $from Start date
+     * @param  DateTime $to   End date
      * @return array Array of daily statistics with counts per log level
      */
     public function getCallStatsByDateRange(DateTime $from, DateTime $to): array
@@ -66,12 +73,12 @@ class CallLogMapper extends BaseMapper
         $qb = $this->db->getQueryBuilder();
 
         $qb->select(
-                $qb->createFunction('DATE(created) as date'),
-                $qb->createFunction('SUM(CASE WHEN level = \'INFO\' THEN 1 ELSE 0 END) as info'),
-                $qb->createFunction('SUM(CASE WHEN level = \'WARNING\' THEN 1 ELSE 0 END) as warning'),
-                $qb->createFunction('SUM(CASE WHEN level = \'ERROR\' THEN 1 ELSE 0 END) as error'),
-                $qb->createFunction('SUM(CASE WHEN level = \'DEBUG\' THEN 1 ELSE 0 END) as debug')
-            )
+            $qb->createFunction('DATE(created) as date'),
+            $qb->createFunction('SUM(CASE WHEN level = \'INFO\' THEN 1 ELSE 0 END) as info'),
+            $qb->createFunction('SUM(CASE WHEN level = \'WARNING\' THEN 1 ELSE 0 END) as warning'),
+            $qb->createFunction('SUM(CASE WHEN level = \'ERROR\' THEN 1 ELSE 0 END) as error'),
+            $qb->createFunction('SUM(CASE WHEN level = \'DEBUG\' THEN 1 ELSE 0 END) as debug')
+        )
             ->from(self::TABLE_NAME)
             ->where($qb->expr()->gte('created', $qb->createNamedParameter($from->format('Y-m-d H:i:s'))))
             ->andWhere($qb->expr()->lte('created', $qb->createNamedParameter($to->format('Y-m-d H:i:s'))))
@@ -79,7 +86,7 @@ class CallLogMapper extends BaseMapper
             ->orderBy('date', 'ASC');
 
         $result = $qb->execute();
-        $stats = [];
+        $stats  = [];
 
         // Create DatePeriod to iterate through all dates
         $period = new DatePeriod(
@@ -90,33 +97,35 @@ class CallLogMapper extends BaseMapper
 
         // Initialize all dates with zero values
         foreach ($period as $date) {
-            $dateStr = $date->format('Y-m-d');
+            $dateStr         = $date->format('Y-m-d');
             $stats[$dateStr] = [
-                'info' => 0,
+                'info'    => 0,
                 'warning' => 0,
-                'error' => 0,
-                'debug' => 0
+                'error'   => 0,
+                'debug'   => 0,
             ];
         }
 
         // Fill in actual values where they exist
         while ($row = $result->fetch()) {
             $stats[$row['date']] = [
-                'info' => (int)$row['info'],
-                'warning' => (int)$row['warning'],
-                'error' => (int)$row['error'],
-                'debug' => (int)$row['debug']
+                'info'    => (int) $row['info'],
+                'warning' => (int) $row['warning'],
+                'error'   => (int) $row['error'],
+                'debug'   => (int) $row['debug'],
             ];
         }
 
         return $stats;
-    }
+
+    }//end getCallStatsByDateRange()
+
 
     /**
      * Get call statistics grouped by hour for a specific date range
      *
-     * @param DateTime $from Start date
-     * @param DateTime $to End date
+     * @param  DateTime $from Start date
+     * @param  DateTime $to   End date
      * @return array Array of hourly statistics with counts per log level
      */
     public function getCallStatsByHourRange(DateTime $from, DateTime $to): array
@@ -124,12 +133,12 @@ class CallLogMapper extends BaseMapper
         $qb = $this->db->getQueryBuilder();
 
         $qb->select(
-                $qb->createFunction('HOUR(created) as hour'),
-                $qb->createFunction('SUM(CASE WHEN level = \'INFO\' THEN 1 ELSE 0 END) as info'),
-                $qb->createFunction('SUM(CASE WHEN level = \'WARNING\' THEN 1 ELSE 0 END) as warning'),
-                $qb->createFunction('SUM(CASE WHEN level = \'ERROR\' THEN 1 ELSE 0 END) as error'),
-                $qb->createFunction('SUM(CASE WHEN level = \'DEBUG\' THEN 1 ELSE 0 END) as debug')
-            )
+            $qb->createFunction('HOUR(created) as hour'),
+            $qb->createFunction('SUM(CASE WHEN level = \'INFO\' THEN 1 ELSE 0 END) as info'),
+            $qb->createFunction('SUM(CASE WHEN level = \'WARNING\' THEN 1 ELSE 0 END) as warning'),
+            $qb->createFunction('SUM(CASE WHEN level = \'ERROR\' THEN 1 ELSE 0 END) as error'),
+            $qb->createFunction('SUM(CASE WHEN level = \'DEBUG\' THEN 1 ELSE 0 END) as debug')
+        )
             ->from(self::TABLE_NAME)
             ->where($qb->expr()->gte('created', $qb->createNamedParameter($from->format('Y-m-d H:i:s'))))
             ->andWhere($qb->expr()->lte('created', $qb->createNamedParameter($to->format('Y-m-d H:i:s'))))
@@ -137,19 +146,21 @@ class CallLogMapper extends BaseMapper
             ->orderBy('hour', 'ASC');
 
         $result = $qb->execute();
-        $stats = [];
+        $stats  = [];
 
         while ($row = $result->fetch()) {
             $stats[$row['hour']] = [
-                'info' => (int)$row['info'],
-                'warning' => (int)$row['warning'],
-                'error' => (int)$row['error'],
-                'debug' => (int)$row['debug']
+                'info'    => (int) $row['info'],
+                'warning' => (int) $row['warning'],
+                'error'   => (int) $row['error'],
+                'debug'   => (int) $row['debug'],
             ];
         }
 
         return $stats;
-    }
+
+    }//end getCallStatsByHourRange()
+
 
     /**
      * Get the last call log
@@ -161,16 +172,18 @@ class CallLogMapper extends BaseMapper
         $qb = $this->db->getQueryBuilder();
 
         $qb->select('*')
-           ->from(self::TABLE_NAME)
-           ->orderBy('created', 'DESC')
-           ->setMaxResults(1);
+            ->from(self::TABLE_NAME)
+            ->orderBy('created', 'DESC')
+            ->setMaxResults(1);
 
         try {
             return $this->findEntity($qb);
         } catch (\OCP\AppFramework\Db\DoesNotExistException $e) {
             return null;
         }
-    }
+
+    }//end getLastCallLog()
+
 
     /**
      * Clear all call logs
@@ -184,7 +197,9 @@ class CallLogMapper extends BaseMapper
         $qb->delete(self::TABLE_NAME);
 
         return $qb->executeStatement();
-    }
+
+    }//end clearLogs()
+
 
     /**
      * Get call log counts grouped by creation date.
@@ -198,20 +213,22 @@ class CallLogMapper extends BaseMapper
 
         // Select the date part of the created timestamp and count of logs
         $qb->select($qb->createFunction('DATE(created) as date'), $qb->createFunction('COUNT(*) as count'))
-           ->from(self::TABLE_NAME)
-           ->groupBy('date')
-           ->orderBy('date', 'ASC');
+            ->from(self::TABLE_NAME)
+            ->groupBy('date')
+            ->orderBy('date', 'ASC');
 
         $result = $qb->execute();
         $counts = [];
 
         // Fetch results and build the return array
         while ($row = $result->fetch()) {
-            $counts[$row['date']] = (int)$row['count'];
+            $counts[$row['date']] = (int) $row['count'];
         }
 
         return $counts;
-    }
+
+    }//end getCallCountsByDate()
+
 
     /**
      * Get call log counts grouped by creation time (hour).
@@ -225,18 +242,21 @@ class CallLogMapper extends BaseMapper
 
         // Select the hour part of the created timestamp and count of logs
         $qb->select($qb->createFunction('HOUR(created) as hour'), $qb->createFunction('COUNT(*) as count'))
-           ->from(self::TABLE_NAME)
-           ->groupBy('hour')
-           ->orderBy('hour', 'ASC');
+            ->from(self::TABLE_NAME)
+            ->groupBy('hour')
+            ->orderBy('hour', 'ASC');
 
         $result = $qb->execute();
         $counts = [];
 
         // Fetch results and build the return array
         while ($row = $result->fetch()) {
-            $counts[$row['hour']] = (int)$row['count'];
+            $counts[$row['hour']] = (int) $row['count'];
         }
 
         return $counts;
-    }
-}
+
+    }//end getCallCountsByTime()
+
+
+}//end class

@@ -19,33 +19,41 @@ use Symfony\Component\Uid\Uuid;
  */
 class JobMapper extends BaseMapper
 {
-	/**
-	 * The name of the database table for jobs
-	 */
-	private const TABLE_NAME = 'openconnector_jobs';
+    /**
+     * The name of the database table for jobs
+     */
+    private const TABLE_NAME = 'openconnector_jobs';
 
-	public function __construct(IDBConnection $db)
-	{
-		parent::__construct($db, self::TABLE_NAME);
-	}
 
-	/**
-	 * Get the name of the database table
-	 *
-	 * @return string The table name
-	 */
-	protected function getTableName(): string
-	{
-		return self::TABLE_NAME;
-	}
+    public function __construct(IDBConnection $db)
+    {
+        parent::__construct($db, self::TABLE_NAME);
 
-	/**
-	 * Create a new Job entity instance
-	 *
-	 * @return Job A new Job instance
-	 */
-	protected function createEntity(): Entity
-	{
-		return new Job();
-	}
-}
+    }//end __construct()
+
+
+    /**
+     * Get the name of the database table
+     *
+     * @return string The table name
+     */
+    protected function getTableName(): string
+    {
+        return self::TABLE_NAME;
+
+    }//end getTableName()
+
+
+    /**
+     * Create a new Job entity instance
+     *
+     * @return Job A new Job instance
+     */
+    protected function createEntity(): Entity
+    {
+        return new Job();
+
+    }//end createEntity()
+
+
+}//end class

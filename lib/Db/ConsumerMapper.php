@@ -19,38 +19,46 @@ use Symfony\Component\Uid\Uuid;
  */
 class ConsumerMapper extends BaseMapper
 {
-	/**
-	 * The name of the database table for consumers
-	 */
-	private const TABLE_NAME = 'openconnector_consumers';
+    /**
+     * The name of the database table for consumers
+     */
+    private const TABLE_NAME = 'openconnector_consumers';
 
-	/**
-	 * ConsumerMapper constructor.
-	 *
-	 * @param IDBConnection $db The database connection
-	 */
-	public function __construct(IDBConnection $db)
-	{
-		parent::__construct($db, self::TABLE_NAME);
-	}
 
-	/**
-	 * Get the name of the database table
-	 *
-	 * @return string The table name
-	 */
-	protected function getTableName(): string
-	{
-		return self::TABLE_NAME;
-	}
+    /**
+     * ConsumerMapper constructor.
+     *
+     * @param IDBConnection $db The database connection
+     */
+    public function __construct(IDBConnection $db)
+    {
+        parent::__construct($db, self::TABLE_NAME);
 
-	/**
-	 * Create a new Consumer entity instance
-	 *
-	 * @return Consumer A new Consumer instance
-	 */
-	protected function createEntity(): Entity
-	{
-		return new Consumer();
-	}
-}
+    }//end __construct()
+
+
+    /**
+     * Get the name of the database table
+     *
+     * @return string The table name
+     */
+    protected function getTableName(): string
+    {
+        return self::TABLE_NAME;
+
+    }//end getTableName()
+
+
+    /**
+     * Create a new Consumer entity instance
+     *
+     * @return Consumer A new Consumer instance
+     */
+    protected function createEntity(): Entity
+    {
+        return new Consumer();
+
+    }//end createEntity()
+
+
+}//end class

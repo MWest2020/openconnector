@@ -21,6 +21,7 @@ class EventSubscriptionMapper extends QBMapper
      */
     private const TABLE_NAME = 'openconnector_event_subscriptions';
 
+
     /**
      * Constructor
      *
@@ -29,5 +30,8 @@ class EventSubscriptionMapper extends QBMapper
     public function __construct(IDBConnection $db)
     {
         parent::__construct($db, self::TABLE_NAME);
-    }
-}
+
+    }//end __construct()
+
+
+}//end class

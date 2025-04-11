@@ -19,33 +19,41 @@ use Symfony\Component\Uid\Uuid;
  */
 class SourceMapper extends BaseMapper
 {
-	/**
-	 * The name of the database table for sources
-	 */
-	private const TABLE_NAME = 'openconnector_sources';
+    /**
+     * The name of the database table for sources
+     */
+    private const TABLE_NAME = 'openconnector_sources';
 
-	public function __construct(IDBConnection $db)
-	{
-		parent::__construct($db, self::TABLE_NAME);
-	}
 
-	/**
-	 * Get the name of the database table
-	 *
-	 * @return string The table name
-	 */
-	protected function getTableName(): string
-	{
-		return self::TABLE_NAME;
-	}
+    public function __construct(IDBConnection $db)
+    {
+        parent::__construct($db, self::TABLE_NAME);
 
-	/**
-	 * Create a new Source entity instance
-	 *
-	 * @return Source A new Source instance
-	 */
-	protected function createEntity(): Entity
-	{
-		return new Source();
-	}
-}
+    }//end __construct()
+
+
+    /**
+     * Get the name of the database table
+     *
+     * @return string The table name
+     */
+    protected function getTableName(): string
+    {
+        return self::TABLE_NAME;
+
+    }//end getTableName()
+
+
+    /**
+     * Create a new Source entity instance
+     *
+     * @return Source A new Source instance
+     */
+    protected function createEntity(): Entity
+    {
+        return new Source();
+
+    }//end createEntity()
+
+
+}//end class
