@@ -118,11 +118,12 @@ class SynchronizationService
 	 *
 	 * @param Synchronization $synchronization The synchronization configuration.
 	 * @param bool 		      $isTest Whether this is a test run (does not persist data if true).
-	 * @param \OCA\OpenRegister\Db\ObjectEntity|array $object The object to be synchronized.
+	 * @param \OCA\OpenRegister\Db\ObjectEntity|array $object The object to be synchronized, also referenced so its updated in parent objects.
+     * @param SynchronizationLog $log
 	 *
 	 * @return SynchronizationContract|array|null Returns a synchronization contract, an array for test cases, or null if conditions are not met.
 	 */
-	private function synchronizeInternToExtern(Synchronization $synchronization, ?bool $isTest = false, ?bool $force = false, \OCA\OpenRegister\Db\ObjectEntity|array $object, SynchronizationLog $log)
+	private function synchronizeInternToExtern(Synchronization $synchronization, ?bool $isTest = false, ?bool $force = false, \OCA\OpenRegister\Db\ObjectEntity|array &$object, SynchronizationLog $log)
 	{
 		if ($synchronization->getConditions() !== [] && !JsonLogic::apply($synchronization->getConditions(), $object)) {
 
@@ -131,10 +132,8 @@ class SynchronizationService
 		}
 		
 		$originId = null;
-		if (is_array($object) === true && isset($object['originId']) === true) {
-			$originId = $object['originId'];
-		} else if (is_array($object) === true) {
-			$object['originId'] = $originId  = Uuid::v4();
+		if (is_array($object) === true && isset($object['id']) === true) {
+			$originId = $object['id'];
 		}
 		if ($object instanceof \OCA\OpenRegister\Db\ObjectEntity === true && $object->getUuid()) {
 			$originId = $object->getUuid();
@@ -274,7 +273,7 @@ class SynchronizationService
 	 * @param Synchronization $synchronization
 	 * @param bool|null $isTest False by default, currently added for synchronziation-test endpoint
 	 * @param bool|null $force False by default, if true, the object will be updated regardless of changes
-	 * @param array|\OCA\OpenRegister\Db\ObjectEntity|null $object Object to synchronize
+	 * @param array|\OCA\OpenRegister\Db\ObjectEntity|null $object Object to synchronize, updated by reference
 	 *
 	 * @return array
 	 * @throws ContainerExceptionInterface
@@ -291,7 +290,7 @@ class SynchronizationService
 		Synchronization $synchronization,
 		?bool $isTest = false,
 		?bool $force = false,
-        array|\OCA\OpenRegister\Db\ObjectEntity|null $object = null
+        array|\OCA\OpenRegister\Db\ObjectEntity|null &$object = null,
 	): array
 	{
         // Start execution time measurement
@@ -650,6 +649,7 @@ class SynchronizationService
 	 * @param bool|null $isTest False by default, currently added for synchronization-test endpoint
 	 * @param bool|null $force False by default, if true, the object will be updated regardless of changes
 	 * @param SynchronizationLog|null $log The log to update
+     * 
 	 * @return SynchronizationContract|Exception|array
 	 * @throws ContainerExceptionInterface
 	 * @throws NotFoundExceptionInterface
@@ -660,10 +660,10 @@ class SynchronizationService
 	public function synchronizeContract(
 		SynchronizationContract $synchronizationContract,
 		Synchronization $synchronization = null,
-		array $object = [],
+		array &$object = [],
 		?bool $isTest = false,
 		?bool $force = false,
-		?SynchronizationLog $log = null
+		?SynchronizationLog $log = null,
 		): SynchronizationContract|Exception|array
 	{
 		$contractLog = null;
@@ -1087,7 +1087,7 @@ class SynchronizationService
 				break;
 			case 'api':
 				$targetConfig = $synchronization->getTargetConfig();
-				$synchronizationContract = $this->writeObjectToTarget(synchronization: $synchronization, contract: $synchronizationContract, endpoint: $targetConfig['endpoint'] ?? '');
+				$synchronizationContract = $this->writeObjectToTarget(synchronization: $synchronization, contract: $synchronizationContract, endpoint: $targetConfig['endpoint'] ?? '', targetObject: $targetObject);
 				break;
 			case 'database':
 				//@todo: implement
@@ -1480,6 +1480,7 @@ class SynchronizationService
 	 * @param Synchronization $synchronization The synchronization to run.
 	 * @param SynchronizationContract $contract The contract to enforce.
 	 * @param string $endpoint The endpoint to write the object to.
+	 * @param array|null $targetObject Update referenced targetObject so we can return response here.
      *
 	 * @return SynchronizationContract The updated contract.
      *
@@ -1494,6 +1495,7 @@ class SynchronizationService
 		Synchronization         $synchronization,
 		SynchronizationContract $contract,
 		string                  $endpoint,
+        ?array                  &$targetObject = null,
 	): SynchronizationContract
 	{
 		$target = $this->sourceMapper->find(id: $synchronization->getTargetId());
@@ -1548,6 +1550,7 @@ class SynchronizationService
 		$response = $this->callService->call(source: $target, endpoint: $endpoint, method: 'PUT', config: $targetConfig)->getResponse();
 
 		$body = json_decode($response['body'], true);
+        $targetObject = $body;
 
 		return $contract;
 	}
