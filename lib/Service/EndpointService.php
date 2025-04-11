@@ -750,6 +750,12 @@ class EndpointService
         }
 
         $endpoint = $endpoints[0];
+        $filteredEndpoints = array_filter($endpoints, function(Endpoint $endpoint) {return in_array(needle: '{{id}}', haystack: $endpoint->getEndpointArray()) === true;});
+
+        if(count($filteredEndpoints) > 0) {
+            $endpoint = array_shift($filteredEndpoints);
+        }
+
         $location = $endpoint->getEndpointArray();
 
         // Determine schema title (lowercased)
