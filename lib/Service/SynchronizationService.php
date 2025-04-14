@@ -184,7 +184,9 @@ class SynchronizationService
 			}
 		}
 
-		$synchronizationContract = $this->synchronizationContractMapper->update($synchronizationContract);
+        if ($synchronizationContract instanceof SynchronizationContract === true) {
+            $synchronizationContract = $this->synchronizationContractMapper->update($synchronizationContract);
+        }
         return $synchronizationContract;
 	}
 
