@@ -20,6 +20,7 @@ use OCA\OpenConnector\Service\MappingService;
 use OCA\OpenConnector\Service\ObjectService;
 use OCA\OpenConnector\Db\Source;
 use OCA\OpenConnector\Db\Endpoint;
+use OCA\OpenConnector\Db\Mapping;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\ClientException;
 use GuzzleHttp\Exception\GuzzleException;
@@ -420,6 +421,8 @@ class EndpointService
         int                                              &$status = 200
     ): Entity|array
     {
+        $extend = $requestParams['extend'] ?? $requestParams['_extend'] ?? null;
+
         if (isset($pathParams['id']) === true && $pathParams['id'] === end($pathParams)) {
             return $this->objectService->getOpenRegisters()->renderEntity(
                 entity: $this->replaceInternalReferences(mapper: $mapper, object: $mapper->find($pathParams['id'])),
@@ -480,8 +483,10 @@ class EndpointService
 
         $result = $mapper->findAllPaginated(requestParams: $parameters);
 
-        $result['results'] = array_map(function ($object) use ($mapper) {
-            return $this->objectService->getOpenRegisters()->renderEntity(entity: $this->replaceInternalReferences(mapper: $mapper, object: $object));
+        $result['results'] = array_map(function ($object) use ($mapper, $extend) {
+            $object = is_array($object) ? $object : $object->jsonSerialize();
+            $object = $mapper->renderEntity(entity: $object, extend: $extend);
+            return $this->replaceInternalReferences(mapper: $mapper, serializedObject: $object);
         }, $result['results']);
 
         $returnArray = [
@@ -797,6 +802,31 @@ class EndpointService
     }
 
     /**
+     * Saves object to OpenRegister
+     * 
+     * @param Rule $rule 
+     * @param array $data
+     * 
+     * @return array $data
+     */
+    private function processSaveObjectRule(Rule $rule, array $data): array
+    {
+        $configuration = $rule->getConfiguration();
+        $register = $configuration['register'];
+        $schema = $configuration['schema'];
+        $mapping = $configuration['mapping'] ?? null;
+
+        if (isset($mapping) === true) {
+            $data = $this->processMapping(rule: $rule, mapping: $mapping, data: $data);
+        }
+
+        $objectService = $this->containerInterface->get('OCA\OpenRegister\Service\ObjectService');
+        $data['body'] = $objectService->saveObject(register: $register, schema: $schema, object: $data['body']);
+
+        return $data;
+    }
+
+    /**
      * Processes rules for an endpoint request
      *
      * @param Endpoint $endpoint The endpoint being processed
@@ -838,6 +868,7 @@ class EndpointService
 
                 // Process rule based on type
                 $result = match ($rule->getType()) {
+                    'save_object' => $this->processSaveObjectRule($rule, $data),
                     'authentication' => $this->processAuthenticationRule($rule, $data),
                     'error' => $this->processErrorRule($rule),
                     'mapping' => $this->processMappingRule($rule, $data),
@@ -976,6 +1007,33 @@ class EndpointService
     }
 
     /**
+     * Executes mapping on data from endpoint flow
+     * 
+     * @param mapping $mapping
+     * @param array $data
+     * 
+     * @return array $data
+     */
+    private function processMapping(Rule $rule, Mapping $mapping, array $data): array
+    {
+        // Todo: We should just remove this if statement and use mapping to loop through results instead.
+        if (isset($data['body']['results']) === true
+            && strtolower($rule->getAction()) === 'get'
+            && (isset($config['mapResults']) === false || $config['mapResults'] === true)
+        ) {
+            foreach (($data['body']['results']) as $key => $result) {
+                $data['body']['results'][$key] = $this->mappingService->executeMapping($mapping, $result);
+            }
+
+            return $data;
+        }
+
+        $data['body'] = $this->mappingService->executeMapping($mapping, $data['body']);
+
+        return $data;
+    }
+
+    /**
      * Processes a mapping rule
      *
      * @param Rule $rule The rule object containing mapping details
@@ -992,19 +1050,7 @@ class EndpointService
         $config = $rule->getConfiguration();
         $mapping = $this->mappingService->getMapping($config['mapping']);
 
-        // Todo: We should just remove this if statement and use mapping to loop through results instead.
-        if (isset($data['body']['results']) === true
-            && strtolower($rule->getAction()) === 'get'
-            && (isset($config['mapResults']) === false || $config['mapResults'] === true)
-        ) {
-            foreach (($data['body']['results']) as $key => $result) {
-                $data['body']['results'][$key] = $this->mappingService->executeMapping($mapping, $result);
-            }
-
-            return $data;
-        }
-
-        $data['body'] = $this->mappingService->executeMapping($mapping, $data['body']);
+        $data = $this->processMapping(rule: $rule, mapping: $mapping, data: $data);
 
         return $data;
     }
@@ -1240,8 +1286,36 @@ class EndpointService
             $force = false;
         }
 
+        $object = null;
+        if (isset($data['body']) === true) {
+            $object = $data['body'];
+        }
+
+        // Set $object to a different variable becuase we might update $object with reference and want to keep what we send to synchronize.
+        $sendObject = $object;
+
         // Run synchronization.
-        $data['body'] = $this->synchronizationService->synchronize(synchronization: $synchronization, isTest: $test, force: $force);
+        $log = $this->synchronizationService->synchronize(synchronization: $synchronization, isTest: $test, force: $force, object: $object, returnResult: true);
+
+        // $object got updated through reference.
+        $returnedObject = $object;
+
+        if (isset($config['synchronizationConfig']['mergeResultToKey']) === true) {
+            // Merge result to root send object.
+            if ($config['synchronizationConfig']['mergeResultToKey'] === '#') {
+                $data['body'] = array_merge($sendObject, $returnedObject);
+            // Merge result to configured key in send object
+            } else {
+                $sendObject[$config['synchronizationConfig']['mergeResultToKey']] = $returnedObject;
+                $data['body'] = $sendObject;
+            }
+        // Overwrite body with result  
+        } else if (isset($config['synchronizationConfig']['overwriteObjectWithResult']) === true && filter_var($config['synchronizationConfig']['overwriteObjectWithResult'], FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) === true) {
+            $data['body'] = $returnedObject;
+        } else {
+            $data['body'] = $log;
+        }
+
         return $data;
     }
 
