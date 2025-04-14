@@ -49,6 +49,7 @@ use OCA\OpenConnector\Db\Rule;
 use OCA\OpenConnector\Db\RuleMapper;
 use Psr\Container\ContainerInterface;
 use DateTime;
+use OCA\OpenConnector\Service\RuleService;
 
 /**
  * Service class for handling endpoint requests
@@ -89,6 +90,7 @@ class EndpointService
         private readonly AuthorizationService $authorizationService,
         private readonly ContainerInterface $containerInterface,
         private readonly SynchronizationService $synchronizationService,
+        private readonly RuleService $ruleService,
     )
     {
     }
@@ -850,6 +852,7 @@ class EndpointService
                     'audit_trail' => $this->processAuditTrailRule(rule: $rule, endpoint: $endpoint, data: $data, objectId: $objectId),
                     'write_file' => $this->processWriteFileRule(rule: $rule, data: $data, objectId: $objectId),
                     'lock' => $this->processLockingRule(rule: $rule, data: $data, objectId: $objectId),
+                    'custom' => $this->processCustomRule(rule: $rule, data: $data),
                     default => throw new Exception('Unsupported rule type: ' . $rule->getType()),
                 };
 
@@ -1111,6 +1114,19 @@ class EndpointService
         $data['body'] = $this->objectService->getOpenRegisters()->renderEntity(entity: $object->jsonSerialize());
 
         return $data;
+    }
+
+    /** 
+     * Process a custom rule
+     *
+     * @param Rule $rule The rule to process
+     * @param array $data The data to process
+     *
+     * @return array The updated data array.
+     */
+    private function processCustomRule(Rule $rule, array $data): array
+    {
+        return $this->ruleService->processCustomRule(rule: $rule, data: $data);
     }
 
     /**
