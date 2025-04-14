@@ -188,6 +188,25 @@ class SynchronizationService
         return $synchronizationContract;
 	}
 
+    /**
+     * Synchronizes external source data to the internal system.
+     *
+     * This method retrieves objects from the external source as configured in the `Synchronization` object.
+     * Each object is processed and mapped internally, and optionally, invalid internal objects are deleted.
+     * If the synchronization is part of a chain, any defined follow-ups are also executed.
+     *
+     * If a rate limit error occurs during the external request, a `TooManyRequestsHttpException` is thrown.
+     *
+     * @param Synchronization     $synchronization The synchronization configuration and state.
+     * @param SynchronizationLog  $log             The log object to record synchronization details and results.
+     * @param bool|null           $isTest          Optional flag to run the synchronization in test mode (no deletions, no persistence).
+     * @param bool|null           $force           Optional flag to bypass change checks and force synchronization of all objects.
+     *
+     * @return SynchronizationLog Returns the updated synchronization log with processing results.
+     *
+     * @throws TooManyRequestsHttpException If the external source responds with a rate limiting error.
+     * @throws Exception If the source ID is empty or synchronization cannot proceed.
+     */
     private function synchronizeExternToIntern(
         Synchronization $synchronization,
         SynchronizationLog $log,
@@ -324,7 +343,6 @@ class SynchronizationService
             return [$this->synchronizeInternToExtern($synchronization, $isTest, $force, $object, $log)];
         }
 
-		var_dump('synchronizeExternToIntern' );die;
         $log['result']['type'] = 'externToIntern';
 
         // lets always create the log entry first, because we need its uuid later on for contractLogs
