@@ -1257,15 +1257,15 @@ class EndpointService
         $config = $rule->getConfiguration();
 
         // Check if base requirement is in config.
-        if(isset($config['synchronization']['id']) === false) {
+        if(isset($config['synchronization']) === false) {
             return $data;
         }
 
         // Fetch the synchronization.
-        if (is_numeric($config['synchronization']['id']) === true) {
-            $synchronization = $this->synchronizationService->getSynchronization(id: (int) $config['synchronization']['id']);
+        if (is_numeric($config['synchronization']) === true) {
+            $synchronization = $this->synchronizationService->getSynchronization(id: (int) $config['synchronization']);
         } else {
-            $synchronization = $this->synchronizationService->getSynchronization(filters: ['reference' => $config['synchronization']['id']]);
+            $synchronization = $this->synchronizationService->getSynchronization(filters: ['reference' => $config['synchronization']]);
         }
 
         // Check if the synchronization should be in test mode.
