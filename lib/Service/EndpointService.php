@@ -1300,17 +1300,17 @@ class EndpointService
         // $object got updated through reference.
         $returnedObject = $object;
 
-        if (isset($config['synchronization']['mergeResultToKey']) === true) {
+        if (isset($config['synchronizationConfig']['mergeResultToKey']) === true) {
             // Merge result to root send object.
-            if ($config['synchronization']['mergeResultToKey'] === '#') {
+            if ($config['synchronizationConfig']['mergeResultToKey'] === '#') {
                 $data['body'] = array_merge($sendObject, $returnedObject);
             // Merge result to configured key in send object
             } else {
-                $sendObject[$config['synchronization']['mergeResultToKey']] = $returnedObject;
+                $sendObject[$config['synchronizationConfig']['mergeResultToKey']] = $returnedObject;
                 $data['body'] = $sendObject;
             }
         // Overwrite body with result  
-        } else if (isset($config['synchronization']['overwriteObjectWithResult']) === true && filter_var($config['synchronization']['overwriteObjectWithResult'], FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) === true) {
+        } else if (isset($config['synchronizationConfig']['overwriteObjectWithResult']) === true && filter_var($config['synchronizationConfig']['overwriteObjectWithResult'], FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) === true) {
             $data['body'] = $returnedObject;
         } else {
             $data['body'] = $log;
