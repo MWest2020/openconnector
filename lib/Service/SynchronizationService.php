@@ -1499,9 +1499,12 @@ class SynchronizationService
 	): SynchronizationContract
 	{
 		$target = $this->sourceMapper->find(id: $synchronization->getTargetId());
+        if ($targetObject !== null) {
+            $object = $targetObject;
+        }
 
 		$sourceId = $synchronization->getSourceId();
-		if ($synchronization->getSourceType() === 'register/schema' && $contract->getOriginId() !== null) {
+		if ($synchronization->getSourceType() === 'register/schema' && $contract->getOriginId() !== null && $targetObject === null) {
 			$sourceIds = explode(separator: '/', string: $sourceId);
 
 			$this->objectService->getOpenRegisters()->setRegister($sourceIds[0]);
