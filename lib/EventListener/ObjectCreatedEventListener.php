@@ -38,7 +38,6 @@ class ObjectCreatedEventListener implements IEventListener
         }
 
         $synchronizations = $this->synchronizationService->findAllBySourceId(register: $object->getRegister(), schema: $object->getSchema());
-        // $objectArray = $object->getObject();
         foreach ($synchronizations as $synchronization) {
             try {
                 $this->synchronizationService->synchronize($synchronization, false, true, $object);
