@@ -842,7 +842,7 @@ class EndpointService
             return $data;
         }
 
-        // try {
+        try {
             // Get all rules at once and sort by order
             $ruleEntities = array_filter(
                 array_map(
@@ -894,10 +894,10 @@ class EndpointService
             }
 
             return $data;
-        // } catch (Exception $e) {
-        //     $this->logger->error('Error processing rules: ' . $e->getMessage());
-        //     return new JSONResponse(['error' => 'Rule processing failed: ' . $e->getMessage()], 500);
-        // }
+        } catch (Exception $e) {
+            $this->logger->error('Error processing rules: ' . $e->getMessage());
+            return new JSONResponse(['error' => 'Rule processing failed: ' . $e->getMessage()], 500);
+        }
     }
 
     /**
