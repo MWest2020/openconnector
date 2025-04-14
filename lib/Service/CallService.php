@@ -105,7 +105,12 @@ class CallService
 	 */
 	private function renderConfiguration(array $configuration, Source $source): array
 	{
-		return array_map(function($value) use ($source) { return $this->renderValue($value, $source);}, $configuration);
+		return array_map(function($value) use ($source) { 
+            if (is_string($value) === true || is_array($value) === true) {
+                return $this->renderValue($value, $source);
+            }
+            return $value;
+        }, $configuration);
 	}
 
     /**
