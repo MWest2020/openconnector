@@ -424,7 +424,10 @@ class EndpointService
         $extend = $requestParams['extend'] ?? $requestParams['_extend'] ?? null;
 
         if (isset($pathParams['id']) === true && $pathParams['id'] === end($pathParams)) {
-            return $this->replaceInternalReferences(mapper: $mapper, object: $mapper->find($pathParams['id']));
+            return $this->objectService->getOpenRegisters()->renderEntity(
+                entity: $this->replaceInternalReferences(mapper: $mapper, object: $mapper->find($pathParams['id'])),
+                extend: $parameters['_extend'] ?? $parameters['extend'] ?? null
+            );
 
 
         } else if (isset($pathParams['id']) === true) {
@@ -442,8 +445,8 @@ class EndpointService
             $main = $mapper->findByUuid($pathParams['id'])->getObject();
             $ids = $main[$property];
 
-            if (isset($main[$property]) === false) {
-                return $this->replaceInternalReferences(mapper: $mapper, object: $mapper->find($pathParams['id']));
+            if(isset($main[$property]) === false) {
+                return $this->objectService->getOpenRegisters()->renderEntity(entity: $this->replaceInternalReferences(mapper: $mapper, object: $mapper->find($pathParams['id'])));
             }
 
             if ($ids === null || empty($ids) === true) {
@@ -752,6 +755,12 @@ class EndpointService
         }
 
         $endpoint = $endpoints[0];
+        $filteredEndpoints = array_filter($endpoints, function(Endpoint $endpoint) {return in_array(needle: '{{id}}', haystack: $endpoint->getEndpointArray()) === true;});
+
+        if(count($filteredEndpoints) > 0) {
+            $endpoint = array_shift($filteredEndpoints);
+        }
+
         $location = $endpoint->getEndpointArray();
 
         // Determine schema title (lowercased)
@@ -867,7 +876,11 @@ class EndpointService
                     'javascript' => $this->processJavaScriptRule($rule, $data),
                     'fileparts_create' => $this->processFilePartRule($rule, $data, $endpoint, $objectId),
                     'filepart_upload' => $this->processFilePartUploadRule(rule: $rule, data: $data, request: $request, objectId: $objectId),
-                    'download' => $this->processDownloadRule($rule, $data, $objectId),
+                    'download' => $this->processDownloadRule(rule: $rule, data: $data, objectId: $objectId),
+                    'extend_input' => $this->processExtendInputRule(rule: $rule, data: $data),
+                    'audit_trail' => $this->processAuditTrailRule(rule: $rule, endpoint: $endpoint, data: $data, objectId: $objectId),
+                    'write_file' => $this->processWriteFileRule(rule: $rule, data: $data, objectId: $objectId),
+                    'lock' => $this->processLockingRule(rule: $rule, data: $data, objectId: $objectId),
                     default => throw new Exception('Unsupported rule type: ' . $rule->getType()),
                 };
 
@@ -1040,6 +1053,195 @@ class EndpointService
         $data = $this->processMapping(rule: $rule, mapping: $mapping, data: $data);
 
         return $data;
+    }
+
+    /**
+     * Extends input for performing business logic
+     *
+     * @param Rule $rule The rule containing the configuration which parameters could be extended
+     * @param array $data The data array containing the input parameters.
+     *
+     * @return array The data array with the extended parameters in the 'extendedParameters' key.
+     * @throws ContainerExceptionInterface
+     * @throws NotFoundExceptionInterface
+     */
+    private function processExtendInputRule(Rule $rule, array $data): array
+    {
+        $parameters = new Dot($data['parameters']);
+        $config = $rule->getConfiguration();
+        $extendedParameters = new Dot();
+
+        foreach ($config['extend_input']['properties'] as $property) {
+            $value = $parameters->get($property);
+
+            if(filter_var($value, FILTER_VALIDATE_URL) !== false) {
+                $exploded = explode(separator: '/', string: $value);
+                $value = end($exploded);
+            }
+
+            try {
+                $object = $this->objectService->getOpenRegisters()->getMapper('objectEntity')->find(identifier: $value);
+            } catch (DoesNotExistException $exception) {
+                continue;
+            }
+            $extendedParameters->add($property, $this->objectService->getOpenRegisters()->renderEntity($object->jsonSerialize()));
+
+        }
+
+        $data['extendedParameters'] = $extendedParameters->all();
+
+        return $data;
+    }
+
+    /**
+     * Fetches the audit trail for an object, returns a specific audit rule if the path parameter audittrail-id is specified.
+     *
+     * @param Rule $rule The rule to execute
+     * @param Endpoint $endpoint The endpoint on which the rule is executed
+     * @param array $data The data from the request.
+     * @param string $objectId The object id for which the request was done.
+     *
+     * @return array|Response The updated data array, or a json response with a not found error.
+     *
+     * @throws ContainerExceptionInterface
+     * @throws NotFoundExceptionInterface
+     */
+    private function processAuditTrailRule(Rule $rule, Endpoint $endpoint, array $data, string $objectId): array|Response
+    {
+
+        $pathParameters = $this->getPathParameters(endpointArray: $endpoint->getEndpointArray(), path: $data['path']);
+
+        if(isset($pathParameters['audittrail-id']) === true) {
+            $auditrule = $this->objectService->getOpenRegisters()->getPaginatedAuditTrail($objectId, requestParams: ['uuid' => $pathParameters['audittrail-id']]);
+
+            if(count($auditrule) === 1) {
+                $data['body'] = $auditrule[0];
+                return $data;
+            }
+
+            return new JSONResponse(data: ['error' => 'Not found', 'reason' => 'The resource you are looking for does not exist'], statusCode: HTTP::STATUS_NOT_FOUND);
+
+        }
+        $audittrail = $this->objectService->getOpenRegisters()->getPaginatedAuditTrail($objectId);
+
+        $data['body'] = $audittrail['results'];
+
+
+        return $data;
+    }
+
+    /**
+     * Process a locking rule, either locking or unlocking a resource.
+     *
+     * @param Rule $rule Rule containing configuration for the execution of the rule.
+     * @param array $data The data to update
+     * @param string $objectId The object id of the object to lock or unlock
+     *
+     * @return array The updated data array.
+     *
+     * @throws ContainerExceptionInterface
+     * @throws NotFoundExceptionInterface
+     * @throws \OCP\Files\NotFoundException
+     */
+    private function processLockingRule(Rule $rule, array $data, string $objectId): array
+    {
+        $config = $rule->getConfiguration();
+
+        if($config['locking']['action'] === 'lock') {
+            $process = (Uuid::v4())->jsonSerialize();
+            $object = $this->objectService->getOpenRegisters()->lockObject(identifier: $objectId, process: $process, duration: $config['locking']['duration'] ?? 3600);
+        } else if ($config['locking']['action'] === 'unlock') {
+            $object = $this->objectService->getOpenRegisters()->unlockObject(identifier: $objectId);
+        }
+
+        $data['body'] = $this->objectService->getOpenRegisters()->renderEntity(entity: $object->jsonSerialize());
+
+        return $data;
+    }
+
+    /**
+     * Process a rule to write files.
+     *
+     * @param Rule $rule The rule to process.
+     * @param array $data The data to write.
+     * @param string $objectId The object to write the data to.
+     * @param int $registerId The register the object is in.
+     * @param int $schemaId The schema the object is in.
+     *
+     * @return array
+     * @throws ContainerExceptionInterface
+     * @throws NotFoundExceptionInterface
+     * @throws Exception
+     */
+    private function processWriteFileRule(Rule $rule, array $data, string $objectId): array
+    {
+        if (isset($rule->getConfiguration()['write_file']) === false) {
+            throw new Exception('No configuration found for write_file');
+        }
+
+        $config  = $rule->getConfiguration()['write_file'];
+        $dataDot = new Dot($data);
+        $files = $dataDot[$config['filePath']];
+        if (isset($files) === false || empty($files) === true) {
+            return $dataDot->jsonSerialize();
+        }
+
+        // Check if associative array
+        if (is_array($files) === true && isset($files[0]) === true & array_keys($files[0]) !== range(0, count($files[0]) - 1)) {
+            $result = [];
+            foreach ($files as $key => $value) {
+
+                // Check for tags
+                $tags = [];
+                if (is_array($value) === true) {
+                    $content = $value['content'];
+                    if (isset($value['label']) === true && isset($config['tags']) === true &&
+                        in_array(needle: $value['label'], haystack: $config['tags']) === true) {
+                        $tags = [$value['label']];
+                    }
+                    if (isset($value['filename']) === true) {
+                        $fileName = $value['filename'];
+                    }
+                } else {
+                    $content = $value;
+                }
+
+                try {
+                    // Write file with OpenRegister ObjectService.
+                    $objectService = $this->containerInterface->get('OCA\OpenRegister\Service\ObjectService');
+                    $file = $objectService->addFile(object: $objectId, fileName: $fileName, base64Content: $content);
+
+                    $tags = array_merge($config['tags'] ?? [], ["object:$objectId"]);
+                    if ($file instanceof \OCP\Files\File === true) {
+                        $this->attachTagsToFile(fileId: $file->getId(), tags: $tags);
+                    }
+
+                    $result[$key] = $file->getPath();
+                } catch (Exception $exception) {
+                }
+            }
+            $result[$key] = $file->getPath();
+            $dataDot[$config['filePath']] = $result;
+        } else {
+            $content = $files;
+            $fileName = $dataDot[$config['fileNamePath']];
+
+            try {
+                // Write file with OpenRegister ObjectService.
+                $objectService = $this->containerInterface->get('OCA\OpenRegister\Service\ObjectService');
+                $file = $objectService->addFile(object: $objectId, fileName: $fileName, base64Content: $content);
+
+                $tags = array_merge($config['tags'] ?? [], ["object:$objectId"]);
+                if ($file instanceof File === true) {
+                    $this->attachTagsToFile(fileId: $file->getId(), tags: $tags);
+                }
+                $dataDot[$config['filePath']] = $file->getPath();
+            } catch (Exception $exception) {
+            }
+        }
+
+
+        return $dataDot->jsonSerialize();
     }
 
     /**
