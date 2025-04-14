@@ -1302,7 +1302,7 @@ export default {
 				configuration.save_object = {
 					register: this.ruleItem.configuration.save_object.register,
 					schema: this.ruleItem.configuration.save_object.schema,
-                    mapping: this.mappingOptions.value?.value
+					mapping: this.mappingOptions.value?.value,
 				}
 				break
 			}
