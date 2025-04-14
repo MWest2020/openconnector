@@ -1539,13 +1539,27 @@ class SynchronizationService
 		$targetConfig['json'] = $object;
 
 		if ($contract->getTargetId() === null) {
-		var_dump('POST');
+            $targetId = null;
+            if (isset($targetConfig['idInRequestBody']) === true) {
+                $targetId = $targetConfig['json'][$targetConfig['idInRequestBody']];
+            }
 			$response = $this->callService->call(source: $target, endpoint: $endpoint, method: 'POST', config: $targetConfig)->getResponse();
 
 			$body = json_decode($response['body'], true);
 
+            if ($targetId === null) {
+                $targetId = $body['id'];
 
-			$contract->setTargetId($body[$targetConfig['idposition']] ?? $body['id']);
+                if (isset($body[$targetConfig['idposition']]) === true) { 
+                    $targetId = $body[$targetConfig['idposition']];
+                }
+            }
+
+            $body['targetId'] = $targetId;
+
+            $targetObject = $body;
+
+			$contract->setTargetId($targetId);
 
 			return $contract;
 		}
