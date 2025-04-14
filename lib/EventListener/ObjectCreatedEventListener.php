@@ -40,7 +40,7 @@ class ObjectCreatedEventListener implements IEventListener
         $synchronizations = $this->synchronizationService->findAllBySourceId(register: $object->getRegister(), schema: $object->getSchema());
         foreach ($synchronizations as $synchronization) {
             try {
-                $this->synchronizationService->synchronize(synchronization: $synchronization, isTest: false, force: true, object: $object);
+                $this->synchronizationService->synchronize(synchronization: $synchronization, force: true, object: $object);
             } catch (\Exception $e) {
                 $this->logger->error('Failed to process object event: ' . $e->getMessage() . ' for synchronization ' . $synchronization->getId(), [
                     'exception' => $e,
