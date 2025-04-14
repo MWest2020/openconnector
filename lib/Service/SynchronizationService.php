@@ -127,7 +127,6 @@ class SynchronizationService
 	{
 		if ($synchronization->getConditions() !== [] && !JsonLogic::apply($synchronization->getConditions(), $object)) {
 
-			var_dump('conditions check fail', json_encode($synchronization->getConditions()), json_encode($object), $object );die;
 			return;
 		}
 		
@@ -151,7 +150,6 @@ class SynchronizationService
 		if ($synchronizationContract instanceof SynchronizationContract === false) {
 			// Only persist if not test
 			if ($isTest === false) {
-				var_dump($originId);
 				$synchronizationContract = $this->synchronizationContractMapper->createFromArray([
 					'synchronizationId' => $synchronization->getId(),
 					'originId' => $originId,
@@ -1523,7 +1521,6 @@ class SynchronizationService
 			$endpoint = str_replace(search: $target->getLocation(), replace: '', subject: $endpoint);
 		}
 
-		var_dump($contract->getOriginId());
 		if ($contract->getOriginId() === null) {
 
 			$endpoint .= '/'.$contract->getTargetId();
