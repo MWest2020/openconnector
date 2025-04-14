@@ -388,8 +388,8 @@ class CallService
 		$this->source->setLastCall(new \DateTime());
 		// @todo: save the source
 		// Let's make the call.
-		// $time_start = microtime(true);
-		// var_dump($url, $method, $config);die;
+		$time_start = microtime(true);
+        
 		try {
 			if ($asynchronous === false) {
 			   $response = $this->client->request($method, $url, $config);
