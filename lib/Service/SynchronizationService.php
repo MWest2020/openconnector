@@ -1568,7 +1568,7 @@ class SynchronizationService
 
 		$response = $this->callService->call(source: $target, endpoint: $endpoint, method: 'PUT', config: $targetConfig)->getResponse();
 
-		$body = json_decode($response['body'], true);
+		$body = array_merge(json_decode($response['body']), ['targetId' => $contract->getTargetId()], true);
         $targetObject = $body;
 
 		return $contract;
