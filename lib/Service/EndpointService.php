@@ -1295,7 +1295,7 @@ class EndpointService
         $sendObject = $object;
 
         // Run synchronization.
-        $log = $this->synchronizationService->synchronize(synchronization: $synchronization, isTest: $test, force: $force, object: $object, returnResult: true);
+        $log = $this->synchronizationService->synchronize(synchronization: $synchronization, isTest: $test, force: $force, object: $object);
 
         // $object got updated through reference.
         $returnedObject = $object;
