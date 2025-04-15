@@ -87,7 +87,7 @@ class RuleService
                 $newUuid = Uuid::v4();
                 $elementId = "id-{$newUuid}";
                 $data['body']['results'][0]['elements'][] = [
-                    'identificatie' => $elementId,
+                    'identifier' => $elementId,
                     'name' => $voorziening['naam'],
                     'name-lang' => 'nl',
                     'documentation' => $voorziening['beschrijving'],
