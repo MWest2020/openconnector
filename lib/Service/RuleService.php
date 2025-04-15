@@ -62,23 +62,33 @@ class RuleService
         
         // Fetch Voorziening objects
         $openRegisters->setSchema($voorzieningSchemaId);
-        $voorzieningenMapper = $openRegisters->getMapper('objectEntity', $registerId, $voorzieningSchemaId);
-        $voorzieningen = $voorzieningenMapper->findAll();
+        $objectEntityMapper = $openRegisters->getMapper('objectEntity');
+        $voorzieningen = $objectEntityMapper->findAll(
+            filters: [
+                'register' => $registerId,
+                'schema' => $voorzieningSchemaId
+            ]
+        );
         
         // Fetch VoorzieningGebruik objects
         $openRegisters->setSchema($voorzieningGebruikSchemaId);
-        $voorzieningGebruikMapper = $openRegisters->getMapper('objectEntity', $registerId, $voorzieningGebruikSchemaId);
-        $voorzieningGebruiken = $voorzieningGebruikMapper->findAll();
-        
+        $objectEntityMapper = $openRegisters->getMapper('objectEntity');
+        $voorzieningGebruiken = $objectEntityMapper->findAll(
+            filters: [
+                'register' => $registerId,
+                'schema' => $voorzieningGebruikSchemaId
+            ]
+        );
+
         // Add to response data
         foreach ($voorzieningen as $voorziening) {
             $voorziening = $voorziening->jsonSerialize();
             foreach ($voorziening['referentieComponenten'] as $referentieComponent) {
                 $newUuid = Uuid::v4();
                 $elementId = "id-{$newUuid}";
-                $data['body']['elements'][] = [
+                $data['body']['results'][0]['elements'][] = [
                     'identificatie' => $elementId,
-                    'name' => $voorziening['title'],
+                    'name' => $voorziening['naam'],
                     'name-lang' => 'nl',
                     'documentation' => $voorziening['beschrijving'],
                     'documentation-lang' => 'nl',
@@ -89,33 +99,12 @@ class RuleService
                 ];
 
                 // Search for nodes with elementRef matching the voorzienings identificatie and create subnodes
-                if (isset($data['body']['views']) && is_array($data['body']['views'])) {
-                    foreach ($data['body']['views'] as &$view) {
+                if (isset($data['body']['results'][0]['views']) && is_array($data['body']['results'][0]['views'])) {
+                    foreach ($data['body']['results'][0]['views'] as &$view) {
                         if (isset($view['nodes']) && is_array($view['nodes'])) {
-                            foreach ($view['nodes'] as &$node) {
-                                if (isset($node['elementRef']) && $node['elementRef'] === $voorziening['identificatie']) {
-                                    // Create a subnode with reference to the newly created element
-                                    $subnodeUuid = Uuid::v4();
-                                    $subnodeId = "id-{$subnodeUuid}";
-                                    
-                                    // If nodes doesn't exist yet, initialize it
-                                    if (isset($node['nodes']) === false || is_array($node['nodes']) === false) {
-                                        $node['nodes'] = [];
-                                    }
-                                    
-                                    // Add subnode with reference to new element
-                                    $node['nodes'][] = [
-                                        'identifier' => $subnodeId,
-                                        'elementRef' => $elementId,
-                                        'type' => 'element',
-                                        'position' => [
-                                            'x' => 0,
-                                            'y' => 0
-                                        ],
-                                        'style' => []
-                                    ];
-                                }
-                            }
+                            // Make sure identificatie exists
+                            $identificatie = $referentieComponent;
+                            $this->processNodes($view['nodes'], $identificatie, $elementId);
                         }
                     }
                 }
@@ -127,5 +116,56 @@ class RuleService
         // }
         
         return $data;
+    }
+
+    /**
+     * Recursively processes nodes and their nested nodes to find matches and create subnodes
+     * 
+     * @param array &$nodes The nodes to process
+     * @param string|null $matchIdentificatie The identificatie to match against elementRef
+     * @param string $newElementId The ID of the new element to reference
+     * 
+     * @return void
+     */
+    private function processNodes(array &$nodes, ?string $matchIdentificatie, string $newElementId): void
+    {
+        // If matchIdentificatie is null, return early
+        if ($matchIdentificatie === null) {
+            return;
+        }
+        
+        // Loop through each node in the array
+        foreach ($nodes as &$node) {
+            // Check if current node has an elementRef property and if it matches the target identificatie
+            if (isset($node['elementRef']) === true && $node['elementRef'] === $matchIdentificatie) {
+                // Create a subnode with reference to the newly created element
+                $subnodeUuid = Uuid::v4();
+                $subnodeId = "id-{$subnodeUuid}";
+                
+                // Check if the nodes array doesn't exist or is not an array
+                if (isset($node['nodes']) === false || is_array($node['nodes']) === false) {
+                    // Initialize the nodes array if it doesn't exist properly
+                    $node['nodes'] = [];
+                }
+                
+                // Add subnode with reference to new element
+                $node['nodes'][] = [
+                    'identifier' => $subnodeId,
+                    'elementRef' => $newElementId,
+                    'type' => 'element',
+                    'position' => [
+                        'x' => 0,
+                        'y' => 0
+                    ],
+                    'style' => []
+                ];
+            }
+            
+            // Process nested nodes recursively if they exist
+            if (isset($node['nodes']) === true && is_array($node['nodes']) === true) {
+                // Call this function recursively on the nested nodes
+                $this->processNodes($node['nodes'], $matchIdentificatie, $newElementId);
+            }
+        }
     }
 } 
