@@ -1,4 +1,0 @@
-merge_config:
-  files:
-    'appinfo/info.xml':
-      strategy: ours
