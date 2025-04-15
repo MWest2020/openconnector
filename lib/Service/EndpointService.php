@@ -439,7 +439,7 @@ class EndpointService
                 $id = pos($pathParams);
             }
 
-            $main = $mapper->findByUuid($pathParams['id'])->getObject();
+            $main = $this->objectService->getOpenRegisters()->renderEntity($mapper->findByUuid($pathParams['id'])->getObject());
             $ids = $main[$property];
 
             if(isset($main[$property]) === false) {
