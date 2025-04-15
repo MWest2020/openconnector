@@ -72,6 +72,7 @@ class RuleService
         
         // Add to response data
         foreach ($voorzieningen as $voorziening) {
+            $voorziening = $voorziening->jsonSerialize();
             foreach ($voorziening['referentieComponenten'] as $referentieComponent) {
                 $newUuid = Uuid::v4();
                 $elementId = "id-{$newUuid}";
@@ -87,14 +88,43 @@ class RuleService
                     // ],
                 ];
 
-                // zoeken naar nodes met elementref = $voorziening['identificatie']
-                // voor elke node ene subnode maken met elementref = NEW id-UUID (type = element)
+                // Search for nodes with elementRef matching the voorzienings identificatie and create subnodes
+                if (isset($data['body']['views']) && is_array($data['body']['views'])) {
+                    foreach ($data['body']['views'] as &$view) {
+                        if (isset($view['nodes']) && is_array($view['nodes'])) {
+                            foreach ($view['nodes'] as &$node) {
+                                if (isset($node['elementRef']) && $node['elementRef'] === $voorziening['identificatie']) {
+                                    // Create a subnode with reference to the newly created element
+                                    $subnodeUuid = Uuid::v4();
+                                    $subnodeId = "id-{$subnodeUuid}";
+                                    
+                                    // If nodes doesn't exist yet, initialize it
+                                    if (isset($node['nodes']) === false || is_array($node['nodes']) === false) {
+                                        $node['nodes'] = [];
+                                    }
+                                    
+                                    // Add subnode with reference to new element
+                                    $node['nodes'][] = [
+                                        'identifier' => $subnodeId,
+                                        'elementRef' => $elementId,
+                                        'type' => 'element',
+                                        'position' => [
+                                            'x' => 0,
+                                            'y' => 0
+                                        ],
+                                        'style' => []
+                                    ];
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
         
-        foreach ($voorzieningGebruiken as $voorzieningGebruik) {
-            $data['body']['views'][] = $voorzieningGebruik;
-        }
+        // foreach ($voorzieningGebruiken as $voorzieningGebruik) {
+        //     $data['body']['views'][] = $voorzieningGebruik;
+        // }
         
         return $data;
     }
