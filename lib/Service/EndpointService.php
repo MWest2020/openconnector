@@ -812,9 +812,9 @@ class EndpointService
     private function processSaveObjectRule(Rule $rule, array $data): array
     {
         $configuration = $rule->getConfiguration();
-        $register = $configuration['register'];
-        $schema = $configuration['schema'];
-        $mapping = $configuration['mapping'] ?? null;
+        $register = $configuration['save_object']['register'];
+        $schema = $configuration['save_object']['schema'];
+        $mapping = $configuration['save_object']['mapping'] ?? null;
 
         if (isset($mapping) === true) {
             $data = $this->processMapping(rule: $rule, mapping: $mapping, data: $data);

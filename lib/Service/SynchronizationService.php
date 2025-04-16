@@ -129,7 +129,9 @@ class SynchronizationService
 
 			return;
 		}
-		
+
+		$targetConfig = $synchronization->getTargetConfig();
+
 		$originId = null;
 		if (is_array($object) === true && isset($object['id']) === true) {
 			$originId = $object['id'];
@@ -137,6 +139,9 @@ class SynchronizationService
 		if ($object instanceof \OCA\OpenRegister\Db\ObjectEntity === true && $object->getUuid()) {
 			$originId = $object->getUuid();
 			$object = $object->getObject();
+		}
+		if (isset($targetConfig['extend_input']) === true) {
+			$object = array_merge($object, $this->processExtendInputRule(['extend_input' => ['properties' => $targetConfig['extend_input']]], $object));
 		}
 
 		// If the source configuration contains a dot notation for the id position, we need to extract the id from the source object
@@ -757,21 +762,20 @@ class SynchronizationService
 
         // Execute mapping if found
         if ($sourceTargetMapping) {
-            $targetObject = $this->mappingService->executeMapping(mapping: $sourceTargetMapping, input: $object);
-        } else {
-            $targetObject = $object;
+			$objectBeforeMapping = $object;
+            $object = $this->mappingService->executeMapping(mapping: $sourceTargetMapping, input: $object);
         }
 
         if (isset($contractLog) === true) {
-		    $contractLog->setTarget($targetObject);
+		    $contractLog->setTarget($object);
         }
 
         if ($synchronization->getActions() !== []) {
-            $targetObject = $this->processRules(synchronization: $synchronization, data: $targetObject, timing: 'before');
+            $object = $this->processRules(synchronization: $synchronization, data: $object, timing: 'before');
         }
 
             // set the target hash
-        $targetHash = md5(serialize($targetObject));
+        $targetHash = md5(serialize($object));
 
         $synchronizationContract->setTargetHash($targetHash);
 		$synchronizationContract->setTargetLastChanged(new DateTime());
@@ -794,13 +798,17 @@ class SynchronizationService
 		// Update target and create log when not in test mode
 		$synchronizationContract = $this->updateTarget(
 			synchronizationContract: $synchronizationContract,
-			targetObject: $targetObject
+			targetObject: $object
 		);
 
         if ($synchronization->getTargetType() === 'register/schema') {
             [$registerId, $schemaId] = explode(separator: '/', string: $synchronization->getTargetId());
-            $this->processRules(synchronization: $synchronization, data: $targetObject, timing: 'after', objectId: $synchronizationContract->getTargetId(), registerId: $registerId, schemaId: $schemaId);
-        }
+            $this->processRules(synchronization: $synchronization, data: array_merge($object, ['_objectBeforeMapping' => $objectBeforeMapping]), timing: 'after', objectId: $synchronizationContract->getTargetId(), registerId: $registerId, schemaId: $schemaId);
+        } else if ($synchronization->getTargetType() === 'api' && $synchronization->getSourceType() === 'register/schema') {
+            [$registerId, $schemaId] = explode(separator: '/', string: $synchronization->getSourceId());
+            $this->processRules(synchronization: $synchronization, data: array_merge($object, ['_objectBeforeMapping' => $objectBeforeMapping]), timing: 'after', objectId: $synchronizationContract->getSourceId(), registerId: $registerId, schemaId: $schemaId);
+		}
+
 
 		// Create log entry for the synchronization
         if (isset($contractLog) === true) {
@@ -1522,15 +1530,17 @@ class SynchronizationService
         }
 
 		$sourceId = $synchronization->getSourceId();
-		if ($synchronization->getSourceType() === 'register/schema' && $contract->getOriginId() !== null && $targetObject === null) {
+		if ($synchronization->getSourceType() === 'register/schema' && $contract->getOriginId() !== null) {
 			$sourceIds = explode(separator: '/', string: $sourceId);
 
 			$this->objectService->getOpenRegisters()->setRegister($sourceIds[0]);
 			$this->objectService->getOpenRegisters()->setSchema($sourceIds[1]);
 
-			$object = $this->objectService->getOpenRegisters()->find(
-				id: $contract->getOriginId(),
-			)->jsonSerialize();
+			if ($targetObject === null) {
+				$object = $this->objectService->getOpenRegisters()->find(
+					id: $contract->getOriginId(),
+				)->jsonSerialize();
+			}
 		}
 
 		$targetConfig = $this->callService->applyConfigDot($synchronization->getTargetConfig());
@@ -1570,9 +1580,13 @@ class SynchronizationService
                 }
             }
 
-            $body['targetId'] = $targetId;
+			$body['targetId'] = $targetId;
+			$targetObject['targetId'] = $targetId;
 
-            $targetObject = $body;
+			$data = array_merge($this->objectService->getOpenRegisters()->find(
+				id: $contract->getOriginId(),
+			)->getObject(), ['targetId' => $targetId], ['id' => $contract->getOriginId()]);
+		    $this->objectService->getOpenRegisters()->saveObject(register: $this->objectService->getOpenRegisters()->getRegister(), schema: $this->objectService->getOpenRegisters()->getSchema(), object: $data);
 
 			$contract->setTargetId($targetId);
 
@@ -1658,6 +1672,76 @@ class SynchronizationService
 
 	}
 
+    /**
+     * Saves object to OpenRegister
+     *
+     * @param Rule $rule
+     * @param array $data
+     *
+     * @return array $data
+     */
+    private function processSaveObjectRule(Rule $rule, array $data): array
+    {
+        $configuration = $rule->getConfiguration();
+        $register = $configuration['save_object']['register'];
+        $schema = $configuration['save_object']['schema'];
+        $mapping = $configuration['save_object']['mapping'] ?? null;
+        $patch = $configuration['save_object']['patch'] ?? false;
+
+		if ($mapping) {
+
+			if (isset($data['_objectBeforeMapping']['id']) === true) {
+				$id = $data['_objectBeforeMapping']['id'];
+				unset($data['_objectBeforeMapping']);
+			}
+
+        	$mapping = $this->mappingService->getMapping($mapping);
+            $data = $this->processMapping(mapping: $mapping, data: $data);
+		}
+
+        $objectService = $this->containerInterface->get('OCA\OpenRegister\Service\ObjectService');
+		if ($patch === true || $patch === 'true') {
+            $object = $this->objectService->getOpenRegisters()->getMapper('objectEntity')->find($id);
+			$data = array_merge($object->getObject(), ['id' => $object->getId()], $data);
+		}
+        return $objectService->saveObject(register: $register, schema: $schema, object: $data)->jsonSerialize();
+    }
+
+    /**
+     * Extends input for performing business logic
+     *
+     * @param array $config The rule configuration which parameters could be extended
+     * @param array $data The data array containing the input parameters.
+     *
+     * @return array The data array with the extended parameters in the 'extendedParameters' key.
+     * @throws ContainerExceptionInterface
+     * @throws NotFoundExceptionInterface
+     */
+    private function processExtendInputRule(array $config, array $data): array
+    {
+        $parameters = new Dot($data);
+        $extendedParameters = new Dot();
+
+        foreach ($config['extend_input']['properties'] as $property) {
+            $value = $parameters->get($property);
+
+            if(filter_var($value, FILTER_VALIDATE_URL) !== false) {
+                $exploded = explode(separator: '/', string: $value);
+                $value = end($exploded);
+            }
+
+            try {
+                $object = $this->objectService->getOpenRegisters()->getMapper('objectEntity')->find(identifier: $value);
+            } catch (DoesNotExistException $exception) {
+                continue;
+            }
+            $extendedParameters->add($property, $this->objectService->getOpenRegisters()->renderEntity($object->jsonSerialize()));
+
+        }
+
+        return array_merge($data, $extendedParameters->all());
+    }
+
 	/**
 	 * Processes rules for an endpoint request
 	 *
@@ -1705,8 +1789,10 @@ class SynchronizationService
                     'error' => $this->processErrorRule($rule),
                     'mapping' => $this->processMappingRule($rule, $data),
                     'synchronization' => $this->processSyncRule($rule, $data),
+                    'save_object' => $this->processSaveObjectRule($rule, $data),
                     'fetch_file' => $this->processFetchFileRule($rule, $data, $objectId),
                     'write_file' => $this->processWriteFileRule($rule, $data, $objectId, $registerId, $schemaId),
+                    'extend_input' => $this->processExtendInputRule(config: $rule->getConfig(), data: $data),
                     default => throw new Exception('Unsupported rule type: ' . $rule->getType()),
                 };
 
@@ -2172,6 +2258,20 @@ class SynchronizationService
     {
         $config = $rule->getConfiguration();
         $mapping = $this->mappingService->getMapping($config['mapping']);
+
+        return $this->processMapping(mapping: $mapping, data: $data);
+    }
+
+    /**
+     * Executes mapping on data from endpoint flow
+     *
+     * @param mapping $mapping
+     * @param array $data
+     *
+     * @return array $data
+     */
+    private function processMapping(Mapping $mapping, array $data): array
+    {
         return $this->mappingService->executeMapping($mapping, $data);
     }
 
