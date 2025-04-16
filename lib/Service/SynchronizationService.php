@@ -757,21 +757,19 @@ class SynchronizationService
 
         // Execute mapping if found
         if ($sourceTargetMapping) {
-            $targetObject = $this->mappingService->executeMapping(mapping: $sourceTargetMapping, input: $object);
-        } else {
-            $targetObject = $object;
+            $object = $this->mappingService->executeMapping(mapping: $sourceTargetMapping, input: $object);
         }
 
         if (isset($contractLog) === true) {
-		    $contractLog->setTarget($targetObject);
+		    $contractLog->setTarget($object);
         }
 
         if ($synchronization->getActions() !== []) {
-            $targetObject = $this->processRules(synchronization: $synchronization, data: $targetObject, timing: 'before');
+            $object = $this->processRules(synchronization: $synchronization, data: $object, timing: 'before');
         }
 
             // set the target hash
-        $targetHash = md5(serialize($targetObject));
+        $targetHash = md5(serialize($object));
 
         $synchronizationContract->setTargetHash($targetHash);
 		$synchronizationContract->setTargetLastChanged(new DateTime());
@@ -794,7 +792,7 @@ class SynchronizationService
 		// Update target and create log when not in test mode
 		$synchronizationContract = $this->updateTarget(
 			synchronizationContract: $synchronizationContract,
-			targetObject: $targetObject
+			targetObject: $object
 		);
 
         if ($synchronization->getTargetType() === 'register/schema') {
@@ -1526,15 +1524,17 @@ class SynchronizationService
         }
 
 		$sourceId = $synchronization->getSourceId();
-		if ($synchronization->getSourceType() === 'register/schema' && $contract->getOriginId() !== null && $targetObject === null) {
+		if ($synchronization->getSourceType() === 'register/schema' && $contract->getOriginId() !== null) {
 			$sourceIds = explode(separator: '/', string: $sourceId);
 
 			$this->objectService->getOpenRegisters()->setRegister($sourceIds[0]);
 			$this->objectService->getOpenRegisters()->setSchema($sourceIds[1]);
 
-			$object = $this->objectService->getOpenRegisters()->find(
-				id: $contract->getOriginId(),
-			)->jsonSerialize();
+			if ($targetObject === null) {
+				$object = $this->objectService->getOpenRegisters()->find(
+					id: $contract->getOriginId(),
+				)->jsonSerialize();
+			}
 		}
 
 		$targetConfig = $this->callService->applyConfigDot($synchronization->getTargetConfig());
@@ -1576,7 +1576,10 @@ class SynchronizationService
 
             $body['targetId'] = $targetId;
 
-            $targetObject = $body;
+			$data = array_merge($this->objectService->getOpenRegisters()->find(
+				id: $contract->getOriginId(),
+			)->getObject(), ['targetId' => $targetId], ['id' => $contract->getOriginId()]);
+		    $this->objectService->getOpenRegisters()->saveObject(register: $this->objectService->getOpenRegisters()->getRegister(), schema: $this->objectService->getOpenRegisters()->getSchema(), object: $data);
 
 			$contract->setTargetId($targetId);
 
