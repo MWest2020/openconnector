@@ -129,7 +129,9 @@ class SynchronizationService
 
 			return;
 		}
-		
+
+		$targetConfig = $synchronization->getTargetConfig();
+
 		$originId = null;
 		if (is_array($object) === true && isset($object['id']) === true) {
 			$originId = $object['id'];
@@ -137,6 +139,9 @@ class SynchronizationService
 		if ($object instanceof \OCA\OpenRegister\Db\ObjectEntity === true && $object->getUuid()) {
 			$originId = $object->getUuid();
 			$object = $object->getObject();
+		}
+		if (isset($targetConfig['extend_input']) === true) {
+			$object = array_merge($object, $this->processExtendInputRule(['extend_input' => ['properties' => $targetConfig['extend_input']]], $object));
 		}
 
 		// If the source configuration contains a dot notation for the id position, we need to extract the id from the source object
@@ -1702,6 +1707,41 @@ class SynchronizationService
         return $objectService->saveObject(register: $register, schema: $schema, object: $data)->jsonSerialize();
     }
 
+    /**
+     * Extends input for performing business logic
+     *
+     * @param array $config The rule configuration which parameters could be extended
+     * @param array $data The data array containing the input parameters.
+     *
+     * @return array The data array with the extended parameters in the 'extendedParameters' key.
+     * @throws ContainerExceptionInterface
+     * @throws NotFoundExceptionInterface
+     */
+    private function processExtendInputRule(array $config, array $data): array
+    {
+        $parameters = new Dot($data);
+        $extendedParameters = new Dot();
+
+        foreach ($config['extend_input']['properties'] as $property) {
+            $value = $parameters->get($property);
+
+            if(filter_var($value, FILTER_VALIDATE_URL) !== false) {
+                $exploded = explode(separator: '/', string: $value);
+                $value = end($exploded);
+            }
+
+            try {
+                $object = $this->objectService->getOpenRegisters()->getMapper('objectEntity')->find(identifier: $value);
+            } catch (DoesNotExistException $exception) {
+                continue;
+            }
+            $extendedParameters->add($property, $this->objectService->getOpenRegisters()->renderEntity($object->jsonSerialize()));
+
+        }
+
+        return array_merge($data, $extendedParameters->all());
+    }
+
 	/**
 	 * Processes rules for an endpoint request
 	 *
@@ -1752,6 +1792,7 @@ class SynchronizationService
                     'save_object' => $this->processSaveObjectRule($rule, $data),
                     'fetch_file' => $this->processFetchFileRule($rule, $data, $objectId),
                     'write_file' => $this->processWriteFileRule($rule, $data, $objectId, $registerId, $schemaId),
+                    'extend_input' => $this->processExtendInputRule(config: $rule->getConfig(), data: $data),
                     default => throw new Exception('Unsupported rule type: ' . $rule->getType()),
                 };
 
