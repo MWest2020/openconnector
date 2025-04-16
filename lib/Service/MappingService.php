@@ -135,6 +135,10 @@ class MappingService
             }
 
             // Render the value from twig.
+            if (is_array($value) === true) {
+                $dotArray->set($key, $value);
+                continue;
+            }
 			$dotArray->set($key, $this->twig->createTemplate($value)->render($originalInput));
         }
 
