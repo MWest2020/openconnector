@@ -1574,7 +1574,8 @@ class SynchronizationService
                 }
             }
 
-            $body['targetId'] = $targetId;
+			$body['targetId'] = $targetId;
+			$targetObject['targetId'] = $targetId;
 
 			$data = array_merge($this->objectService->getOpenRegisters()->find(
 				id: $contract->getOriginId(),
