@@ -799,8 +799,12 @@ class SynchronizationService
 
         if ($synchronization->getTargetType() === 'register/schema') {
             [$registerId, $schemaId] = explode(separator: '/', string: $synchronization->getTargetId());
-            $this->processRules(synchronization: $synchronization, data: $targetObject, timing: 'after', objectId: $synchronizationContract->getTargetId(), registerId: $registerId, schemaId: $schemaId);
-        }
+            $this->processRules(synchronization: $synchronization, data: $object, timing: 'after', objectId: $synchronizationContract->getTargetId(), registerId: $registerId, schemaId: $schemaId);
+        } else if ($synchronization->getTargetType() === 'api' && $synchronization->getSourceType() === 'register/schema') {
+            [$registerId, $schemaId] = explode(separator: '/', string: $synchronization->getSourceId());
+            $this->processRules(synchronization: $synchronization, data: $object, timing: 'after', objectId: $synchronizationContract->getSourceId(), registerId: $registerId, schemaId: $schemaId);
+		}
+
 
 		// Create log entry for the synchronization
         if (isset($contractLog) === true) {
@@ -1658,6 +1662,29 @@ class SynchronizationService
 
 	}
 
+    /**
+     * Saves object to OpenRegister
+     *
+     * @param Rule $rule
+     * @param array $data
+     *
+     * @return array $data
+     */
+    private function processSaveObjectRule(Rule $rule, array $data): array
+    {
+        $configuration = $rule->getConfiguration();
+        $register = $configuration['save_object']['register'];
+        $schema = $configuration['save_object']['schema'];
+        $mapping = $configuration['save_object']['mapping'] ?? null;
+		if ($mapping) {
+        	$mapping = $this->mappingService->getMapping($mapping);
+            $data = $this->processMapping(mapping: $mapping, data: $data);
+		}
+
+        $objectService = $this->containerInterface->get('OCA\OpenRegister\Service\ObjectService');
+        return $objectService->saveObject(register: $register, schema: $schema, object: $data);
+    }
+
 	/**
 	 * Processes rules for an endpoint request
 	 *
@@ -1705,6 +1732,7 @@ class SynchronizationService
                     'error' => $this->processErrorRule($rule),
                     'mapping' => $this->processMappingRule($rule, $data),
                     'synchronization' => $this->processSyncRule($rule, $data),
+                    'save_object' => $this->processSaveObjectRule($rule, $data),
                     'fetch_file' => $this->processFetchFileRule($rule, $data, $objectId),
                     'write_file' => $this->processWriteFileRule($rule, $data, $objectId, $registerId, $schemaId),
                     default => throw new Exception('Unsupported rule type: ' . $rule->getType()),
@@ -2172,6 +2200,20 @@ class SynchronizationService
     {
         $config = $rule->getConfiguration();
         $mapping = $this->mappingService->getMapping($config['mapping']);
+
+        return $this->processMapping(mapping: $mapping, data: $data);
+    }
+
+    /**
+     * Executes mapping on data from endpoint flow
+     *
+     * @param mapping $mapping
+     * @param array $data
+     *
+     * @return array $data
+     */
+    private function processMapping(Mapping $mapping, array $data): array
+    {
         return $this->mappingService->executeMapping($mapping, $data);
     }
 
