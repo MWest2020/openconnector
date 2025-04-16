@@ -1575,8 +1575,9 @@ class SynchronizationService
             if ($targetId === null) {
                 $targetId = $body['id'];
 
-                if (isset($body[$targetConfig['idposition']]) === true) { 
-                    $targetId = $body[$targetConfig['idposition']];
+                if (isset($body[$targetConfig['idposition']]) === true) {
+					$bodyDot = new Dot($body);
+					$targetId = $bodyDot->get($targetConfig['idposition']);
                 }
             }
 
