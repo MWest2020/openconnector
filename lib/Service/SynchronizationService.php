@@ -757,6 +757,7 @@ class SynchronizationService
 
         // Execute mapping if found
         if ($sourceTargetMapping) {
+			$objectBeforeMapping = $object;
             $object = $this->mappingService->executeMapping(mapping: $sourceTargetMapping, input: $object);
         }
 
@@ -797,10 +798,10 @@ class SynchronizationService
 
         if ($synchronization->getTargetType() === 'register/schema') {
             [$registerId, $schemaId] = explode(separator: '/', string: $synchronization->getTargetId());
-            $this->processRules(synchronization: $synchronization, data: $object, timing: 'after', objectId: $synchronizationContract->getTargetId(), registerId: $registerId, schemaId: $schemaId);
+            $this->processRules(synchronization: $synchronization, data: array_merge($object, ['_objectBeforeMapping' => $objectBeforeMapping]), timing: 'after', objectId: $synchronizationContract->getTargetId(), registerId: $registerId, schemaId: $schemaId);
         } else if ($synchronization->getTargetType() === 'api' && $synchronization->getSourceType() === 'register/schema') {
             [$registerId, $schemaId] = explode(separator: '/', string: $synchronization->getSourceId());
-            $this->processRules(synchronization: $synchronization, data: $object, timing: 'after', objectId: $synchronizationContract->getSourceId(), registerId: $registerId, schemaId: $schemaId);
+            $this->processRules(synchronization: $synchronization, data: array_merge($object, ['_objectBeforeMapping' => $objectBeforeMapping]), timing: 'after', objectId: $synchronizationContract->getSourceId(), registerId: $registerId, schemaId: $schemaId);
 		}
 
 
