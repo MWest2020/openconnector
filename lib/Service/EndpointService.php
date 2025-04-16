@@ -442,7 +442,7 @@ class EndpointService
                 $id = pos($pathParams);
             }
 
-            $main = $this->objectService->getOpenRegisters()->renderEntity($mapper->findByUuid($pathParams['id'])->getObject());
+            $main = $this->objectService->getOpenRegisters()->renderEntity($mapper->findByUuid($pathParams['id'])->jsonSerialize());
             $ids = $main[$property];
 
             if(isset($main[$property]) === false) {
@@ -803,10 +803,10 @@ class EndpointService
 
     /**
      * Saves object to OpenRegister
-     * 
-     * @param Rule $rule 
+     *
+     * @param Rule $rule
      * @param array $data
-     * 
+     *
      * @return array $data
      */
     private function processSaveObjectRule(Rule $rule, array $data): array
@@ -1008,10 +1008,10 @@ class EndpointService
 
     /**
      * Executes mapping on data from endpoint flow
-     * 
+     *
      * @param mapping $mapping
      * @param array $data
-     * 
+     *
      * @return array $data
      */
     private function processMapping(Rule $rule, Mapping $mapping, array $data): array
@@ -1309,7 +1309,7 @@ class EndpointService
                 $sendObject[$config['synchronizationConfig']['mergeResultToKey']] = $returnedObject;
                 $data['body'] = $sendObject;
             }
-        // Overwrite body with result  
+        // Overwrite body with result
         } else if (isset($config['synchronizationConfig']['overwriteObjectWithResult']) === true && filter_var($config['synchronizationConfig']['overwriteObjectWithResult'], FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) === true) {
             $data['body'] = $returnedObject;
         } else {
