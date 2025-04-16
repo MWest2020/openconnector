@@ -1681,13 +1681,25 @@ class SynchronizationService
         $register = $configuration['save_object']['register'];
         $schema = $configuration['save_object']['schema'];
         $mapping = $configuration['save_object']['mapping'] ?? null;
+        $patch = $configuration['save_object']['patch'] ?? false;
+
 		if ($mapping) {
+
+			if (isset($data['_objectBeforeMapping']['id']) === true) {
+				$id = $data['_objectBeforeMapping']['id'];
+				unset($data['_objectBeforeMapping']);
+			}
+
         	$mapping = $this->mappingService->getMapping($mapping);
             $data = $this->processMapping(mapping: $mapping, data: $data);
 		}
 
         $objectService = $this->containerInterface->get('OCA\OpenRegister\Service\ObjectService');
-        return $objectService->saveObject(register: $register, schema: $schema, object: $data);
+		if ($patch === true || $patch === 'true') {
+            $object = $this->objectService->getOpenRegisters()->getMapper('objectEntity')->find($id);
+			$data = array_merge($object->getObject(), ['id' => $object->getId()], $data);
+		}
+        return $objectService->saveObject(register: $register, schema: $schema, object: $data)->jsonSerialize();
     }
 
 	/**
