@@ -293,6 +293,11 @@ class EndpointService
         }
 
         $uses = $object->getRelations();
+
+        if(isset($serializedObject) === true && !empty($serializedObject['@self']['relations'])) {
+            $uses = $serializedObject['@self']['relations'];
+        }
+
         $useUrls = [];
 
         $uuidToUrlMap = [];
