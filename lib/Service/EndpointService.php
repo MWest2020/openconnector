@@ -405,6 +405,55 @@ class EndpointService
     }
 
     /**
+     * Inverse of replaceInternalReferences, rewriting external references to internal references for query parameters.
+     *
+     * @param array $parameters The incoming request parameters.
+     * @param \OCA\OpenRegister\Service\ObjectService|QBMapper $mapper The ObjectService containing the request schema.
+     *
+     * @return array The updated request parameters.
+     *
+     * @throws ContainerExceptionInterface|NotFoundExceptionInterface
+     */
+    private function rewriteExternalReferences(array $parameters, \OCA\OpenRegister\Service\ObjectService|QBMapper $mapper): array
+    {
+        $schemaMapper = $this->containerInterface->get('OCA\OpenRegister\Db\SchemaMapper');
+        $schema        = $schemaMapper->find($mapper->getSchema());
+
+        $rewriteParameters = array_intersect(array_keys($parameters), array_keys($schema->getProperties()));
+
+        foreach($rewriteParameters as $rewriteParameter) {
+            if (
+                ((isset($schema->getProperties()[$rewriteParameter]['$ref']) === false
+                        || empty($schema->getProperties()[$rewriteParameter]['$ref']) === true)
+                    && (isset($schema->getProperties()[$rewriteParameter]['items']['$ref']) === false
+                        || empty($schema->getProperties()[$rewriteParameter]['items']['$ref']) === true))
+                || filter_var($parameters[$rewriteParameter], FILTER_VALIDATE_URL) === false
+            ) {
+                continue;
+            }
+
+            $parsedPath = parse_url($parameters[$rewriteParameter], PHP_URL_PATH);
+            $parsedPath = substr($parsedPath, 33);
+            $endpoints = $this->endpointMapper->findByPathRegex(
+                path: $parsedPath,
+                method: 'GET'
+            );
+
+            if(count($endpoints) < 1) {
+                continue;
+            }
+
+            $endpoint = array_shift($endpoints);
+
+            $pathArray = $this->getPathParameters(endpointArray: $endpoint->getEndpointArray(), path: $parsedPath);
+            $parameters[$rewriteParameter] = end($pathArray);
+
+        }
+
+        return $parameters;
+    }
+
+    /**
      * Fetch objects for the endpoint.
      *
      * @param \OCA\OpenRegister\Service\ObjectService|QBMapper $mapper The mapper for the object type
@@ -421,12 +470,10 @@ class EndpointService
         int                                              &$status = 200
     ): Entity|array
     {
-        $extend = $requestParams['extend'] ?? $requestParams['_extend'] ?? null;
-
         if (isset($pathParams['id']) === true && $pathParams['id'] === end($pathParams)) {
-            return $this->objectService->getOpenRegisters()->renderEntity(
-                entity: $this->replaceInternalReferences(mapper: $mapper, object: $mapper->find($pathParams['id'])),
-                extend: $parameters['_extend'] ?? $parameters['extend'] ?? null
+            return $this->replaceInternalReferences(mapper: $mapper, serializedObject: $this->objectService->getOpenRegisters()->renderEntity(
+                entity: $mapper->find($pathParams['id'])->jsonSerialize(),
+                extend: $parameters['_extend'] ?? $parameters['extend'] ?? null),
             );
 
 
@@ -442,7 +489,7 @@ class EndpointService
                 $id = pos($pathParams);
             }
 
-            $main = $this->objectService->getOpenRegisters()->renderEntity($mapper->findByUuid($pathParams['id'])->jsonSerialize());
+            $main = $this->objectService->getOpenRegisters()->renderEntity($mapper->findByUuid($pathParams['id'])->getObject());
             $ids = $main[$property];
 
             if(isset($main[$property]) === false) {
@@ -481,12 +528,12 @@ class EndpointService
             return $returnArray;
         }
 
+        $parameters = $this->rewriteExternalReferences($parameters, $mapper);
+
         $result = $mapper->findAllPaginated(requestParams: $parameters);
 
-        $result['results'] = array_map(function ($object) use ($mapper, $extend) {
-            $object = is_array($object) ? $object : $object->jsonSerialize();
-            $object = $mapper->renderEntity(entity: $object, extend: $extend);
-            return $this->replaceInternalReferences(mapper: $mapper, serializedObject: $object);
+        $result['results'] = array_map(function ($object) use ($mapper) {
+            return $this->replaceInternalReferences(mapper: $mapper, serializedObject: $this->objectService->getOpenRegisters()->renderEntity(entity: $object->jsonSerialize()));
         }, $result['results']);
 
         $returnArray = [
