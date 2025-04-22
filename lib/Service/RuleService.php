@@ -83,21 +83,29 @@ class RuleService
         // Add to response data
         foreach ($voorzieningen as $voorziening) {
             $voorziening = $voorziening->jsonSerialize();
-            foreach ($voorziening['referentieComponenten'] as $referentieComponent) {
-                $newUuid = Uuid::v4();
-                $elementId = "id-{$newUuid}";
-                $data['body']['results'][0]['elements'][] = [
-                    'identifier' => $elementId,
-                    'name' => $voorziening['naam'],
-                    'name-lang' => 'nl',
-                    'documentation' => $voorziening['beschrijving'],
-                    'documentation-lang' => 'nl',
-                    'type' => 'Constraint',
-                    // 'properties' => [
-                    //     'todo' => '',
-                    // ],
-                ];
 
+            $newUuid = Uuid::v4();
+            $elementId = "id-{$newUuid}";
+            $data['body']['results'][0]['elements'][] = [
+                'identifier' => $elementId,
+                'name' => $voorziening['naam'],
+                'name-lang' => 'nl',
+                'documentation' => $voorziening['beschrijving'],
+                'documentation-lang' => 'nl',
+                'type' => 'Constraint',
+                'properties' => [
+                    0 => [
+                        'propertyDefinitionRef' => 'id-c3355444b6cb8fb34b62e241dd073043',
+                        'value' => 'Pakket',
+                    ],
+                    1 => [
+                        'propertyDefinitionRef' => 'id-d222f71c083de2460625d0914174ee9d',
+                        'value' => 'n',
+                    ],
+                ],
+            ];
+
+            foreach ($voorziening['referentieComponenten'] as $referentieComponent) {
                 // Search for nodes with elementRef matching the voorzienings identificatie and create subnodes
                 if (isset($data['body']['results'][0]['views']) && is_array($data['body']['results'][0]['views'])) {
                     foreach ($data['body']['results'][0]['views'] as &$view) {
@@ -135,7 +143,7 @@ class RuleService
         }
         
         // Loop through each node in the array
-        foreach ($nodes as &$node) {
+        foreach ($nodes as $index => &$node) {
             // Check if current node has an elementRef property and if it matches the target identificatie
             if (isset($node['elementRef']) === true && $node['elementRef'] === $matchIdentificatie) {
                 // Create a subnode with reference to the newly created element
@@ -147,6 +155,17 @@ class RuleService
                     // Initialize the nodes array if it doesn't exist properly
                     $node['nodes'] = [];
                 }
+
+                $totalChildren = count($node['nodes']) + 1; // @todo: check if this is correct, prevent it from being 0
+                $childIndex = $index; // @todo: check if this is correct
+                $parentPadding = 20;
+                $childSpacing = 8;
+                $parentWidth = $node['position']['w'] - ($parentPadding * 2);
+                $parentHeight = $node['position']['h'] - ($parentPadding * 2);
+                $childWidth = min(($parentWidth - ($childSpacing * ($totalChildren - 1))) / $totalChildren, 120);
+                $childHeight = min($parentHeight * 0.35, 30);
+                $absoluteX = $node['position']['x'] + $parentPadding + ($childIndex * ($childWidth + $childSpacing));
+                $absoluteY = $node['position']['y'] + $node['position']['h'] - $childHeight - 10;
                 
                 // Add subnode with reference to new element
                 $node['nodes'][] = [
@@ -154,10 +173,36 @@ class RuleService
                     'elementRef' => $newElementId,
                     'type' => 'element',
                     'position' => [
-                        'x' => 0,
-                        'y' => 0
+                        'x' => $absoluteX,
+                        'y' => $absoluteY,
+                        'w' => $childWidth,
+                        'h' => $childHeight
                     ],
-                    'style' => []
+                    'style' => [
+                        'lineWidth' => 1,
+                        'fillColor' => [
+                            'r' => 100,
+                            'g' => 149,
+                            'b' => 237,
+                            'a' => 100
+                        ],
+                        'lineColor' => [
+                            'r' => 0,
+                            'g' => 0,
+                            'b' => 0,
+                            'a' => 100
+                        ],
+                        'font' => [
+                            'name' => 'Arial',
+                            'size' => 10,
+                            'style' => 'plain'
+                        ],
+                        'color' => [
+                            'r' => 0,
+                            'g' => 0,
+                            'b' => 0
+                        ]
+                    ]
                 ];
             }
             
