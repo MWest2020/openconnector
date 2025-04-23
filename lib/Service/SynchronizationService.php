@@ -1612,15 +1612,7 @@ class SynchronizationService
 					$targetId = $bodyDot->get($targetConfig['idposition']);
                 }
             }
-
-			$body['targetId'] = $targetId;
-			$targetObject['targetId'] = $targetId;
-
-			$data = array_merge($this->objectService->getOpenRegisters()->find(
-				id: $contract->getOriginId(),
-			)->getObject(), ['targetId' => $targetId], ['id' => $contract->getOriginId()]);
-		    $this->objectService->getOpenRegisters()->saveObject(register: $this->objectService->getOpenRegisters()->getRegister(), schema: $this->objectService->getOpenRegisters()->getSchema(), object: $data, throwEvent: false);
-
+			
 			$contract->setTargetId($targetId);
 			return $contract;
 		}
