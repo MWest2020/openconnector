@@ -71,6 +71,7 @@ class SynchronizationService
     const MERGE_EXTRA_DATA_OBJECT_LOCATION     = 'mergeExtraData';
     const UNSET_CONFIG_KEY_LOCATION            = 'unsetConfigKey';
     const FILE_TAG_TYPE                        = 'files';
+    const VALID_MUTATION_TYPES                 = ['create', 'update', 'delete'];
 
 	public function __construct(
 		CallService                      $callService,
@@ -120,10 +121,11 @@ class SynchronizationService
 	 * @param bool 		      $isTest Whether this is a test run (does not persist data if true).
 	 * @param \OCA\OpenRegister\Db\ObjectEntity|array $object The object to be synchronized, also referenced so its updated in parent objects.
      * @param SynchronizationLog $log
+	 * @param string|null $mutationType If dealing with single object synchronization, the type of the mutation that will be handled, 'create', 'update' or 'delete'. Used for syncs to extern sources.
 	 *
 	 * @return SynchronizationContract|array|null Returns a synchronization contract, an array for test cases, or null if conditions are not met.
 	 */
-	private function synchronizeInternToExtern(Synchronization $synchronization, ?bool $isTest = false, ?bool $force = false, \OCA\OpenRegister\Db\ObjectEntity|array &$object, SynchronizationLog $log)
+	private function synchronizeInternToExtern(Synchronization $synchronization, ?bool $isTest = false, ?bool $force = false, \OCA\OpenRegister\Db\ObjectEntity|array &$object, SynchronizationLog $log, ?string $mutationType = null)
 	{
 		if ($synchronization->getConditions() !== [] && !JsonLogic::apply($synchronization->getConditions(), $object)) {
 
@@ -165,7 +167,7 @@ class SynchronizationService
 				$synchronizationContract->setOriginId($originId);
 			}
 
-			$synchronizationContract = $this->synchronizeContract(synchronizationContract: $synchronizationContract, synchronization: $synchronization, object: $object, isTest: $isTest, force: $force, log: $log);
+			$synchronizationContract = $this->synchronizeContract(synchronizationContract: $synchronizationContract, synchronization: $synchronization, object: $object, isTest: $isTest, force: $force, log: $log, mutationType: $mutationType);
 
 			if ($isTest === true && is_array($synchronizationContract) === true) {
 				// If this is a log and contract array return for the test endpoint.
@@ -175,7 +177,7 @@ class SynchronizationService
 			}
 		} else {
 			// @todo this is wierd
-			$synchronizationContract = $this->synchronizeContract(synchronizationContract: $synchronizationContract, synchronization: $synchronization, object: $object, isTest: $isTest, force: $force, log: $log);
+			$synchronizationContract = $this->synchronizeContract(synchronizationContract: $synchronizationContract, synchronization: $synchronization, object: $object, isTest: $isTest, force: $force, log: $log, mutationType: $mutationType);
 			if ($isTest === false && $synchronizationContract instanceof SynchronizationContract === true) {
 				// If this is a regular synchronizationContract update it to the database.
 				$this->synchronizationContractMapper->update(entity: $synchronizationContract);
@@ -298,6 +300,7 @@ class SynchronizationService
 	 * @param bool|null $isTest False by default, currently added for synchronziation-test endpoint
 	 * @param bool|null $force False by default, if true, the object will be updated regardless of changes
 	 * @param array|\OCA\OpenRegister\Db\ObjectEntity|null $object Object to synchronize, updated by reference
+	 * @param string|null $mutationType If dealing with single object synchronization, the type of the mutation that will be handled, 'create', 'update' or 'delete'. Used for syncs to extern sources.
 	 *
 	 * @return array
 	 * @throws ContainerExceptionInterface
@@ -315,8 +318,14 @@ class SynchronizationService
 		?bool $isTest = false,
 		?bool $force = false,
         array|\OCA\OpenRegister\Db\ObjectEntity|null &$object = null,
+		?string $mutationType = null
 	): array
 	{
+		if ($mutationType !== null && in_array($mutationType, $this::VALID_MUTATION_TYPES) === false) {
+			throw new Exception(sprintf('Invalid mutation type: %s given. Allowed mutation types are: %s', $mutationType, implode(', ', $this::VALID_MUTATION_TYPES)));
+		}
+
+
         // Start execution time measurement
         $startTime = microtime(true);
 
@@ -345,7 +354,7 @@ class SynchronizationService
             // lets always create the log entry first, because we need its uuid later on for contractLogs
             $log['result']['type'] = 'internToExtern';
             $log = $this->synchronizationLogMapper->createFromArray($log);
-            return [$this->synchronizeInternToExtern($synchronization, $isTest, $force, $object, $log)];
+            return [$this->synchronizeInternToExtern(synchronization: $synchronization, isTest: $isTest, force: $force, object: $object, log: $log, mutationType: $mutationType)];
         }
 
         $log['result']['type'] = 'externToIntern';
@@ -672,7 +681,8 @@ class SynchronizationService
 	 * @param bool|null $isTest False by default, currently added for synchronization-test endpoint
 	 * @param bool|null $force False by default, if true, the object will be updated regardless of changes
 	 * @param SynchronizationLog|null $log The log to update
-     * 
+	 * @param string|null $mutationType If dealing with single object synchronization, the type of the mutation that will be handled, 'create', 'update' or 'delete'. Used for syncs to extern sources.
+     *
 	 * @return SynchronizationContract|Exception|array
 	 * @throws ContainerExceptionInterface
 	 * @throws NotFoundExceptionInterface
@@ -687,6 +697,7 @@ class SynchronizationService
 		?bool $isTest = false,
 		?bool $force = false,
 		?SynchronizationLog $log = null,
+		?string $mutationType = null
 		): SynchronizationContract|Exception|array
 	{
 		$contractLog = null;
@@ -798,7 +809,8 @@ class SynchronizationService
 		// Update target and create log when not in test mode
 		$synchronizationContract = $this->updateTarget(
 			synchronizationContract: $synchronizationContract,
-			targetObject: $object
+			targetObject: $object,
+			mutationType: $mutationType
 		);
 
         if ($synchronization->getTargetType() === 'register/schema') {
@@ -1082,6 +1094,7 @@ class SynchronizationService
 	 * @param SynchronizationContract $synchronizationContract
 	 * @param array|null $targetObject
 	 * @param string|null $action Determines what needs to be done with the target object, defaults to 'save'
+	 * @param string|null $mutationType If dealing with single object synchronization, the type of the mutation that will be handled, 'create', 'update' or 'delete'. Used for syncs to extern sources.
 	 *
 	 * @return SynchronizationContract
 	 * @throws ContainerExceptionInterface
@@ -1092,7 +1105,7 @@ class SynchronizationService
 	 * @throws \OCP\DB\Exception
 	 * @throws Exception
 	 */
-	public function updateTarget(SynchronizationContract $synchronizationContract, ?array &$targetObject = [], ?string $action = 'save'): SynchronizationContract
+	public function updateTarget(SynchronizationContract $synchronizationContract, ?array &$targetObject = [], ?string $action = 'save', ?string $mutationType = null): SynchronizationContract
 	{
 		// The function can be called solo set let's make sure we have the full synchronization object
 		if (isset($synchronization) === false) {
@@ -1113,7 +1126,7 @@ class SynchronizationService
 				break;
 			case 'api':
 				$targetConfig = $synchronization->getTargetConfig();
-				$synchronizationContract = $this->writeObjectToTarget(synchronization: $synchronization, contract: $synchronizationContract, endpoint: $targetConfig['endpoint'] ?? '', targetObject: $targetObject);
+				$synchronizationContract = $this->writeObjectToTarget(synchronization: $synchronization, contract: $synchronizationContract, endpoint: $targetConfig['endpoint'] ?? '', targetObject: $targetObject, mutationType: $mutationType);
 				break;
 			case 'database':
 				//@todo: implement
@@ -1507,6 +1520,7 @@ class SynchronizationService
 	 * @param SynchronizationContract $contract The contract to enforce.
 	 * @param string $endpoint The endpoint to write the object to.
 	 * @param array|null $targetObject Update referenced targetObject so we can return response here.
+	 * @param string|null $mutationType If dealing with single object synchronization, the type of the mutation that will be handled, 'create', 'update' or 'delete'. Used for syncs to extern sources.
      *
 	 * @return SynchronizationContract The updated contract.
      *
@@ -1522,6 +1536,7 @@ class SynchronizationService
 		SynchronizationContract $contract,
 		string                  $endpoint,
         ?array                  &$targetObject = null,
+		?string 				$mutationType = null
 	): SynchronizationContract
 	{
 		$target = $this->sourceMapper->find(id: $synchronization->getTargetId());
@@ -1549,10 +1564,27 @@ class SynchronizationService
 			$endpoint = str_replace(search: $target->getLocation(), replace: '', subject: $endpoint);
 		}
 
-		if ($contract->getOriginId() === null) {
+		if ($mutationType === 'delete') {
+			$method = 'DELETE';
 
-			$endpoint .= '/'.$contract->getTargetId();
-			$response = $this->callService->call(source: $target, endpoint: $endpoint, method: 'DELETE', config: $targetConfig)->getResponse();
+			// @todo check for {{targetId}} in endpoint and replace
+			if (isset($targetConfig['deleteEndpoint']) === true) {
+				$endpoint = $targetConfig['deleteEndpoint'];
+			} else {
+				$endpoint .= '/'.$contract->getTargetId();
+			}
+
+			if (isset($targetConfig['deleteMethod']) === true) {
+				$method = $targetConfig['deleteMethod'];
+			}
+
+			if (isset($targetConfig['deleteMapping']) === true) {
+				$deleteMapping = $this->mappingService->getMapping($targetConfig['deleteMapping']);
+				$targetConfig['json'] = $this->mappingService->executeMapping(mapping: $deleteMapping, input: $object);
+			}
+
+			$response = $this->callService->call(source: $target, endpoint: $endpoint, method: $method, config: $targetConfig)->getResponse();
+
 
 			$contract->setTargetHash(md5(serialize($response['body'])));
 			$contract->setTargetId(null);
@@ -1587,16 +1619,26 @@ class SynchronizationService
 			$data = array_merge($this->objectService->getOpenRegisters()->find(
 				id: $contract->getOriginId(),
 			)->getObject(), ['targetId' => $targetId], ['id' => $contract->getOriginId()]);
-		    $this->objectService->getOpenRegisters()->saveObject(register: $this->objectService->getOpenRegisters()->getRegister(), schema: $this->objectService->getOpenRegisters()->getSchema(), object: $data);
+		    $this->objectService->getOpenRegisters()->saveObject(register: $this->objectService->getOpenRegisters()->getRegister(), schema: $this->objectService->getOpenRegisters()->getSchema(), object: $data, throwEvent: false);
 
 			$contract->setTargetId($targetId);
-
 			return $contract;
 		}
 
+		$method = 'PUT';
 		$endpoint .= '/'.$contract->getTargetId();
 
-		$response = $this->callService->call(source: $target, endpoint: $endpoint, method: 'PUT', config: $targetConfig)->getResponse();
+
+		if (isset($targetConfig['updateEndpoint']) === true) {
+			$endpoint = $targetConfig['updateEndpoint'];
+		}
+
+		if (isset($targetConfig['updateMethod']) === true) {
+			$method = $targetConfig['updateMethod'];
+		}
+
+
+		$response = $this->callService->call(source: $target, endpoint: $endpoint, method: $method, config: $targetConfig)->getResponse();
 
 		$body = array_merge(json_decode($response['body']), ['targetId' => $contract->getTargetId()], true);
         $targetObject = $body;
@@ -1705,7 +1747,10 @@ class SynchronizationService
             $object = $this->objectService->getOpenRegisters()->getMapper('objectEntity')->find($id);
 			$data = array_merge($object->getObject(), ['id' => $object->getId()], $data);
 		}
-        return $objectService->saveObject(register: $register, schema: $schema, object: $data)->jsonSerialize();
+
+		$object = $objectService->saveObject(register: $register, schema: $schema, object: $data)->jsonSerialize();
+
+		return $object;
     }
 
     /**
