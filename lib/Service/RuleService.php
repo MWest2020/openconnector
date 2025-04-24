@@ -164,16 +164,36 @@ class RuleService
                     $node['nodes'] = [];
                 }
 
-                $totalChildren = count($node['nodes']) + 1; // @todo: check if this is correct, prevent it from being 0
-                $childIndex = $index; // @todo: check if this is correct
+                $totalChildren = count($node['nodes']) + 1; // @todo: also add the amount of nodes we are going to add...
+
+                $childIndex = $totalChildren; // @todo: check if this is correct
+                
                 $parentPadding = 20;
                 $childSpacing = 8;
                 $parentWidth = $node['position']['w'] - ($parentPadding * 2);
                 $parentHeight = $node['position']['h'] - ($parentPadding * 2);
-                $childWidth = min(($parentWidth - ($childSpacing * ($totalChildren - 1))) / $totalChildren, 120);
-                $childHeight = min($parentHeight * 0.35, 30);
+                
+                // Calculate child width: 
+                // Available width = (parent width - left/right padding - spacing between children) / number of children
+                $childWidth = min(
+                    ($parentWidth - ($childSpacing * ($totalChildren - 1))) / $totalChildren, 
+                    120 // Maximum width of 120px
+                );
+
+                // Child height is 35% of parent height, but no more than 30px
+                // $childHeight = min($parentHeight * 0.35, 30);
+                $childHeight = 81;
+                if (isset($nodes['nodes'][0]) === true) {
+                    $childHeight = $nodes['nodes'][0]['position']['h'];
+                }
+
+                // Calculate X position:
+                // Start from parent's left edge + padding + (child's index × (child width + spacing))
                 $absoluteX = $node['position']['x'] + $parentPadding + ($childIndex * ($childWidth + $childSpacing));
-                $absoluteY = $node['position']['y'] + $node['position']['h'] - $childHeight - 10;
+
+                // Calculate Y position:
+                // Position from bottom of parent
+                $absoluteY = $node['position']['y'] + ($node['position']['h'] - $childHeight - 16);
                 
                 // Add subnode with reference to new element
                 $node['nodes'][] = [
