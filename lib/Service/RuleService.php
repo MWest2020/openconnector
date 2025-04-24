@@ -7,6 +7,14 @@ use OCA\OpenConnector\Db\Rule;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Uid\Uuid;
 
+/**
+ * Service for handling Rule processing in the OpenConnector app.
+ * 
+ * This service provides functionality to process various types of Rules,
+ * applying transformations and business logic to data based on rule configurations.
+ * 
+ * Note: The custom rules functionality is experimental and subject to change.
+ */
 class RuleService
 {
     public function __construct(
@@ -171,36 +179,36 @@ class RuleService
                 $node['nodes'][] = [
                     'identifier' => $subnodeId,
                     'elementRef' => $newElementId,
-                    'type' => 'element',
+                    'type' => 'Element',
                     'position' => [
-                        'x' => $absoluteX,
-                        'y' => $absoluteY,
-                        'w' => $childWidth,
-                        'h' => $childHeight
+                        'x' => (int) $absoluteX,
+                        'y' => (int) $absoluteY,
+                        'w' => (int) $childWidth,
+                        'h' => (int) $childHeight
                     ],
                     'style' => [
-                        'lineWidth' => 1,
+                        'lineWidth' => "1",
                         'fillColor' => [
-                            'r' => 100,
-                            'g' => 149,
-                            'b' => 237,
-                            'a' => 100
+                            'r' => "100",
+                            'g' => "149",
+                            'b' => "237",
+                            'a' => "100"
                         ],
                         'lineColor' => [
-                            'r' => 0,
-                            'g' => 0,
-                            'b' => 0,
-                            'a' => 100
+                            'r' => "0",
+                            'g' => "0",
+                            'b' => "0",
+                            'a' => "100"
                         ],
                         'font' => [
                             'name' => 'Arial',
-                            'size' => 10,
+                            'size' => "10",
                             'style' => 'plain'
                         ],
                         'color' => [
-                            'r' => 0,
-                            'g' => 0,
-                            'b' => 0
+                            'r' => "0",
+                            'g' => "0",
+                            'b' => "0"
                         ]
                     ]
                 ];

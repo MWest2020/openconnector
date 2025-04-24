@@ -18,6 +18,7 @@ use OCA\OpenConnector\Service\AuthenticationService;
 use OCA\OpenConnector\Service\CallService;
 use OCA\OpenConnector\Service\MappingService;
 use OCA\OpenConnector\Service\ObjectService;
+use OCA\OpenConnector\Service\RuleService;
 use OCA\OpenConnector\Db\Source;
 use OCA\OpenConnector\Db\Endpoint;
 use OCA\OpenConnector\Db\Mapping;
@@ -50,7 +51,6 @@ use OCA\OpenConnector\Db\Rule;
 use OCA\OpenConnector\Db\RuleMapper;
 use Psr\Container\ContainerInterface;
 use DateTime;
-use OCA\OpenConnector\Service\RuleService;
 
 /**
  * Service class for handling endpoint requests
@@ -1071,6 +1071,7 @@ class EndpointService
      */
     private function processMapping(Rule $rule, Mapping $mapping, array $data): array
     {
+        $config = $rule->getConfiguration();
         // Todo: We should just remove this if statement and use mapping to loop through results instead.
         if (isset($data['body']['results']) === true
             && strtolower($rule->getAction()) === 'get'
