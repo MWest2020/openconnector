@@ -27,20 +27,20 @@ class ObjectUpdatedEventListener implements IEventListener
             return;
         }
 
-        if (method_exists($event, 'getObject') === false) {
+        if (method_exists($event, 'getNewObject') === false) {
             return;
         }
 
 
-        $object = $event->getObject();
-        if ($object === null || $object->getRegister() === null || $object->getSchema() === null && $object->getObject() !== null) {
+        $object = $event->getNewObject();
+        if ($object === null || $object->getRegister() === null || $object->getSchema() === null && $object->getNewObject() !== null) {
             return;
         }
 
         $synchronizations = $this->synchronizationService->findAllBySourceId(register: $object->getRegister(), schema: $object->getSchema());
         foreach ($synchronizations as $synchronization) {
             try {
-                $this->synchronizationService->synchronize(synchronization: $synchronization, force: true, object: $object->jsonSerialize());
+                $this->synchronizationService->synchronize(synchronization: $synchronization, force: true, object: $object->jsonSerialize(), mutationType: 'update');
             } catch (\Exception $e) {
                 $this->logger->error('Failed to process object event: ' . $e->getMessage() . ' for synchronization ' . $synchronization->getId(), [
                     'exception' => $e,
