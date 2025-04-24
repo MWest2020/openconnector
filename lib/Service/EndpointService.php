@@ -20,6 +20,7 @@ use OCA\OpenConnector\Service\MappingService;
 use OCA\OpenConnector\Service\ObjectService;
 use OCA\OpenConnector\Db\Source;
 use OCA\OpenConnector\Db\Endpoint;
+use OCA\OpenConnector\Db\Mapping;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\ClientException;
 use GuzzleHttp\Exception\GuzzleException;
@@ -294,6 +295,11 @@ class EndpointService
         }
 
         $uses = $object->getRelations();
+
+        if(isset($serializedObject) === true && !empty($serializedObject['@self']['relations'])) {
+            $uses = $serializedObject['@self']['relations'];
+        }
+
         $useUrls = [];
 
         $uuidToUrlMap = [];
@@ -406,6 +412,55 @@ class EndpointService
     }
 
     /**
+     * Inverse of replaceInternalReferences, rewriting external references to internal references for query parameters.
+     *
+     * @param array $parameters The incoming request parameters.
+     * @param \OCA\OpenRegister\Service\ObjectService|QBMapper $mapper The ObjectService containing the request schema.
+     *
+     * @return array The updated request parameters.
+     *
+     * @throws ContainerExceptionInterface|NotFoundExceptionInterface
+     */
+    private function rewriteExternalReferences(array $parameters, \OCA\OpenRegister\Service\ObjectService|QBMapper $mapper): array
+    {
+        $schemaMapper = $this->containerInterface->get('OCA\OpenRegister\Db\SchemaMapper');
+        $schema        = $schemaMapper->find($mapper->getSchema());
+
+        $rewriteParameters = array_intersect(array_keys($parameters), array_keys($schema->getProperties()));
+
+        foreach($rewriteParameters as $rewriteParameter) {
+            if (
+                ((isset($schema->getProperties()[$rewriteParameter]['$ref']) === false
+                        || empty($schema->getProperties()[$rewriteParameter]['$ref']) === true)
+                    && (isset($schema->getProperties()[$rewriteParameter]['items']['$ref']) === false
+                        || empty($schema->getProperties()[$rewriteParameter]['items']['$ref']) === true))
+                || filter_var($parameters[$rewriteParameter], FILTER_VALIDATE_URL) === false
+            ) {
+                continue;
+            }
+
+            $parsedPath = parse_url($parameters[$rewriteParameter], PHP_URL_PATH);
+            $parsedPath = substr($parsedPath, 33);
+            $endpoints = $this->endpointMapper->findByPathRegex(
+                path: $parsedPath,
+                method: 'GET'
+            );
+
+            if(count($endpoints) < 1) {
+                continue;
+            }
+
+            $endpoint = array_shift($endpoints);
+
+            $pathArray = $this->getPathParameters(endpointArray: $endpoint->getEndpointArray(), path: $parsedPath);
+            $parameters[$rewriteParameter] = end($pathArray);
+
+        }
+
+        return $parameters;
+    }
+
+    /**
      * Fetch objects for the endpoint.
      *
      * @param \OCA\OpenRegister\Service\ObjectService|QBMapper $mapper The mapper for the object type
@@ -423,9 +478,9 @@ class EndpointService
     ): Entity|array
     {
         if (isset($pathParams['id']) === true && $pathParams['id'] === end($pathParams)) {
-            return $this->objectService->getOpenRegisters()->renderEntity(
-                entity: $this->replaceInternalReferences(mapper: $mapper, object: $mapper->find($pathParams['id'])),
-                extend: $parameters['_extend'] ?? $parameters['extend'] ?? null
+            return $this->replaceInternalReferences(mapper: $mapper, serializedObject: $this->objectService->getOpenRegisters()->renderEntity(
+                entity: $mapper->find($pathParams['id'])->jsonSerialize(),
+                extend: $parameters['_extend'] ?? $parameters['extend'] ?? null),
             );
 
 
@@ -441,7 +496,7 @@ class EndpointService
                 $id = pos($pathParams);
             }
 
-            $main = $mapper->findByUuid($pathParams['id'])->getObject();
+            $main = $this->objectService->getOpenRegisters()->renderEntity($mapper->findByUuid($pathParams['id'])->getObject());
             $ids = $main[$property];
 
             if(isset($main[$property]) === false) {
@@ -480,10 +535,12 @@ class EndpointService
             return $returnArray;
         }
 
+        $parameters = $this->rewriteExternalReferences($parameters, $mapper);
+
         $result = $mapper->findAllPaginated(requestParams: $parameters);
 
         $result['results'] = array_map(function ($object) use ($mapper) {
-            return $this->objectService->getOpenRegisters()->renderEntity(entity: $this->replaceInternalReferences(mapper: $mapper, object: $object));
+            return $this->replaceInternalReferences(mapper: $mapper, serializedObject: $this->objectService->getOpenRegisters()->renderEntity(entity: $object->jsonSerialize()));
         }, $result['results']);
 
         $returnArray = [
@@ -799,6 +856,31 @@ class EndpointService
     }
 
     /**
+     * Saves object to OpenRegister
+     *
+     * @param Rule $rule
+     * @param array $data
+     *
+     * @return array $data
+     */
+    private function processSaveObjectRule(Rule $rule, array $data): array
+    {
+        $configuration = $rule->getConfiguration();
+        $register = $configuration['save_object']['register'];
+        $schema = $configuration['save_object']['schema'];
+        $mapping = $configuration['save_object']['mapping'] ?? null;
+
+        if (isset($mapping) === true) {
+            $data = $this->processMapping(rule: $rule, mapping: $mapping, data: $data);
+        }
+
+        $objectService = $this->containerInterface->get('OCA\OpenRegister\Service\ObjectService');
+        $data['body'] = $objectService->saveObject(register: $register, schema: $schema, object: $data['body']);
+
+        return $data;
+    }
+
+    /**
      * Processes rules for an endpoint request
      *
      * @param Endpoint $endpoint The endpoint being processed
@@ -840,6 +922,7 @@ class EndpointService
 
                 // Process rule based on type
                 $result = match ($rule->getType()) {
+                    'save_object' => $this->processSaveObjectRule($rule, $data),
                     'authentication' => $this->processAuthenticationRule($rule, $data),
                     'error' => $this->processErrorRule($rule),
                     'mapping' => $this->processMappingRule($rule, $data),
@@ -979,6 +1062,33 @@ class EndpointService
     }
 
     /**
+     * Executes mapping on data from endpoint flow
+     *
+     * @param mapping $mapping
+     * @param array $data
+     *
+     * @return array $data
+     */
+    private function processMapping(Rule $rule, Mapping $mapping, array $data): array
+    {
+        // Todo: We should just remove this if statement and use mapping to loop through results instead.
+        if (isset($data['body']['results']) === true
+            && strtolower($rule->getAction()) === 'get'
+            && (isset($config['mapResults']) === false || $config['mapResults'] === true)
+        ) {
+            foreach (($data['body']['results']) as $key => $result) {
+                $data['body']['results'][$key] = $this->mappingService->executeMapping($mapping, $result);
+            }
+
+            return $data;
+        }
+
+        $data['body'] = $this->mappingService->executeMapping($mapping, $data['body']);
+
+        return $data;
+    }
+
+    /**
      * Processes a mapping rule
      *
      * @param Rule $rule The rule object containing mapping details
@@ -995,19 +1105,7 @@ class EndpointService
         $config = $rule->getConfiguration();
         $mapping = $this->mappingService->getMapping($config['mapping']);
 
-        // Todo: We should just remove this if statement and use mapping to loop through results instead.
-        if (isset($data['body']['results']) === true
-            && strtolower($rule->getAction()) === 'get'
-            && (isset($config['mapResults']) === false || $config['mapResults'] === true)
-        ) {
-            foreach (($data['body']['results']) as $key => $result) {
-                $data['body']['results'][$key] = $this->mappingService->executeMapping($mapping, $result);
-            }
-
-            return $data;
-        }
-
-        $data['body'] = $this->mappingService->executeMapping($mapping, $data['body']);
+        $data = $this->processMapping(rule: $rule, mapping: $mapping, data: $data);
 
         return $data;
     }
@@ -1256,8 +1354,36 @@ class EndpointService
             $force = false;
         }
 
+        $object = null;
+        if (isset($data['body']) === true) {
+            $object = $data['body'];
+        }
+
+        // Set $object to a different variable becuase we might update $object with reference and want to keep what we send to synchronize.
+        $sendObject = $object;
+
         // Run synchronization.
-        $data['body'] = $this->synchronizationService->synchronize(synchronization: $synchronization, isTest: $test, force: $force);
+        $log = $this->synchronizationService->synchronize(synchronization: $synchronization, isTest: $test, force: $force, object: $object);
+
+        // $object got updated through reference.
+        $returnedObject = $object;
+
+        if (isset($config['synchronizationConfig']['mergeResultToKey']) === true) {
+            // Merge result to root send object.
+            if ($config['synchronizationConfig']['mergeResultToKey'] === '#') {
+                $data['body'] = array_merge($sendObject, $returnedObject);
+            // Merge result to configured key in send object
+            } else {
+                $sendObject[$config['synchronizationConfig']['mergeResultToKey']] = $returnedObject;
+                $data['body'] = $sendObject;
+            }
+        // Overwrite body with result
+        } else if (isset($config['synchronizationConfig']['overwriteObjectWithResult']) === true && filter_var($config['synchronizationConfig']['overwriteObjectWithResult'], FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) === true) {
+            $data['body'] = $returnedObject;
+        } else {
+            $data['body'] = $log;
+        }
+
         return $data;
     }
 

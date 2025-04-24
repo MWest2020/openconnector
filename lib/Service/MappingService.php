@@ -135,6 +135,10 @@ class MappingService
             }
 
             // Render the value from twig.
+            if (is_array($value) === true) {
+                $dotArray->set($key, $value);
+                continue;
+            }
 			$dotArray->set($key, $this->twig->createTemplate($value)->render($originalInput));
         }
 
@@ -280,6 +284,9 @@ class MappingService
             $value = json_encode($value);
             break;
         case 'jsonToArray':
+            if (is_array($value) === true) {
+                break;
+            }
             $value = html_entity_decode($value);
             $value = json_decode($value, true);
             break;
