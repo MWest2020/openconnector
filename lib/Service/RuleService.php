@@ -89,6 +89,20 @@ class RuleService
         );
 
         // Add to response data
+        // Count the total amount of children we are going to add for each referentieComponent.
+        $newChildrenCount = [];
+        foreach ($voorzieningen as $voorziening) {
+            $voorziening = $voorziening->jsonSerialize();
+
+            foreach ($voorziening['referentieComponenten'] as $referentieComponent) {
+                if (isset($newChildrenCount[$referentieComponent]) === false) {
+                    $newChildrenCount[$referentieComponent] = 0;
+                }
+                $newChildrenCount[$referentieComponent]++;
+            }
+        }
+
+        // Add to response data
         foreach ($voorzieningen as $voorziening) {
             $voorziening = $voorziening->jsonSerialize();
 
@@ -100,15 +114,27 @@ class RuleService
                 'name-lang' => 'nl',
                 'documentation' => $voorziening['beschrijving'],
                 'documentation-lang' => 'nl',
-                'type' => 'Constraint',
+                'type' => 'ApplicationComponent',
                 'properties' => [
                     0 => [
-                        'propertyDefinitionRef' => 'id-c3355444b6cb8fb34b62e241dd073043',
+                        'propertyDefinitionRef' => 'id-c3355444b6cb8fb34b62e241dd073043', // SWC type
                         'value' => 'Pakket',
                     ],
                     1 => [
-                        'propertyDefinitionRef' => 'id-d222f71c083de2460625d0914174ee9d',
+                        'propertyDefinitionRef' => 'propid-2', // Object ID
+                        'value' => $newUuid,
+                    ],
+                    2 => [
+                        'propertyDefinitionRef' => 'propid-39', // URL
+                        'value' => '',
+                    ],
+                    3 => [
+                        'propertyDefinitionRef' => 'id-d222f71c083de2460625d0914174ee9d', // Extern Pakket
                         'value' => 'n',
+                    ],
+                    4 => [
+                        'propertyDefinitionRef' => 'id-e896da96437b4e4f821b3103f6b9c1b4', // Omschrijving gebruik
+                        'value' => '',
                     ],
                 ],
             ];
@@ -120,7 +146,7 @@ class RuleService
                         if (isset($view['nodes']) && is_array($view['nodes'])) {
                             // Make sure identificatie exists
                             $identificatie = $referentieComponent;
-                            $this->processNodes($view['nodes'], $identificatie, $elementId);
+                            $this->processNodes($view['nodes'], $identificatie, $elementId, $newChildrenCount[$referentieComponent]);
                         }
                     }
                 }
@@ -140,10 +166,11 @@ class RuleService
      * @param array &$nodes The nodes to process
      * @param string|null $matchIdentificatie The identificatie to match against elementRef
      * @param string $newElementId The ID of the new element to reference
+     * @param int $totalNewChildren The total amount of children we are going to add for the current $matchIdentificatie.
      * 
      * @return void
      */
-    private function processNodes(array &$nodes, ?string $matchIdentificatie, string $newElementId): void
+    private function processNodes(array &$nodes, ?string $matchIdentificatie, string $newElementId, int $totalNewChildren): void
     {
         // If matchIdentificatie is null, return early
         if ($matchIdentificatie === null) {
@@ -164,11 +191,16 @@ class RuleService
                     $node['nodes'] = [];
                 }
 
+                // Count the total amount of children including the new subnodes and store it in the node array.
+                if (isset($node['totalChildren']) === false) {
+                    $node['totalChildren'] = count($node['nodes']) + $totalNewChildren;
+                }
+
                 // Count the total amount of children including the new subnode
-                $totalChildren = count($node['nodes']) + 1;
+                $totalChildren = $node['totalChildren'];
 
                 // Calculate the index of the child node
-                $childIndex = $totalChildren;
+                $childIndex = count($node['nodes']) + 1;
 
                 $parentPadding = 20;
                 $childSpacing = 8;
@@ -239,7 +271,7 @@ class RuleService
             // Process nested nodes recursively if they exist
             if (isset($node['nodes']) === true && is_array($node['nodes']) === true) {
                 // Call this function recursively on the nested nodes
-                $this->processNodes($node['nodes'], $matchIdentificatie, $newElementId);
+                $this->processNodes($node['nodes'], $matchIdentificatie, $newElementId, $totalNewChildren);
             }
         }
     }
