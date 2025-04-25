@@ -312,12 +312,12 @@ class EndpointService
                 $validUriProperties[] = $propertyName;
             }
 
-            if (isset($property['format']) === true && $property['format'] === 'uri') {
+            if (isset($property['format']) === true && $property['format'] === 'uri' && (isset($property['$ref']) === true|| isset($property['items']['$ref']) === true)) {
                 $validUriProperties[] = $propertyName;
             }
         }
 
-        foreach ($uses as $key => $use) {
+        foreach ($object->jsonSerialize() as $key => $use) {
             $baseKey = explode('.', $key, 2)[0];
             // Skip if the key (or its base form) is not in the valid URI properties
             if (in_array(needle: $baseKey, haystack: $validUriProperties) === false) {
@@ -448,6 +448,10 @@ class EndpointService
                 continue;
             }
 
+            // Get the first endpoint found.
+            /**
+             * @var Endpoint $endpoint
+             */
             $endpoint = array_shift($endpoints);
 
             $pathArray = $this->getPathParameters(endpointArray: $endpoint->getEndpointArray(), path: $parsedPath);
