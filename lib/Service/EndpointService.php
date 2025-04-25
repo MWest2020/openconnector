@@ -292,12 +292,6 @@ class EndpointService
             $object = $mapper->find($serializedObject['id']);
         }
 
-        $uses = $object->getRelations();
-
-        if(isset($serializedObject) === true && !empty($serializedObject['@self']['relations'])) {
-            $uses = $serializedObject['@self']['relations'];
-        }
-
         $useUrls = [];
 
         $uuidToUrlMap = [];
@@ -334,7 +328,6 @@ class EndpointService
                 $explodedUrl = explode(separator: '/', string: $use);
                 $useId = end($explodedUrl);
             } else {
-                unset($uses[$key]);
                 continue;
             }
 
