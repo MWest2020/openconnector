@@ -164,10 +164,12 @@ class RuleService
                     $node['nodes'] = [];
                 }
 
-                $totalChildren = count($node['nodes']) + 1; // @todo: also add the amount of nodes we are going to add...
+                // Count the total amount of children including the new subnode
+                $totalChildren = count($node['nodes']) + 1;
 
-                $childIndex = $totalChildren; // @todo: check if this is correct
-                
+                // Calculate the index of the child node
+                $childIndex = $totalChildren;
+
                 $parentPadding = 20;
                 $childSpacing = 8;
                 $parentWidth = $node['position']['w'] - ($parentPadding * 2);
@@ -180,20 +182,20 @@ class RuleService
                     120 // Maximum width of 120px
                 );
 
-                // Child height is 35% of parent height, but no more than 30px
-                // $childHeight = min($parentHeight * 0.35, 30);
-                $childHeight = 81;
-                if (isset($nodes['nodes'][0]) === true) {
-                    $childHeight = $nodes['nodes'][0]['position']['h'];
+                // Child height at least 30px and no more than 100px
+                $childHeight = max(30, min($parentHeight, 100));
+                // If there is another child node, use the height of that child node, but no more than the parent height.
+                if (isset($node['nodes'][0]) === true) {
+                    $childHeight = max(30, min($node['nodes'][0]['position']['h'], $parentHeight));
                 }
 
                 // Calculate X position:
                 // Start from parent's left edge + padding + (child's index × (child width + spacing))
-                $absoluteX = $node['position']['x'] + $parentPadding + ($childIndex * ($childWidth + $childSpacing));
+                $absoluteX = $node['position']['x'] + $parentPadding + (($childIndex - 1) * ($childWidth + $childSpacing));
 
                 // Calculate Y position:
                 // Position from bottom of parent
-                $absoluteY = $node['position']['y'] + ($node['position']['h'] - $childHeight - 16);
+                $absoluteY = $node['position']['y'] + ($node['position']['h'] - $childHeight - 10);
                 
                 // Add subnode with reference to new element
                 $node['nodes'][] = [
@@ -229,7 +231,7 @@ class RuleService
                             'r' => "0",
                             'g' => "0",
                             'b' => "0"
-                        ]
+                        ] // Somehow when all 3 are 0, color is removed from the style array...
                     ]
                 ];
             }
