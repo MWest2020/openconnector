@@ -233,7 +233,6 @@ class SynchronizationService
 			$source = $this->sourceMapper->findOrCreateByLocation(location: $source);
 			$synchronization->setSourceId($source->getId());
 		}
-		}
 
         if (empty($synchronization->getSourceId()) === true && $source === null) {
             $log->setMessage('sourceId of synchronization cannot be empty. Canceling synchronization...');
