@@ -163,7 +163,7 @@ class SourceMapper extends QBMapper
             $sourceData = array_merge([
                 'location' => $location,
                 'name' => basename($location),
-                'type' => 'file',
+                'type' => 'api',
                 'enabled' => true,
             ], $defaultData);
 
