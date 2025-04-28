@@ -302,6 +302,8 @@ class SynchronizationsController extends Controller
         $parameters = $this->request->getParams();
         $test  = filter_var($parameters['test'] ?? false, FILTER_VALIDATE_BOOLEAN);
         $force = filter_var($parameters['force'] ?? false, FILTER_VALIDATE_BOOLEAN);
+        $source = $parameters['source'] ?? null;
+        $data = $parameters['data'] ?? [];
 
         try {
             $synchronization = $this->synchronizationMapper->find(id: $id);
@@ -314,7 +316,9 @@ class SynchronizationsController extends Controller
             $logAndContractArray = $this->synchronizationService->synchronize(
                 synchronization: $synchronization,
                 isTest: $test,
-                force: $force
+                force: $force,
+                source: $source,
+                data: $data
             );
 
             // Return the result as a JSON response

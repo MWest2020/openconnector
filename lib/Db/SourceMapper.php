@@ -129,4 +129,45 @@ class SourceMapper extends QBMapper
         // Return the total count
         return (int)$row['count'];
     }
+
+    /**
+     * Find or create a source based on the location.
+     * If a source with the given location exists, it will be returned.
+     * If no source exists, a new one will be created with the provided data.
+     *
+     * @param string $location The location to search for
+     * @param array $defaultData Additional data to use when creating a new source
+     * @return Source The found or newly created source
+     * @throws \OCP\AppFramework\Db\DoesNotExistException
+     * @throws \OCP\AppFramework\Db\MultipleObjectsReturnedException
+     * @throws \OCP\DB\Exception
+     */
+    public function findOrCreateByLocation(string $location, array $defaultData = []): Source
+    {
+        // Create query builder
+        $qb = $this->db->getQueryBuilder();
+
+        // Search for existing source with the given location
+        $qb->select('*')
+            ->from('openconnector_sources')
+            ->where(
+                $qb->expr()->eq('location', $qb->createNamedParameter($location))
+            );
+
+        try {
+            // Try to find existing source
+			$source = $this->findEntity(query: $qb);
+            return $source;
+        } catch (\OCP\AppFramework\Db\DoesNotExistException $e) {
+            // If source doesn't exist, create a new one
+            $sourceData = array_merge([
+                'location' => $location,
+                'name' => basename($location),
+                'type' => 'file',
+                'enabled' => true,
+            ], $defaultData);
+
+            return $this->createFromArray($sourceData);
+        }
+    }
 }
