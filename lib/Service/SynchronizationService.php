@@ -208,6 +208,8 @@ class SynchronizationService
      * @param SynchronizationLog  $log             The log object to record synchronization details and results.
      * @param bool|null           $isTest          Optional flag to run the synchronization in test mode (no deletions, no persistence).
      * @param bool|null           $force           Optional flag to bypass change checks and force synchronization of all objects.
+     * @param string|null $source The source to synchronize, if not provided, the synchronization's source will be used
+     * @param array|null $data The data to add to synchronize, if not provided, the synchronization's data will be used
      *
      * @return SynchronizationLog Returns the updated synchronization log with processing results.
      *
@@ -218,20 +220,28 @@ class SynchronizationService
         Synchronization $synchronization,
         SynchronizationLog $log,
         ?bool $isTest = false,
-        ?bool $force = false
+        ?bool $force = false,
+        ?string $source = null,
+        ?array $data = null
     ): SynchronizationLog {
         $rateLimitException = null;
 
         $sourceConfig = $this->callService->applyConfigDot($synchronization->getSourceConfig());
 
-        if (empty($synchronization->getSourceId())) {
+        if (empty($synchronization->getSourceId() && $source === null)) {
             $log->setMessage('sourceId of synchronization cannot be empty. Canceling synchronization...');
             $this->synchronizationLogMapper->update($log);
             throw new Exception('sourceId of synchronization cannot be empty. Canceling synchronization...');
         }
 
+		// If a source is provided, use it instead of the synchronization's source
+		if ($source !== null) {
+			$source = $this->sourceMapper->findOrCreateByLocation(location: $source);
+			$synchronization->setSourceId($source->getId());
+		}
+
         try {
-            $objectList = $this->getAllObjectsFromSource($synchronization, $isTest);
+            $objectList = $this->getAllObjectsFromSource($synchronization, $isTest, $data);
         } catch (TooManyRequestsHttpException $e) {
             $rateLimitException = $e;
             $objectList = []; // Ensure it's defined
@@ -301,6 +311,8 @@ class SynchronizationService
 	 * @param bool|null $force False by default, if true, the object will be updated regardless of changes
 	 * @param array|\OCA\OpenRegister\Db\ObjectEntity|null $object Object to synchronize, updated by reference
 	 * @param string|null $mutationType If dealing with single object synchronization, the type of the mutation that will be handled, 'create', 'update' or 'delete'. Used for syncs to extern sources.
+	 * @param string|null $source The source to synchronize, if not provided, the synchronization's source will be used
+	 * @param array|null $data The data to add to synchronize, if not provided, the synchronization's data will be used
 	 *
 	 * @return array
 	 * @throws ContainerExceptionInterface
@@ -318,7 +330,9 @@ class SynchronizationService
 		?bool $isTest = false,
 		?bool $force = false,
         array|\OCA\OpenRegister\Db\ObjectEntity|null &$object = null,
-		?string $mutationType = null
+		?string $mutationType = null,
+		?string $source = null,
+		?array $data = null
 	): array
 	{
 		if ($mutationType !== null && in_array($mutationType, $this::VALID_MUTATION_TYPES) === false) {
@@ -363,7 +377,7 @@ class SynchronizationService
 		$log = $this->synchronizationLogMapper->createFromArray($log);
 
         // Handle full extern-to-intern sync
-        $log = $this->synchronizeExternToIntern($synchronization, $log, $isTest, $force);
+        $log = $this->synchronizeExternToIntern($synchronization, $log, $isTest, $force, $source, $data);
 
         // Finalize log
         $executionTime = round((microtime(true) - $startTime) * 1000);
@@ -1143,14 +1157,15 @@ class SynchronizationService
 	 *
 	 * @param Synchronization $synchronization
 	 * @param bool|null $isTest False by default, currently added for synchronziation-test endpoint
-	 *
+	 * @param array|null $data The data to add to synchronize, if not provided, the synchronization's data will be used
+	 * 
 	 * @return array
 	 * @throws ContainerExceptionInterface
 	 * @throws GuzzleException
 	 * @throws NotFoundExceptionInterface
 	 * @throws \OCP\DB\Exception
 	 */
-	public function getAllObjectsFromSource(Synchronization $synchronization, ?bool $isTest = false): array
+	public function getAllObjectsFromSource(Synchronization $synchronization, ?bool $isTest = false, ?array $data = null): array
 	{
 		$objects = [];
 
@@ -1162,7 +1177,7 @@ class SynchronizationService
                 //@todo: implement
 				break;
 			case 'api':
-				$objects = $this->getAllObjectsFromApi(synchronization: $synchronization, isTest: $isTest);
+				$objects = $this->getAllObjectsFromApi(synchronization: $synchronization, isTest: $isTest, data: $data);
 				break;
 			case 'database':
 				//@todo: implement
@@ -1177,6 +1192,7 @@ class SynchronizationService
 	 *
 	 * @param Synchronization $synchronization The synchronization object containing source information.
 	 * @param bool|null $isTest If true, only a single object is returned for testing purposes.
+	 * @param array|null $data The data to add to synchronize, if not provided, the synchronization's data will be used
 	 *
 	 * @return array An array of all objects retrieved from the API.
 	 * @throws GuzzleException
@@ -1184,8 +1200,9 @@ class SynchronizationService
 	 * @throws SyntaxError
 	 * @throws \OCP\DB\Exception
 	 */
-	public function getAllObjectsFromApi(Synchronization $synchronization, ?bool $isTest = false): array
+	public function getAllObjectsFromApi(Synchronization $synchronization, ?bool $isTest = false, ?array $data = null): array
 	{
+		//@todo this is an nuessesery db call, we should refactor this
 		$source = $this->sourceMapper->find($synchronization->getSourceId());
 
 		// Check rate limit before proceeding
@@ -1226,6 +1243,13 @@ class SynchronizationService
 			isTest: $isTest,
             usesPagination: $usesPagination
 		);
+
+		// Merge additional data into each object if $data is provided
+		if ($data !== null) {
+			foreach ($objects as &$object) {
+				$object = array_merge($object, $data);
+			}
+		}
 
 		// Reset the current page after synchronization if not a test
 		if ($isTest === false) {
