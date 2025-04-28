@@ -156,7 +156,8 @@ class SourceMapper extends QBMapper
 
         try {
             // Try to find existing source
-            return $this->findEntity(query: $qb);
+			$source = $this->findEntity(query: $qb);
+            return $source;
         } catch (\OCP\AppFramework\Db\DoesNotExistException $e) {
             // If source doesn't exist, create a new one
             $sourceData = array_merge([

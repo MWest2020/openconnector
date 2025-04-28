@@ -228,17 +228,18 @@ class SynchronizationService
 
         $sourceConfig = $this->callService->applyConfigDot($synchronization->getSourceConfig());
 
-        if (empty($synchronization->getSourceId() && $source === null)) {
-            $log->setMessage('sourceId of synchronization cannot be empty. Canceling synchronization...');
-            $this->synchronizationLogMapper->update($log);
-            throw new Exception('sourceId of synchronization cannot be empty. Canceling synchronization...');
-        }
-
 		// If a source is provided, use it instead of the synchronization's source
 		if ($source !== null) {
 			$source = $this->sourceMapper->findOrCreateByLocation(location: $source);
 			$synchronization->setSourceId($source->getId());
 		}
+		}
+
+        if (empty($synchronization->getSourceId()) === true && $source === null) {
+            $log->setMessage('sourceId of synchronization cannot be empty. Canceling synchronization...');
+            $this->synchronizationLogMapper->update($log);
+            throw new Exception('sourceId of synchronization cannot be empty. Canceling synchronization...');
+        }
 
         try {
             $objectList = $this->getAllObjectsFromSource($synchronization, $isTest, $data);
@@ -280,7 +281,7 @@ class SynchronizationService
 
         foreach ($synchronization->getFollowUps() as $followUp) {
             $followUpSynchronization = $this->synchronizationMapper->find($followUp);
-            $this->synchronize($followUpSynchronization, $isTest, $force);
+            $this->synchronize(synchronization: $followUpSynchronization, isTest: $isTest, force: $force);
         }
 
         $log->setResult($result);
