@@ -63,6 +63,8 @@ class RuleService
         // Get schema IDs
         $voorzieningSchemaId = $config['VoorzieningSchema'];
         $voorzieningGebruikSchemaId = $config['VoorzieningGebruikSchema'];
+        $organisatieSchemaId = $config['OrganisatieSchema'];
+        $voorzieningAanbodSchemaId = $config['VoorzieningAanbodSchema'];
         
         // Get OpenRegisters instance and set the register
         $openRegisters = $this->objectService->getOpenRegisters();
@@ -88,6 +90,26 @@ class RuleService
             ]
         );
 
+        // Fetch Organisatie objects
+        $openRegisters->setSchema($organisatieSchemaId);
+        $objectEntityMapper = $openRegisters->getMapper('objectEntity');
+        $organisaties = $objectEntityMapper->findAll(
+            filters: [
+                'register' => $registerId,
+                'schema' => $organisatieSchemaId
+            ]
+        );
+
+        // Fetch VoorzieningAanbod objects
+        $openRegisters->setSchema($voorzieningAanbodSchemaId);
+        $objectEntityMapper = $openRegisters->getMapper('objectEntity');
+        $voorzieningAanbod = $objectEntityMapper->findAll(
+            filters: [
+                'register' => $registerId,
+                'schema' => $voorzieningAanbodSchemaId
+            ]
+        );
+
         // Add to response data
         // Count the total amount of children we are going to add for each referentieComponent.
         $newChildrenCount = [];
@@ -102,13 +124,13 @@ class RuleService
             }
         }
 
-        // Add to response data
+        // Add voorzieningen (pakketten/applicaties) to response data
         foreach ($voorzieningen as $voorziening) {
             $voorziening = $voorziening->jsonSerialize();
 
             $newUuid = Uuid::v4();
             $elementId = "id-{$newUuid}";
-            $data['body']['results'][0]['elements'][] = [
+            $data['body']['elements'][] = [
                 'identifier' => $elementId,
                 'name' => $voorziening['naam'],
                 'name-lang' => 'nl',
@@ -141,8 +163,8 @@ class RuleService
 
             foreach ($voorziening['referentieComponenten'] as $referentieComponent) {
                 // Search for nodes with elementRef matching the voorzienings identificatie and create subnodes
-                if (isset($data['body']['results'][0]['views']) && is_array($data['body']['results'][0]['views'])) {
-                    foreach ($data['body']['results'][0]['views'] as &$view) {
+                if (isset($data['body']['views']) && is_array($data['body']['views'])) {
+                    foreach ($data['body']['views'] as &$view) {
                         if (isset($view['nodes']) && is_array($view['nodes'])) {
                             // Make sure identificatie exists
                             $identificatie = $referentieComponent;
@@ -154,7 +176,41 @@ class RuleService
         }
         
         // foreach ($voorzieningGebruiken as $voorzieningGebruik) {
-        //     $data['body']['views'][] = $voorzieningGebruik;
+        //     $voorzieningGebruik = $voorzieningGebruik->jsonSerialize();
+        // }
+
+        // Add organisaties (leveranciers) to response data
+        foreach ($organisaties as $organisatie) {
+            $organisatie = $organisatie->jsonSerialize();
+
+            $newUuid = Uuid::v4();
+            $elementId = "id-{$newUuid}";
+            $data['body']['elements'][] = [
+                'identifier' => $elementId,
+                'name' => $organisatie['naam'],
+                'name-lang' => 'nl',
+                'documentation' => $organisatie['beschrijving'],
+                'documentation-lang' => 'nl',
+                'type' => 'BusinessActor',
+                'properties' => [
+                    0 => [
+                        'propertyDefinitionRef' => 'id-c3355444b6cb8fb34b62e241dd073043', // SWC type
+                        'value' => 'Leverancier',
+                    ],
+                    1 => [
+                        'propertyDefinitionRef' => 'propid-2', // Object ID
+                        'value' => $newUuid,
+                    ],
+                    2 => [
+                        'propertyDefinitionRef' => 'propid-39', // URL
+                        'value' => '',
+                    ],
+                ],
+            ];
+        }
+
+        // foreach ($voorzieningAanbod as $voorzieningAanbod) {
+        //     $voorzieningAanbod = $voorzieningAanbod->jsonSerialize();
         // }
         
         return $data;
