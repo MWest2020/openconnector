@@ -764,7 +764,7 @@ export default {
 				option => option.id === this.ruleItem.type,
 			)
 			this.authenticationTypeOptions.value = this.authenticationTypeOptions.options.find(
-				option => option.value === ruleStore.ruleItem.configuration.authentication.type,
+				option => option.value === ruleStore.ruleItem?.configuration?.authentication?.type ?? Symbol('backup value'),
 			)
 		}
 		if (!this.IS_EDIT) {
