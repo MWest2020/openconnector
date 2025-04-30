@@ -105,7 +105,7 @@ class CallService
 	 */
 	private function renderConfiguration(array $configuration, Source $source): array
 	{
-		return array_map(function($value) use ($source) { 
+		return array_map(function($value) use ($source) {
             if (is_string($value) === true || is_array($value) === true) {
                 return $this->renderValue($value, $source);
             }
@@ -389,18 +389,24 @@ class CallService
 		// @todo: save the source
 		// Let's make the call.
 		$time_start = microtime(true);
-        
-		try {
-			if ($asynchronous === false) {
-			   $response = $this->client->request($method, $url, $config);
-			} else {
-				// @todo: we want to get rate limit headers from async calls as well
-				return $this->client->requestAsync($method, $url, $config);
-			}
-		} catch (GuzzleHttp\Exception\BadResponseException $e) {
-			$this->removeFiles($config);
-			$response = $e->getResponse();
-		}
+
+        if ($source->getType() === 'file') {
+            $soapService = new SoapService();
+
+            $response = $soapService->createMessage($source, $endpoint, $config);
+        } else {
+            try {
+                if ($asynchronous === false) {
+                    $response = $this->client->request($method, $url, $config);
+                } else {
+                    // @todo: we want to get rate limit headers from async calls as well
+                    return $this->client->requestAsync($method, $url, $config);
+                }
+            } catch (GuzzleHttp\Exception\BadResponseException $e) {
+                $this->removeFiles($config);
+                $response = $e->getResponse();
+            }
+        }
 
 		$this->removeFiles($config);
 
