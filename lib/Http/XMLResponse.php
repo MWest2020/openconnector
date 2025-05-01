@@ -237,8 +237,8 @@ class XMLResponse extends Response
 			// Handle objects that might not be convertible to string directly
 			if (is_object($data) === true) {
 				// For QueryBuilder objects or objects without __toString(), create a placeholder
-				if ($data instanceof \OCP\DB\QueryBuilder\IQueryBuilder || 
-					!method_exists($data, '__toString')) {
+				if ($data instanceof IQueryBuilder || 
+					method_exists($data, '__toString') === false) {
 					$data = '[Object of class ' . get_class($data) . ']';
 				} else {
 					// For objects with __toString() method
