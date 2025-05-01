@@ -483,7 +483,7 @@ class EndpointService
     {
         if (isset($pathParams['id']) === true && $pathParams['id'] === end($pathParams)) {
             return $this->replaceInternalReferences(mapper: $mapper, serializedObject: $this->objectService->getOpenRegisters()->renderEntity(
-                entity: $mapper->find($pathParams['id'])->jsonSerialize(),
+                entity: $mapper->find($pathParams['id'], extend: $parameters['extend'] ?? $parameters['_extend'] ?? null)->jsonSerialize(),
                 extend: $parameters['_extend'] ?? $parameters['extend'] ?? null),
             );
 
@@ -1219,7 +1219,7 @@ class EndpointService
         return $data;
     }
 
-    /** 
+    /**
      * Process a custom rule
      *
      * @param Rule $rule The rule to process
