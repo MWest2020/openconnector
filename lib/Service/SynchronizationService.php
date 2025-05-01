@@ -896,7 +896,7 @@ class SynchronizationService
 		// Save the object to the target
 		switch ($action) {
 			case 'save':
-				$target = $objectService->saveObject(register: $register, schema: $schema, object: $targetObject);
+				$target = $objectService->saveObject(register: $register, schema: $schema, object: $targetObject, uuid: $synchronizationContract->getTargetId());
 				// Get the id form the target object
 				$synchronizationContract->setTargetId($target->getUuid());
 
