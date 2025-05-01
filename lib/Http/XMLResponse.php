@@ -56,7 +56,7 @@ class XMLResponse extends Response
 		$this->addHeader('Content-Type', 'application/xml; charset=utf-8');
 		
 		// Only add Content-Disposition header if path ends with .xml
-		if ($path !== null && str_ends_with($path, '.xml') === true) {
+		if ($path !== null && str_ends_with($path, '.xml') === true && isset($this->getHeaders()['Content-Disposition']) === false) {
 			$this->addHeader('Content-Disposition', 'attachment; filename="export.xml"');
 		}
 	}
