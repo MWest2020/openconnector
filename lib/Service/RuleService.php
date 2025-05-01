@@ -162,7 +162,9 @@ class RuleService
             $elementId = "id-{$voorziening['id']}";
 
             // Add voorziening to Application folder
-            $data['body']['organizations'][$applicationFolderKey]['item'][$applicationFolderCount]['item'][] = $elementId;
+            $data['body']['organizations'][$applicationFolderKey]['item'][$applicationFolderCount]['item'][] = [
+                'identifierRef' => $elementId
+            ];
 
             // Add voorziening to elements
             $data['body']['elements'][] = [
