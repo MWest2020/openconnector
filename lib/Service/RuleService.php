@@ -111,7 +111,52 @@ class RuleService
         //     ]
         // );
 
-        // Add to response data
+        // Check if property definitions already exist
+        $propertyIds = [
+            'id-3093daaa7d93748d2e1aed59caa28192' => false, // Datum export
+            'id-c3355444b6cb8fb34b62e241dd073043' => false, // SWC type
+            'id-d222f71c083de2460625d0914174ee9d' => false, // Extern Pakket
+            'id-e896da96437b4e4f821b3103f6b9c1b4' => false, // Omschrijving gebruik
+        ];
+        
+        foreach ($data['body']['propertyDefinitions'] as $propertyDefinition) {
+            if (isset($propertyDefinition['identifier']) === true && isset($propertyIds[$propertyDefinition['identifier']]) === true) {
+                $propertyIds[$propertyDefinition['identifier']] = true;
+            }
+        }
+        
+        // Add property definitions that don't exist yet
+        if ($propertyIds['id-3093daaa7d93748d2e1aed59caa28192'] === false) {
+            $data['body']['propertyDefinitions'][] = [
+                'identifier' => 'id-3093daaa7d93748d2e1aed59caa28192',
+                'type' => 'string',
+                'name' => 'Datum export'
+            ];
+        }
+        
+        if ($propertyIds['id-c3355444b6cb8fb34b62e241dd073043'] === false) {
+            $data['body']['propertyDefinitions'][] = [
+                'identifier' => 'id-c3355444b6cb8fb34b62e241dd073043',
+                'type' => 'string',
+                'name' => 'SWC type'
+            ];
+        }
+        
+        if ($propertyIds['id-d222f71c083de2460625d0914174ee9d'] === false) {
+            $data['body']['propertyDefinitions'][] = [
+                'identifier' => 'id-d222f71c083de2460625d0914174ee9d',
+                'type' => 'string',
+                'name' => 'Extern Pakket'
+            ];
+        }
+        
+        if ($propertyIds['id-e896da96437b4e4f821b3103f6b9c1b4'] === false) {
+            $data['body']['propertyDefinitions'][] = [
+                'identifier' => 'id-e896da96437b4e4f821b3103f6b9c1b4',
+                'type' => 'string',
+                'name' => 'Omschrijving gebruik'
+            ];
+        }
 
         // Add datum export
         $datumExport = new DateTime();
