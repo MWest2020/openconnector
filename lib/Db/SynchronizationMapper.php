@@ -16,9 +16,11 @@ class SynchronizationMapper extends QBMapper
 		parent::__construct($db, 'openconnector_synchronizations');
 	}
 
-	public function find(int|string	 $id): Synchronization
+	public function find(int|string $id): Synchronization
 	{
-		if (is_string($id) === true) {
+		// If it's a string but can be converted to a numeric value without data loss, use as ID
+		// Otherwise try to find by UUID
+		if (is_string($id) && ctype_digit($id) === false) {
 			return $this->findByUuid($id);
 		}
 
