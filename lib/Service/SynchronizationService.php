@@ -7,13 +7,11 @@ use GuzzleHttp\Exception\GuzzleException;
 use JWadhams\JsonLogic;
 use OC\User\NoUserException;
 use OCA\OpenConnector\Db\CallLog;
-use OCA\OpenConnector\Db\Endpoint;
 use OCA\OpenConnector\Db\Mapping;
 use OCA\OpenConnector\Db\Rule;
 use OCA\OpenConnector\Db\RuleMapper;
 use OCA\OpenConnector\Db\Source;
 use OCA\OpenConnector\Db\SourceMapper;
-use OCA\OpenConnector\Db\MappignMapper;
 use OCA\OpenConnector\Db\Synchronization;
 use OCA\OpenConnector\Db\SynchronizationMapper;
 use OCA\OpenConnector\Db\SynchronizationLog;
@@ -30,7 +28,6 @@ use OCP\AppFramework\Http\JSONResponse;
 use OCP\Files\GenericFileException;
 use OCP\Files\NotFoundException;
 use OCP\Files\NotPermittedException;
-use OCP\IRequest;
 use OCP\Lock\LockedException;
 use Psr\Container\ContainerExceptionInterface;
 use Psr\Container\NotFoundExceptionInterface;
@@ -38,17 +35,10 @@ use Symfony\Component\HttpKernel\Exception\TooManyRequestsHttpException;
 use Symfony\Component\Uid\Uuid;
 use OCP\AppFramework\Db\DoesNotExistException;
 use Adbar\Dot;
-use OCP\SystemTag\ISystemTagManager;
-use OCP\SystemTag\ISystemTagObjectMapper;
 use OCP\Files\File;
-use OCP\SystemTag\TagNotFoundException;
-
 use Psr\Container\ContainerInterface;
-use DateInterval;
 use DateTime;
 use OCA\OpenConnector\Db\MappingMapper;
-use OCP\AppFramework\Http\NotFoundResponse;
-use Twig\Environment;
 use Twig\Error\LoaderError;
 use Twig\Error\SyntaxError;
 
@@ -86,8 +76,6 @@ class SynchronizationService
 		private readonly ObjectService   $objectService,
         private readonly StorageService  $storageService,
         private readonly RuleMapper      $ruleMapper,
-        private readonly ISystemTagManager      $systemTagManager,
-        private readonly ISystemTagObjectMapper $systemTagMapper,
 	)
 	{
 		$this->callService = $callService;
@@ -125,11 +113,17 @@ class SynchronizationService
 	 *
 	 * @return SynchronizationContract|array|null Returns a synchronization contract, an array for test cases, or null if conditions are not met.
 	 */
-	private function synchronizeInternToExtern(Synchronization $synchronization, ?bool $isTest = false, ?bool $force = false, \OCA\OpenRegister\Db\ObjectEntity|array &$object, SynchronizationLog $log, ?string $mutationType = null)
+	private function synchronizeInternToExtern(
+		Synchronization $synchronization, 
+		?bool $isTest = false, 
+		\OCA\OpenRegister\Db\ObjectEntity|array &$object, 
+		SynchronizationLog $log, 
+		?bool $force = false, 
+		?string $mutationType = null
+	): SynchronizationContract|array|null
 	{
 		if ($synchronization->getConditions() !== [] && !JsonLogic::apply($synchronization->getConditions(), $object)) {
-
-			return;
+			return null;
 		}
 
 		$targetConfig = $synchronization->getTargetConfig();
@@ -314,7 +308,7 @@ class SynchronizationService
 	 * @param string|null $source The source to synchronize, if not provided, the synchronization's source will be used
 	 * @param array|null $data The data to add to synchronize, if not provided, the synchronization's data will be used
 	 *
-	 * @return array
+	 * @return array|SynchronizationContract|array|null
 	 * @throws ContainerExceptionInterface
 	 * @throws NotFoundExceptionInterface
 	 * @throws GuzzleException
@@ -333,7 +327,7 @@ class SynchronizationService
 		?string $mutationType = null,
 		?string $source = null,
 		?array $data = null
-	): array
+	): array|SynchronizationContract|null
 	{
 		if ($mutationType !== null && in_array($mutationType, $this::VALID_MUTATION_TYPES) === false) {
 			throw new Exception(sprintf('Invalid mutation type: %s given. Allowed mutation types are: %s', $mutationType, implode(', ', $this::VALID_MUTATION_TYPES)));
@@ -368,7 +362,14 @@ class SynchronizationService
             // lets always create the log entry first, because we need its uuid later on for contractLogs
             $log['result']['type'] = 'internToExtern';
             $log = $this->synchronizationLogMapper->createFromArray($log);
-            return [$this->synchronizeInternToExtern(synchronization: $synchronization, isTest: $isTest, force: $force, object: $object, log: $log, mutationType: $mutationType)];
+            return $this->synchronizeInternToExtern(
+                synchronization: $synchronization, 
+                isTest: $isTest, 
+                object: $object, 
+                log: $log, 
+                force: $force, 
+                mutationType: $mutationType
+            );
         }
 
         $log['result']['type'] = 'externToIntern';
@@ -1969,15 +1970,14 @@ class SynchronizationService
             throw new Exception('Could not write file: no filename could be determined');
         }
 
-		// Write file with OpenRegister ObjectService.
 		$objectService = $this->containerInterface->get('OCA\OpenRegister\Service\ObjectService');
-		$file = $objectService->addFile(object: $objectId, fileName: $filename, base64Content: $response['body'], share: isset($config['autoShare']) ? $config['autoShare'] : false);
+		$objectEntity = $objectService->findByUuid(uuid: $objectId);
 
-        // Attach passed down tags
         $tags[] = "object:$objectId";
-        if ($file instanceof File === true && isset($tags) === true && empty($tags) === false) {
-			$this->attachTagsToFile(fileId: $file->getId(), tags: $tags);
-        }
+
+		// Write file with OpenRegister FileService.
+		$fileService = $this->containerInterface->get('OCA\OpenRegister\Service\FileService');
+		$file = $fileService->addFile(objectEntity: $objectEntity, fileName: $filename, content: $response['body'], share: isset($config['autoShare']) ? $config['autoShare'] : false, tags: $tags);
 
 		return $originalEndpoint;
 	}
@@ -2030,12 +2030,11 @@ class SynchronizationService
 	private function getFileContext(array $config, mixed $endpoint, ?string &$filename = null, ?array &$tags = [], ?string &$objectId = null)
 	{
 		$dataDot = new Dot($endpoint);
-
-		if (isset($config['objectIdPath']) === true) {
+		if (isset($config['objectIdPath']) === true && empty($config['objectIdPath']) === false) {
 			$objectId = $dataDot->get($config['objectIdPath']);
 		}
 
-		if (isset($config['subObjectFilepath']) === true) {
+		if (isset($config['subObjectFilepath']) === true && empty($config['subObjectFilepath']) === false) {
 			$endpoint = $dataDot->get($config['subObjectFilepath']);
 		}
 
@@ -2044,7 +2043,7 @@ class SynchronizationService
 				in_array(needle: $endpoint['label'], haystack: $config['tags']) === true) {
 				$tags = [$endpoint['label']];
 			}
-			if (isset($endpoint['filename']) === true) {
+			if (isset($endpoint['filename']) === true && empty($endpoint['filename']) === false) {
 				$filename = $endpoint['filename'];
 			}
 
@@ -2110,6 +2109,11 @@ class SynchronizationService
 	 */
 	private function processFetchFileRule(Rule $rule, array $data, string $objectId): array
 	{
+        $appManager = \OC::$server->get(\OCP\App\IAppManager::class);
+        if ($appManager->isEnabledForUser('openregister') === false) {
+			throw new Exception('OpenRegister app is required for the fetch file rule and not installed');
+        }
+
 		if (isset($rule->getConfiguration()['fetch_file']) === false) {
 			throw new Exception('No configuration found for fetch_file');
 		}
@@ -2145,7 +2149,7 @@ class SynchronizationService
 				foreach ($endpoint as $object) {
 					$filename = null;
 					$tags = [];
-					$objectId = null;
+					$objectId = $objectId;
 					$endpoint = $this->getFileContext(config: $config, endpoint: $object, filename: $filename, tags: $tags, objectId: $objectId);
 					if ($endpoint === null) {
 						throw new Exception('Could not get endpoint for fetch file rule' . $rule->getId());
@@ -2167,28 +2171,6 @@ class SynchronizationService
 		}
 
 		return $dataDot->jsonSerialize();
-	}
-
-	/**
-	 * Attach tags to a file.
-	 *
-	 * @param string $fileId The fileId.
-	 * @param array $tags Tags to associate with the file.
-	 */
-	private function attachTagsToFile(string $fileId, array $tags): void
-	{
-        $tagIds = [];
-		foreach ($tags as $key => $tagName) {
-            try {
-                $tag = $this->systemTagManager->getTag(tagName: $tagName, userVisible: true, userAssignable: true);
-            } catch (TagNotFoundException $exception) {
-                $tag = $this->systemTagManager->createTag(tagName: $tagName, userVisible: true, userAssignable: true);
-            }
-
-            $tagIds[] = $tag->getId();
-		}
-
-        $this->systemTagMapper->assignTags(objId: $fileId, objectType: $this::FILE_TAG_TYPE, tagIds: $tagIds);
 	}
 
 	/**
@@ -2243,14 +2225,14 @@ class SynchronizationService
                 $openRegisters->setSchema($schemaId);
 
                 try {
-                    // Write file with OpenRegister ObjectService.
-                    $objectService = $this->containerInterface->get('OCA\OpenRegister\Service\ObjectService');
-                    $file = $objectService->addFile(object: $objectId, fileName: $fileName, base64Content: $content);
-
                     $tags = array_merge($config['tags'] ?? [], ["object:$objectId"]);
-                    if ($file instanceof File === true) {
-                        $this->attachTagsToFile(fileId: $file->getId(), tags: $tags);
-                    }
+
+                    $objectService = $this->containerInterface->get('OCA\OpenRegister\Service\ObjectService');
+                    $objectEntity = $objectService->findByUuid(uuid: $objectId);
+                    
+                    // Write file with OpenRegister ObjectService.
+                    $fileService = $this->containerInterface->get('OCA\OpenRegister\Service\FileService');
+                    $file = $fileService->addFile(objectEntity: $objectEntity, fileName: $fileName, content: $content, share: false, tags: $tags);
 
                     $result[$key] = $file->getPath();
                 } catch (Exception $exception) {
@@ -2266,14 +2248,15 @@ class SynchronizationService
             $openRegisters->setSchema($schemaId);
 
             try {
-                // Write file with OpenRegister ObjectService.
-                $objectService = $this->containerInterface->get('OCA\OpenRegister\Service\ObjectService');
-                $file = $objectService->addFile(object: $objectId, fileName: $fileName, base64Content: $content);
-
                 $tags = array_merge($config['tags'] ?? [], ["object:$objectId"]);
-                if ($file instanceof File === true) {
-                    $this->attachTagsToFile(fileId: $file->getId(), tags: $tags);
-                }
+                
+                $objectService = $this->containerInterface->get('OCA\OpenRegister\Service\ObjectService');
+                $objectEntity = $objectService->findByUuid(uuid: $objectId);
+
+                // Write file with OpenRegister FileService.
+                $fileService = $this->containerInterface->get('OCA\OpenRegister\Service\FileService');
+                $file = $fileService->addFile(object: $objectId, fileName: $fileName, content: $content, share: false, tags: $tags);
+
                 $dataDot[$config['filePath']] = $file->getPath();
             } catch (Exception $exception) {
             }
@@ -2583,7 +2566,7 @@ class SynchronizationService
      */
     public function getSynchronization(null|string|int $id = null, array $filters = []) :Synchronization
     {
-        if($id !== null) {
+        if ($id !== null) {
             $id = intval($id);
             return $this->synchronizationMapper->find($id);
         }
@@ -2591,7 +2574,7 @@ class SynchronizationService
         /** @var Synchronization[] $synchronizations */
         $synchronizations = $this->synchronizationMapper->findAll(filters: $filters);
 
-        if($synchronizations === 0) {
+        if(count($synchronizations) === 0) {
             throw new DoesNotExistException('The synchronization you are looking for does not exist');
         }
 

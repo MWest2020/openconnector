@@ -19,6 +19,107 @@ use DateTime;
  */
 class RuleService
 {
+    // @TODO: replace this with a way to store these uuids somewhere.
+    /**
+     * Index for tracking the current node ID for software catalog
+     * Used to ensure consistent node identifiers in the output
+     */
+    private int $currentNodeIdIndex = 0;
+
+    // @TODO: replace this with a way to store these uuids somewhere.
+    /**
+     * Predefined node IDs for software catalog visualization
+     * Used to ensure consistent node identifiers in the output
+     */
+    private const NODE_IDS = [
+        'f8c3de3d-1fea-4d7c-a8b0-29f63c4c3454',
+        '7b9e4c1d-0f8a-48b5-9e27-edb90a92e610',
+        'a6d3b4c2-9e8f-4c5d-b2a1-6e5f7a8b9c0d',
+        'e1f2a3b4-c5d6-4e7f-8a9b-0c1d2e3f4a5b',
+        'b7c8d9e0-f1a2-4b3c-5d6e-7f8a9b0c1d2e',
+        'd4e5f6a7-b8c9-4d0e-1f2a-3b4c5d6e7f8a',
+        '9a8b7c6d-5e4f-4a3b-2c1d-0e9f8a7b6c5d',
+        '2c3d4e5f-6a7b-4c8d-9e0f-1a2b3c4d5e6f',
+        '5f6e7d8c-9b0a-4f1e-2d3c-4b5a6c7d8e9f',
+        '1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d',
+        'c5d6e7f8-a9b0-4c1d-2e3f-4a5b6c7d8e9f',
+        '8e9f0a1b-2c3d-4e5f-6a7b-8c9d0e1f2a3b',
+        '3b4c5d6e-7f8a-49b0-c1d2-e3f4a5b6c7d8',
+        '6a7b8c9d-0e1f-4a2b-3c4d-5e6f7a8b9c0d',
+        '0e1f2a3b-4c5d-4e6f-7a8b-9c0d1e2f3a4b',
+        'd1e2f3a4-b5c6-4d7e-8f9a-0b1c2d3e4f5a',
+        '7f8a9b0c-1d2e-4f3a-4b5c-6d7e8f9a0b1c',
+        '2d3e4f5a-6b7c-48d9-e0f1-a2b3c4d5e6f7',
+        'a0b1c2d3-e4f5-4a6b-7c8d-9e0f1a2b3c4d',
+        '4e5f6a7b-8c9d-4e0f-1a2b-3c4d5e6f7a8b'
+    ];
+
+    // @TODO: replace this with a way to store these uuids somewhere.
+    /**
+     * Index for tracking the current node ID for software catalog
+     * Used to ensure consistent node identifiers in the output
+     */
+    private int $currentRelationIdIndex = 0;
+
+    // @TODO: replace this with a way to store these uuids somewhere.
+    /**
+     * Predefined relation IDs for software catalog connections
+     * Used to maintain consistent relationship identifiers between components
+     */
+    private const RELATION_IDS = [
+        "a1b2c3d4-e5f6-4321-87a9-b1c2d3e4f5g6",
+        "b2c3d4e5-f6a1-4321-87a9-c3d4e5f6a1b2",
+        "c3d4e5f6-a1b2-4321-87a9-d4e5f6a1b2c3",
+        "d4e5f6a1-b2c3-4321-87a9-e5f6a1b2c3d4",
+        "e5f6a1b2-c3d4-4321-87a9-f6a1b2c3d4e5",
+        "f6a1b2c3-d4e5-4321-87a9-a1b2c3d4e5f6",
+        "a2b3c4d5-e6f7-5432-98ba-c2d3e4f5g6h7",
+        "b3c4d5e6-f7a2-5432-98ba-d3e4f5g6h7a2",
+        "c4d5e6f7-a2b3-5432-98ba-e4f5g6h7a2b3",
+        "d5e6f7a8-b3c4-5432-98ba-d5e6f7a8b9c0",
+        "e6f7a8b9-c4d5-5432-98ba-e6f7a8b9c0d1",
+        "f7a8b9c0-d5e6-5432-98ba-f7a8b9c0d1e2",
+        "a8b9c0d1-e6f7-5432-98ba-a8b9c0d1e2f3",
+        "b9c0d1e2-f7a8-5432-98ba-b9c0d1e2f3a4",
+        "c0d1e2f3-a8b9-5432-98ba-c0d1e2f3a4b5",
+        "d1e2f3a4-b9c0-5432-98ba-d1e2f3a4b5c6",
+        "e2f3a4b5-c0d1-5432-98ba-e2f3a4b5c6d7",
+        "f3a4b5c6-d1e2-5432-98ba-f3a4b5c6d7e8",
+        "a4b5c6d7-e2f3-5432-98ba-a4b5c6d7e8f9",
+        "b5c6d7e8-f3a4-5432-98ba-b5c6d7e8f9a0"
+    ];
+
+    /**
+     * Property definitions for the software catalog
+     * These are used to ensure consistent property identifiers across objects
+     */
+    private const PROPERTY_DEFINITIONS = [
+        'id-7d91e5c8-f624-48a3-b529-173e4b6d5f9c' => 'Datum export',
+        'id-9358c742-a631-47b5-80d4-f8e69b3a5d12' => 'SWC type',
+        'id-21f8e937-65b4-42d1-9c3a-a8b7f6d4e215' => 'Extern Pakket',
+        'id-b4a7c523-8f19-4e67-9d38-c26517a9e8b4' => 'Omschrijving gebruik',
+        'id-a7c84b23-9f56-42e1-b5d7-8c3e9a2f4b8a' => 'Titel view SWC',
+        'id-65d23a1f-b9c7-483e-a612-d4f8e7b3c529' => 'Verbindingsrol',
+        'id-f18e5d2c-7b4a-496c-85e3-9a2b1c6d7e4f' => 'Object ID'
+    ];
+
+    /**
+     * Property definition keys for easier reference
+     */
+    private const PROP_DATUM_EXPORT = 'id-7d91e5c8-f624-48a3-b529-173e4b6d5f9c';
+    private const PROP_SWC_TYPE = 'id-9358c742-a631-47b5-80d4-f8e69b3a5d12';
+    private const PROP_EXTERN_PAKKET = 'id-21f8e937-65b4-42d1-9c3a-a8b7f6d4e215';
+    private const PROP_OMSCHRIJVING = 'id-b4a7c523-8f19-4e67-9d38-c26517a9e8b4';
+    private const PROP_TITEL_VIEW = 'id-a7c84b23-9f56-42e1-b5d7-8c3e9a2f4b8a';
+    private const PROP_VERBINDINGSROL = 'id-65d23a1f-b9c7-483e-a612-d4f8e7b3c529';
+    private const PROP_OBJECT_ID = 'id-f18e5d2c-7b4a-496c-85e3-9a2b1c6d7e4f';
+
+    /**
+     * Stores relation IDs created during processing for the software catalog
+     * Used to add all relations to the relations folder in a single batch
+     */
+    private array $createdRelationIds = [];
+
     public function __construct(
         private readonly LoggerInterface $logger,
         private readonly ObjectService $objectService
@@ -59,11 +160,9 @@ class RuleService
     private function processSoftwareCatalogusRule(Rule $rule, array $data): array
     {
         $config = $rule->getConfiguration()['configuration'];
-
-        // Get register ID
+        
+        // Get register ID and schema IDs
         $registerId = $config['register'];
-
-        // Get schema IDs
         $voorzieningSchemaId = $config['VoorzieningSchema'];
         $voorzieningGebruikSchemaId = $config['VoorzieningGebruikSchema'];
         $organisatieSchemaId = $config['OrganisatieSchema'];
@@ -113,152 +212,28 @@ class RuleService
         //     ]
         // );
 
-        // Check if property definitions already exist
-        $propertyIds = [
-            'id-3093daaa7d93748d2e1aed59caa28192' => false, // Datum export
-            'id-c3355444b6cb8fb34b62e241dd073043' => false, // SWC type
-            'id-d222f71c083de2460625d0914174ee9d' => false, // Extern Pakket
-            'id-e896da96437b4e4f821b3103f6b9c1b4' => false, // Omschrijving gebruik
-        ];
+        // Process property definitions and update basic metadata
+        $data = $this->processPropertyDefinitionsAndMetadata($data);
 
-        foreach ($data['body']['propertyDefinitions'] as $propertyDefinition) {
-            if (isset($propertyDefinition['identifier']) === true && isset($propertyIds[$propertyDefinition['identifier']]) === true) {
-                $propertyIds[$propertyDefinition['identifier']] = true;
-            }
-        }
+        // Find and configure organizational folders
+        list($applicationFolderKey, $relationsFolderKey, $applicationFolderCount, $relationsFolderCount) 
+            = $this->setupOrganizationalFolders($data);
 
-        // Add property definitions that don't exist yet
-        if ($propertyIds['id-3093daaa7d93748d2e1aed59caa28192'] === false) {
-            $data['body']['propertyDefinitions'][] = [
-                'identifier' => 'id-3093daaa7d93748d2e1aed59caa28192',
-                'type' => 'string',
-                'name' => 'Datum export'
+        // Process voorzieningen data and add to export
+        $data = $this->processVoorzieningenData(
+            $data,
+            $voorzieningen,
+            $applicationFolderKey,
+            $applicationFolderCount
+        );
+
+        // Add all created relations to the Relations folder
+        foreach ($this->createdRelationIds as $relationId) {
+            $data['body']['organizations'][$relationsFolderKey]['item'][$relationsFolderCount]['item'][] = [
+                'identifierRef' => $relationId
             ];
         }
-
-        if ($propertyIds['id-c3355444b6cb8fb34b62e241dd073043'] === false) {
-            $data['body']['propertyDefinitions'][] = [
-                'identifier' => 'id-c3355444b6cb8fb34b62e241dd073043',
-                'type' => 'string',
-                'name' => 'SWC type'
-            ];
-        }
-
-        if ($propertyIds['id-d222f71c083de2460625d0914174ee9d'] === false) {
-            $data['body']['propertyDefinitions'][] = [
-                'identifier' => 'id-d222f71c083de2460625d0914174ee9d',
-                'type' => 'string',
-                'name' => 'Extern Pakket'
-            ];
-        }
-
-        if ($propertyIds['id-e896da96437b4e4f821b3103f6b9c1b4'] === false) {
-            $data['body']['propertyDefinitions'][] = [
-                'identifier' => 'id-e896da96437b4e4f821b3103f6b9c1b4',
-                'type' => 'string',
-                'name' => 'Omschrijving gebruik'
-            ];
-        }
-
-        // Add datum export
-        $datumExport = new DateTime();
-        $data['body']['properties'][] = [
-            'propertyDefinitionRef' => 'id-3093daaa7d93748d2e1aed59caa28192', // Datum export
-            'value' => $datumExport->format('Y-m-d H:i:s'),
-            'value-lang' => 'nl',
-        ];
-
-        // Update Model name
-        $data['body']['name'] = "Turfburg (test VNG Realisatie)";
-
-        // Update filename
-        $filename = $datumExport->format('d-m-Y') . '_GEMMA 2_' . $data['body']['name'] . '_ameff_model.xml';
-        $data['headers']['Content-Disposition'] = 'attachment; filename="' . $filename . '"';
-
-        // Get all folder keys
-        foreach ($data['body']['organizations'] as $key => $organization) {
-            if (isset($organization['label']) === true && $organization['label'] === "Application") {
-                $applicationFolderKey = $key;
-            }
-        }
-
-        // Add the Applicaties / Pakketten (Softwarecatalogus) folder
-        $applicationFolderCount = count($data['body']['organizations'][$applicationFolderKey]['item']); // Index for adding to this organization/folder later on.
-        $data['body']['organizations'][$applicationFolderKey]['item'][] = [
-            'identifier' => "id-29ec7061-0aba-c9eb-25fd-7c9232e4f0",
-            'label' => "Pakketten (Softwarecatalogus)",
-            'label-lang' => "nl"
-        ];
-
-        // Count the total amount of children we are going to add for each referentieComponent.
-        $newChildrenCount = [];
-        foreach ($voorzieningen as $voorziening) {
-            $voorziening = $voorziening->jsonSerialize();
-
-            foreach ($voorziening['referentieComponenten'] as $referentieComponent) {
-                if (isset($newChildrenCount[$referentieComponent]) === false) {
-                    $newChildrenCount[$referentieComponent] = 0;
-                }
-                $newChildrenCount[$referentieComponent]++;
-            }
-        }
-
-        // Add voorzieningen (pakketten/applicaties) to response data
-        foreach ($voorzieningen as $voorziening) {
-            $voorziening = $voorziening->jsonSerialize();
-            $elementId = "id-{$voorziening['id']}";
-
-            // Add voorziening to Application folder
-            $data['body']['organizations'][$applicationFolderKey]['item'][$applicationFolderCount]['item'][] = [
-                'identifierRef' => $elementId
-            ];
-
-            // Add voorziening to elements
-            $data['body']['elements'][] = [
-                'identifier' => $elementId,
-                'name' => $voorziening['naam'],
-                'name-lang' => 'nl',
-                'documentation' => $voorziening['beschrijving'],
-                'documentation-lang' => 'nl',
-                'type' => 'ApplicationComponent',
-                'properties' => [
-                    0 => [
-                        'propertyDefinitionRef' => 'id-c3355444b6cb8fb34b62e241dd073043', // SWC type
-                        'value' => 'Pakket',
-                    ],
-                    1 => [
-                        'propertyDefinitionRef' => 'propid-2', // Object ID
-                        'value' => $voorziening['id'],
-                    ],
-                    2 => [
-                        'propertyDefinitionRef' => 'propid-39', // URL
-                        'value' => '',
-                    ],
-                    3 => [
-                        'propertyDefinitionRef' => 'id-d222f71c083de2460625d0914174ee9d', // Extern Pakket
-                        'value' => 'n',
-                    ],
-                    4 => [
-                        'propertyDefinitionRef' => 'id-e896da96437b4e4f821b3103f6b9c1b4', // Omschrijving gebruik
-                        'value' => '',
-                    ],
-                ],
-            ];
-
-            foreach ($voorziening['referentieComponenten'] as $referentieComponent) {
-                // Search for nodes with elementRef matching the voorzienings identificatie and create subnodes
-                if (isset($data['body']['views']) && is_array($data['body']['views'])) {
-                    foreach ($data['body']['views'] as &$view) {
-                        if (isset($view['nodes']) && is_array($view['nodes'])) {
-                            // Make sure identificatie exists
-                            $identificatie = $referentieComponent;
-                            $this->processNodes($view['nodes'], $identificatie, $elementId, $newChildrenCount[$referentieComponent]);
-                        }
-                    }
-                }
-            }
-        }
-
+        
         // foreach ($voorzieningGebruiken as $voorzieningGebruik) {
         //     $voorzieningGebruik = $voorzieningGebruik->jsonSerialize();
         // }
@@ -296,7 +271,226 @@ class RuleService
         // foreach ($voorzieningAanbod as $voorzieningAanbod) {
         //     $voorzieningAanbod = $voorzieningAanbod->jsonSerialize();
         // }
+        
+        return $data;
+    }
 
+    /**
+     * Process property definitions and update basic metadata in the data structure
+     *
+     * Validates existing property definitions, adds missing ones, and sets up
+     * basic metadata like export date and file name.
+     *
+     * @param array $data The data structure to update
+     * 
+     * @return array The updated data
+     */
+    private function processPropertyDefinitionsAndMetadata(array $data): array
+    {
+        // Check if property definitions already exist
+        $propertyDefinitions = array_fill_keys(array_keys(self::PROPERTY_DEFINITIONS), false);
+        
+        foreach ($data['body']['propertyDefinitions'] as $propertyDefinition) {
+            if (isset($propertyDefinition['identifier']) === true && array_key_exists($propertyDefinition['identifier'], $propertyDefinitions) === true) {
+                // Verify the name matches what we expect
+                if (isset($propertyDefinition['name']) === true && $propertyDefinition['name'] !== self::PROPERTY_DEFINITIONS[$propertyDefinition['identifier']]) {
+                    throw new Exception(sprintf(
+                        'Property definition with ID %s has unexpected name: "%s". Expected: "%s"', 
+                        $propertyDefinition['identifier'],
+                        $propertyDefinition['name'],
+                        self::PROPERTY_DEFINITIONS[$propertyDefinition['identifier']]
+                    ));
+                }
+                $propertyDefinitions[$propertyDefinition['identifier']] = true;
+            }
+        }
+
+        // Add property definitions that don't exist yet
+        foreach (self::PROPERTY_DEFINITIONS as $id => $name) {
+            if ($propertyDefinitions[$id] === false) {
+                $data['body']['propertyDefinitions'][] = [
+                    'identifier' => $id,
+                    'type' => 'string',
+                    'name' => $name
+                ];
+            }
+        }
+
+        // Add datum export
+        $datumExport = new DateTime();
+        $data['body']['properties'][] = [
+            'propertyDefinitionRef' => self::PROP_DATUM_EXPORT, // Datum export
+            'value' => $datumExport->format('Y-m-d H:i:s'),
+            'value-lang' => 'nl',
+        ];
+
+        // Update Model name
+        $data['body']['name'] = "Turfburg (test VNG Realisatie)";
+
+        // Update filename
+        $filename = $datumExport->format('d-m-Y') . '_GEMMA 2_' . $data['body']['name'] . '_ameff_model.xml';
+        $data['headers']['Content-Disposition'] = 'attachment; filename="' . $filename . '"';
+
+        return $data;
+    }
+
+    /**
+     * Find and configure organization folders in the data structure
+     *
+     * Locates Application and Relations folders, validates their existence,
+     * and adds appropriate subfolders for the software catalog.
+     *
+     * @param array $data The data structure to update
+     * 
+     * @return array An array with [$applicationFolderKey, $relationsFolderKey, $applicationFolderCount, $relationsFolderCount]
+     */
+    private function setupOrganizationalFolders(array &$data): array
+    {
+        // Get all folder keys
+        $applicationFolderKey = null;
+        $relationsFolderKey = null;
+        
+        foreach ($data['body']['organizations'] as $key => $organization) {
+            if (isset($organization['label']) === true) {
+                switch ($organization['label']) {
+                    case 'Application':
+                        $applicationFolderKey = $key;
+                        break;
+                    case 'Relations':
+                        $relationsFolderKey = $key;
+                        break;
+                    // Add more cases here as needed for future folder types
+                }
+            }
+        }
+
+        // Check if both required folders exist
+        if ($applicationFolderKey === null || $relationsFolderKey === null) {
+            $missingFolders = array_filter([
+                'Application' => $applicationFolderKey === null,
+                'Relations' => $relationsFolderKey === null,
+            ]);
+            throw new Exception('Required folder(s) not found in organizations: ' . implode(', ', array_keys($missingFolders)));
+        }
+
+        // Add the Applicaties / Pakketten (Softwarecatalogus) folder
+        $applicationFolderCount = count($data['body']['organizations'][$applicationFolderKey]['item']); // Index for adding to this organization/folder later on.
+        $data['body']['organizations'][$applicationFolderKey]['item'][] = [
+            'identifier' => "id-29ec7061-0aba-c9eb-25fd-7c9232e4f0",
+            'label' => "Pakketten (Softwarecatalogus)",
+            'label-lang' => "nl"
+        ];
+        
+        // Add the Relaties (Softwarecatalogus) folder
+        $relationsFolderCount = count($data['body']['organizations'][$relationsFolderKey]['item']); // Index for adding to this organization/folder later on.
+        $data['body']['organizations'][$relationsFolderKey]['item'][] = [
+            'identifier' => "id-8e7d5c3b-6a2f-9d4e-1b3c-7a9e2d5f8c0b",
+            'label' => "Relaties (Softwarecatalogus)",
+            'label-lang' => "nl"
+        ];
+
+        return [$applicationFolderKey, $relationsFolderKey, $applicationFolderCount, $relationsFolderCount];
+    }
+
+    /**
+     * Process voorzieningen data and add to export structure
+     *
+     * Processes voorzieningen objects, counts children for reference components,
+     * creates elements and relationships, and adds them to the appropriate folders.
+     *
+     * @param array $data The data structure to update
+     * @param array $voorzieningen The voorzieningen to process
+     * @param string $applicationFolderKey The key of the Application folder
+     * @param int $applicationFolderCount The count of items in the Application folder
+     * @param string $relationsFolderKey The key of the Relations folder
+     * @param int $relationsFolderCount The count of items in the Relations folder
+     * 
+     * @return array The updated data
+     */
+    private function processVoorzieningenData(
+        array $data,
+        array $voorzieningen,
+        string $applicationFolderKey,
+        int $applicationFolderCount
+    ): array {
+        // Reset relation IDs array
+        $this->createdRelationIds = [];
+        
+        // Count the total amount of children we are going to add for each referentieComponent.
+        $newChildrenCount = [];
+        foreach ($voorzieningen as $voorziening) {
+            $voorziening = $voorziening->jsonSerialize();
+
+            foreach ($voorziening['referentieComponenten'] as $referentieComponent) {
+                if (isset($newChildrenCount[$referentieComponent]) === false) {
+                    $newChildrenCount[$referentieComponent] = 0;
+                }
+                $newChildrenCount[$referentieComponent]++;
+            }
+        }
+
+        // Add voorzieningen (pakketten/applicaties) to response data
+        foreach ($voorzieningen as $voorziening) {
+            $voorziening = $voorziening->jsonSerialize();
+            $elementId = "id-{$voorziening['id']}";
+
+            // Add voorziening to Application folder
+            $data['body']['organizations'][$applicationFolderKey]['item'][$applicationFolderCount]['item'][] = [
+                'identifierRef' => $elementId
+            ];
+
+            // Add voorziening to elements
+            $data['body']['elements'][] = [
+                'identifier' => $elementId,
+                'name' => $voorziening['naam'],
+                'name-lang' => 'nl',
+                'documentation' => $voorziening['beschrijving'],
+                'documentation-lang' => 'nl',
+                'type' => 'ApplicationComponent',
+                'properties' => [
+                    [
+                        'propertyDefinitionRef' => self::PROP_SWC_TYPE, // SWC type
+                        'value' => 'Pakket',
+                    ],
+                    [
+                        'propertyDefinitionRef' => self::PROP_OBJECT_ID, // Object ID
+                        'value' => $voorziening['id'],
+                    ],
+                    [
+                        'propertyDefinitionRef' => 'propid-39', // URL
+                        'value' => '',
+                    ],
+                    [
+                        'propertyDefinitionRef' => self::PROP_EXTERN_PAKKET, // Extern Pakket
+                        'value' => 'n',
+                    ],
+                    [
+                        'propertyDefinitionRef' => self::PROP_OMSCHRIJVING, // Omschrijving gebruik
+                        'value' => '',
+                    ],
+                ],
+            ];
+
+            // Add new nodes and add relations between voorziening and referentiecomponent
+            foreach ($voorziening['referentieComponenten'] as $referentieComponent) {
+                if (isset($data['body']['views']) && is_array($data['body']['views'])) {
+                    foreach ($data['body']['views'] as &$view) {
+                        if (isset($view['nodes']) && is_array($view['nodes'])) {
+                            $this->processNodes($view['nodes'], $referentieComponent, $elementId, $newChildrenCount[$referentieComponent] ?? 0, $data);
+                        }
+                    }
+                }
+                
+                // Create relation between voorziening and referentieComponent
+                $this->createRelation(
+                    $data,
+                    $elementId,
+                    $referentieComponent,
+                    'Specialization'
+                );
+            }
+        }
+        
         return $data;
     }
 
@@ -307,10 +501,11 @@ class RuleService
      * @param string|null $matchIdentificatie The identificatie to match against elementRef
      * @param string $newElementId The ID of the new element to reference
      * @param int $totalNewChildren The total amount of children we are going to add for the current $matchIdentificatie.
-     *
+     * @param array &$data The data structure to update
+     * 
      * @return void
      */
-    private function processNodes(array &$nodes, ?string $matchIdentificatie, string $newElementId, int $totalNewChildren): void
+    private function processNodes(array &$nodes, ?string $matchIdentificatie, string $newElementId, int $totalNewChildren, array &$data): void
     {
         // If matchIdentificatie is null, return early
         if ($matchIdentificatie === null) {
@@ -318,16 +513,21 @@ class RuleService
         }
 
         // Loop through each node in the array
-        foreach ($nodes as $index => &$node) {
+        foreach ($nodes as &$node) {
             // Check if current node has an elementRef property and if it matches the target identificatie
             if (isset($node['elementRef']) === true && $node['elementRef'] === $matchIdentificatie) {
                 // Create a subnode with reference to the newly created element
-                $subnodeUuid = Uuid::v4();
+                if ($this->currentNodeIdIndex < count(self::NODE_IDS)) {
+                    $subnodeUuid = self::NODE_IDS[$this->currentNodeIdIndex];
+                    $this->currentNodeIdIndex++;
+                } else {
+                    $subnodeUuid = 'id-OutOfUniqueUUIDs-' . $this->currentNodeIdIndex;
+                    $this->currentNodeIdIndex++;
+                }
                 $subnodeId = "id-{$subnodeUuid}";
-
-                // Check if the nodes array doesn't exist or is not an array
+                
+                // Initialize the nodes array if it doesn't exist properly
                 if (isset($node['nodes']) === false || is_array($node['nodes']) === false) {
-                    // Initialize the nodes array if it doesn't exist properly
                     $node['nodes'] = [];
                 }
 
@@ -403,18 +603,73 @@ class RuleService
                             'r' => "0",
                             'g' => "0",
                             'b' => "0"
-                        ] // Somehow when all 3 are 0, color is removed from the style array...
+                        ] // @TODO: Somehow when all 3 are 0, color is removed from the style array...
                     ]
                 ];
+
+                // @TODO: Create relation between voorziening node and referentieComponent node
+                // $this->createRelation(
+                //     $data,
+                //     $subnodeId,
+                //     $node['identifier'],
+                //     'Specialization'
+                // );
             }
 
             // Process nested nodes recursively if they exist
             if (isset($node['nodes']) === true && is_array($node['nodes']) === true) {
                 // Call this function recursively on the nested nodes
-                $this->processNodes($node['nodes'], $matchIdentificatie, $newElementId, $totalNewChildren);
+                $this->processNodes($node['nodes'], $matchIdentificatie, $newElementId, $totalNewChildren, $data);
             }
         }
     }
+
+    /**
+     * Creates a relation between elements and adds it to the data structure
+     * 
+     * @param array &$data The data structure to update
+     * @param string $sourceId The source element ID
+     * @param string $targetId The target element ID
+     * @param string $relationType The type of relation
+     * 
+     * @return string The relation ID
+     */
+    private function createRelation(
+        array &$data, 
+        string $sourceId, 
+        string $targetId, 
+        string $relationType
+    ): string {
+        // Create relation UUID
+        $relationUuid = 'id-OutOfUniqueUUIDs-' . $this->currentRelationIdIndex;
+
+        // Use predefined relation ID if available
+        if ($this->currentRelationIdIndex < count(self::RELATION_IDS)) {
+            $relationUuid = self::RELATION_IDS[$this->currentRelationIdIndex];
+        }
+        $this->currentRelationIdIndex++;
+
+        // Add relation to relationships array
+        $relationId = "id-{$relationUuid}";
+        $data['body']['relationships'][] = [
+            'identifier' => $relationId,
+            'source' => $sourceId,
+            'target' => $targetId,
+            'type' => $relationType,
+            'properties' => [
+                [
+                    'propertyDefinitionRef' => self::PROP_OBJECT_ID, // Object ID
+                    'value' => $relationUuid,
+                ],
+            ],
+        ];
+        
+        // Store relation ID for later folder assignment
+        $this->createdRelationIds[] = $relationId;
+        
+        return $relationId;
+    }
+} 
 
     private function recursiveConnectNodes (array $objects, string $recursiveKey, int $elementRegister, int $elementSchema) : array
     {
