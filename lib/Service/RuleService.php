@@ -6,6 +6,7 @@ use Exception;
 use OCA\OpenConnector\Db\Rule;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Uid\Uuid;
+use DateTime;
 
 /**
  * Service for handling Rule processing in the OpenConnector app.
@@ -63,6 +64,8 @@ class RuleService
         // Get schema IDs
         $voorzieningSchemaId = $config['VoorzieningSchema'];
         $voorzieningGebruikSchemaId = $config['VoorzieningGebruikSchema'];
+        $organisatieSchemaId = $config['OrganisatieSchema'];
+        $voorzieningAanbodSchemaId = $config['VoorzieningAanbodSchema'];
         
         // Get OpenRegisters instance and set the register
         $openRegisters = $this->objectService->getOpenRegisters();
@@ -88,7 +91,103 @@ class RuleService
             ]
         );
 
-        // Add to response data
+        // // Fetch Organisatie objects
+        // $openRegisters->setSchema($organisatieSchemaId);
+        // $objectEntityMapper = $openRegisters->getMapper('objectEntity');
+        // $organisaties = $objectEntityMapper->findAll(
+        //     filters: [
+        //         'register' => $registerId,
+        //         'schema' => $organisatieSchemaId
+        //     ]
+        // );
+
+        // // Fetch VoorzieningAanbod objects
+        // $openRegisters->setSchema($voorzieningAanbodSchemaId);
+        // $objectEntityMapper = $openRegisters->getMapper('objectEntity');
+        // $voorzieningAanbod = $objectEntityMapper->findAll(
+        //     filters: [
+        //         'register' => $registerId,
+        //         'schema' => $voorzieningAanbodSchemaId
+        //     ]
+        // );
+
+        // Check if property definitions already exist
+        $propertyIds = [
+            'id-3093daaa7d93748d2e1aed59caa28192' => false, // Datum export
+            'id-c3355444b6cb8fb34b62e241dd073043' => false, // SWC type
+            'id-d222f71c083de2460625d0914174ee9d' => false, // Extern Pakket
+            'id-e896da96437b4e4f821b3103f6b9c1b4' => false, // Omschrijving gebruik
+        ];
+        
+        foreach ($data['body']['propertyDefinitions'] as $propertyDefinition) {
+            if (isset($propertyDefinition['identifier']) === true && isset($propertyIds[$propertyDefinition['identifier']]) === true) {
+                $propertyIds[$propertyDefinition['identifier']] = true;
+            }
+        }
+        
+        // Add property definitions that don't exist yet
+        if ($propertyIds['id-3093daaa7d93748d2e1aed59caa28192'] === false) {
+            $data['body']['propertyDefinitions'][] = [
+                'identifier' => 'id-3093daaa7d93748d2e1aed59caa28192',
+                'type' => 'string',
+                'name' => 'Datum export'
+            ];
+        }
+        
+        if ($propertyIds['id-c3355444b6cb8fb34b62e241dd073043'] === false) {
+            $data['body']['propertyDefinitions'][] = [
+                'identifier' => 'id-c3355444b6cb8fb34b62e241dd073043',
+                'type' => 'string',
+                'name' => 'SWC type'
+            ];
+        }
+        
+        if ($propertyIds['id-d222f71c083de2460625d0914174ee9d'] === false) {
+            $data['body']['propertyDefinitions'][] = [
+                'identifier' => 'id-d222f71c083de2460625d0914174ee9d',
+                'type' => 'string',
+                'name' => 'Extern Pakket'
+            ];
+        }
+        
+        if ($propertyIds['id-e896da96437b4e4f821b3103f6b9c1b4'] === false) {
+            $data['body']['propertyDefinitions'][] = [
+                'identifier' => 'id-e896da96437b4e4f821b3103f6b9c1b4',
+                'type' => 'string',
+                'name' => 'Omschrijving gebruik'
+            ];
+        }
+
+        // Add datum export
+        $datumExport = new DateTime();
+        $data['body']['properties'][] = [
+            'propertyDefinitionRef' => 'id-3093daaa7d93748d2e1aed59caa28192', // Datum export
+            'value' => $datumExport->format('Y-m-d H:i:s'),
+            'value-lang' => 'nl',
+        ];
+
+        // Update Model name
+        $data['body']['name'] = "Turfburg (test VNG Realisatie)";
+
+        // Update filename
+        $filename = $datumExport->format('d-m-Y') . '_GEMMA 2_' . $data['body']['name'] . '_ameff_model.xml';
+        $data['headers']['Content-Disposition'] = 'attachment; filename="' . $filename . '"';
+
+        // Get all folder keys
+        foreach ($data['body']['organizations'] as $key => $organization) {
+            if (isset($organization['label']) === true && $organization['label'] === "Application") {
+                $applicationFolderKey = $key;
+            }
+        }
+
+        // Add the Applicaties / Pakketten (Softwarecatalogus) folder
+        $applicationFolderCount = count($data['body']['organizations'][$applicationFolderKey]['item']); // Index for adding to this organization/folder later on.
+        $data['body']['organizations'][$applicationFolderKey]['item'][] = [
+            'identifier' => "id-29ec7061-0aba-c9eb-25fd-7c9232e4f0",
+            'label' => "Pakketten (Softwarecatalogus)",
+            'label-lang' => "nl"
+        ];
+
         // Count the total amount of children we are going to add for each referentieComponent.
         $newChildrenCount = [];
         foreach ($voorzieningen as $voorziening) {
@@ -102,13 +201,18 @@ class RuleService
             }
         }
 
-        // Add to response data
+        // Add voorzieningen (pakketten/applicaties) to response data
         foreach ($voorzieningen as $voorziening) {
             $voorziening = $voorziening->jsonSerialize();
+            $elementId = "id-{$voorziening['id']}";
 
-            $newUuid = Uuid::v4();
-            $elementId = "id-{$newUuid}";
-            $data['body']['results'][0]['elements'][] = [
+            // Add voorziening to Application folder
+            $data['body']['organizations'][$applicationFolderKey]['item'][$applicationFolderCount]['item'][] = [
+                'identifierRef' => $elementId
+            ];
+
+            // Add voorziening to elements
+            $data['body']['elements'][] = [
                 'identifier' => $elementId,
                 'name' => $voorziening['naam'],
                 'name-lang' => 'nl',
@@ -122,7 +226,7 @@ class RuleService
                     ],
                     1 => [
                         'propertyDefinitionRef' => 'propid-2', // Object ID
-                        'value' => $newUuid,
+                        'value' => $voorziening['id'],
                     ],
                     2 => [
                         'propertyDefinitionRef' => 'propid-39', // URL
@@ -141,8 +245,8 @@ class RuleService
 
             foreach ($voorziening['referentieComponenten'] as $referentieComponent) {
                 // Search for nodes with elementRef matching the voorzienings identificatie and create subnodes
-                if (isset($data['body']['results'][0]['views']) && is_array($data['body']['results'][0]['views'])) {
-                    foreach ($data['body']['results'][0]['views'] as &$view) {
+                if (isset($data['body']['views']) && is_array($data['body']['views'])) {
+                    foreach ($data['body']['views'] as &$view) {
                         if (isset($view['nodes']) && is_array($view['nodes'])) {
                             // Make sure identificatie exists
                             $identificatie = $referentieComponent;
@@ -154,7 +258,41 @@ class RuleService
         }
         
         // foreach ($voorzieningGebruiken as $voorzieningGebruik) {
-        //     $data['body']['views'][] = $voorzieningGebruik;
+        //     $voorzieningGebruik = $voorzieningGebruik->jsonSerialize();
+        // }
+
+        // // Add organisaties (leveranciers) to response data
+        // foreach ($organisaties as $organisatie) {
+        //     $organisatie = $organisatie->jsonSerialize();
+
+        //     $newUuid = Uuid::v4();
+        //     $elementId = "id-{$newUuid}";
+        //     $data['body']['elements'][] = [
+        //         'identifier' => $elementId,
+        //         'name' => $organisatie['naam'],
+        //         'name-lang' => 'nl',
+        //         'documentation' => $organisatie['beschrijving'],
+        //         'documentation-lang' => 'nl',
+        //         'type' => 'BusinessActor',
+        //         'properties' => [
+        //             0 => [
+        //                 'propertyDefinitionRef' => 'id-c3355444b6cb8fb34b62e241dd073043', // SWC type
+        //                 'value' => 'Leverancier',
+        //             ],
+        //             1 => [
+        //                 'propertyDefinitionRef' => 'propid-2', // Object ID
+        //                 'value' => $newUuid,
+        //             ],
+        //             2 => [
+        //                 'propertyDefinitionRef' => 'propid-39', // URL
+        //                 'value' => '',
+        //             ],
+        //         ],
+        //     ];
+        // }
+
+        // foreach ($voorzieningAanbod as $voorzieningAanbod) {
+        //     $voorzieningAanbod = $voorzieningAanbod->jsonSerialize();
         // }
         
         return $data;

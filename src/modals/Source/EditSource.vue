@@ -96,6 +96,7 @@ export default {
 					{ label: 'Database', id: 'database' },
 					{ label: 'API', id: 'api' },
 					{ label: 'File', id: 'file' },
+					{ label: 'SOAP', id: 'soap' },
 				],
 
 			},
@@ -130,6 +131,7 @@ export default {
 						{ label: 'Database', id: 'database' },
 						{ label: 'API', id: 'api' },
 						{ label: 'File', id: 'file' },
+						{ label: 'SOAP', id: 'soap' },
 					],
 					value: selectedType
 						? {
@@ -159,6 +161,7 @@ export default {
 					{ label: 'Database', id: 'database' },
 					{ label: 'API', id: 'api' },
 					{ label: 'File', id: 'file' },
+					{ label: 'SOAP', id: 'soap' },
 				],
 
 			}
