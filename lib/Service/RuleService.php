@@ -275,7 +275,7 @@ class RuleService
                 }
 
                 // Add relations between voorziening and referentiecomponent
-                if ($voorzieningIndex <= 1 && $refCompIndex <= 2) {
+                if ($voorzieningIndex <= 2 && $refCompIndex <= 2) {
                     $relationUuid = $uuidList[$voorzieningIndex][$refCompIndex];
                 }
                 $relationId = "id-{$relationUuid}";
