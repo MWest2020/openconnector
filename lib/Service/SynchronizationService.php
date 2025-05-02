@@ -1969,15 +1969,14 @@ class SynchronizationService
             throw new Exception('Could not write file: no filename could be determined');
         }
 
-		// Write file with OpenRegister ObjectService.
 		$objectService = $this->containerInterface->get('OCA\OpenRegister\Service\ObjectService');
-		$file = $objectService->addFile(object: $objectId, fileName: $filename, base64Content: $response['body'], share: isset($config['autoShare']) ? $config['autoShare'] : false);
+		$objectEntity = $objectService->findByUuid(uuid: $objectId);
 
-        // Attach passed down tags
         $tags[] = "object:$objectId";
-        if ($file instanceof File === true && isset($tags) === true && empty($tags) === false) {
-			$this->attachTagsToFile(fileId: $file->getId(), tags: $tags);
-        }
+
+		// Write file with OpenRegister FileService.
+		$fileService = $this->containerInterface->get('OCA\OpenRegister\Service\FileService');
+		$file = $fileService->addFile(objectEntity: $objectEntity, fileName: $filename, content: $response['body'], share: isset($config['autoShare']) ? $config['autoShare'] : false, tags: $tags);
 
 		return $originalEndpoint;
 	}
@@ -2030,12 +2029,11 @@ class SynchronizationService
 	private function getFileContext(array $config, mixed $endpoint, ?string &$filename = null, ?array &$tags = [], ?string &$objectId = null)
 	{
 		$dataDot = new Dot($endpoint);
-
-		if (isset($config['objectIdPath']) === true) {
+		if (isset($config['objectIdPath']) === true && empty($config['objectIdPath']) === false) {
 			$objectId = $dataDot->get($config['objectIdPath']);
 		}
 
-		if (isset($config['subObjectFilepath']) === true) {
+		if (isset($config['subObjectFilepath']) === true && empty($config['subObjectFilepath']) === false) {
 			$endpoint = $dataDot->get($config['subObjectFilepath']);
 		}
 
@@ -2044,7 +2042,7 @@ class SynchronizationService
 				in_array(needle: $endpoint['label'], haystack: $config['tags']) === true) {
 				$tags = [$endpoint['label']];
 			}
-			if (isset($endpoint['filename']) === true) {
+			if (isset($endpoint['filename']) === true && empty($endpoint['filename']) === false) {
 				$filename = $endpoint['filename'];
 			}
 
@@ -2145,7 +2143,7 @@ class SynchronizationService
 				foreach ($endpoint as $object) {
 					$filename = null;
 					$tags = [];
-					$objectId = null;
+					$objectId = $objectId;
 					$endpoint = $this->getFileContext(config: $config, endpoint: $object, filename: $filename, tags: $tags, objectId: $objectId);
 					if ($endpoint === null) {
 						throw new Exception('Could not get endpoint for fetch file rule' . $rule->getId());
@@ -2243,14 +2241,14 @@ class SynchronizationService
                 $openRegisters->setSchema($schemaId);
 
                 try {
-                    // Write file with OpenRegister ObjectService.
-                    $objectService = $this->containerInterface->get('OCA\OpenRegister\Service\ObjectService');
-                    $file = $objectService->addFile(object: $objectId, fileName: $fileName, base64Content: $content);
-
                     $tags = array_merge($config['tags'] ?? [], ["object:$objectId"]);
-                    if ($file instanceof File === true) {
-                        $this->attachTagsToFile(fileId: $file->getId(), tags: $tags);
-                    }
+
+                    $objectService = $this->containerInterface->get('OCA\OpenRegister\Service\ObjectService');
+                    $objectEntity = $objectService->findByUuid(uuid: $objectId);
+                    
+                    // Write file with OpenRegister ObjectService.
+                    $fileService = $this->containerInterface->get('OCA\OpenRegister\Service\FileService');
+                    $file = $fileService->addFile(objectEntity: $objectEntity, fileName: $fileName, content: $content, share: false, tags: $tags);
 
                     $result[$key] = $file->getPath();
                 } catch (Exception $exception) {
@@ -2266,14 +2264,15 @@ class SynchronizationService
             $openRegisters->setSchema($schemaId);
 
             try {
-                // Write file with OpenRegister ObjectService.
-                $objectService = $this->containerInterface->get('OCA\OpenRegister\Service\ObjectService');
-                $file = $objectService->addFile(object: $objectId, fileName: $fileName, base64Content: $content);
-
                 $tags = array_merge($config['tags'] ?? [], ["object:$objectId"]);
-                if ($file instanceof File === true) {
-                    $this->attachTagsToFile(fileId: $file->getId(), tags: $tags);
-                }
+                
+                $objectService = $this->containerInterface->get('OCA\OpenRegister\Service\ObjectService');
+                $objectEntity = $objectService->findByUuid(uuid: $objectId);
+
+                // Write file with OpenRegister FileService.
+                $fileService = $this->containerInterface->get('OCA\OpenRegister\Service\FileService');
+                $file = $fileService->addFile(object: $objectId, fileName: $fileName, content: $content, share: false, tags: $tags);
+
                 $dataDot[$config['filePath']] = $file->getPath();
             } catch (Exception $exception) {
             }
