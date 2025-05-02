@@ -4,16 +4,17 @@ namespace OCA\OpenConnector\Service;
 
 use Exception;
 use OCA\OpenConnector\Db\Rule;
+use OCA\OpenRegister\Db\ObjectEntity;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Uid\Uuid;
 use DateTime;
 
 /**
  * Service for handling Rule processing in the OpenConnector app.
- * 
+ *
  * This service provides functionality to process various types of Rules,
  * applying transformations and business logic to data based on rule configurations.
- * 
+ *
  * Note: The custom rules functionality is experimental and subject to change.
  */
 class RuleService
@@ -141,12 +142,13 @@ class RuleService
         // Process custom rule based on type
         $data = match ($type) {
             'softwareCatalogus' => $this->processSoftwareCatalogusRule($rule, $data),
+            'connectRelations' => $this->processCustomConnectionsRule($rule, $data),
             default => throw new Exception('Unsupported custom rule type: ' . $rule->getType()),
         };
 
         return $data;
     }
-    
+
     /**
      * Process a Software Catalogus rule
      *
@@ -165,11 +167,11 @@ class RuleService
         $voorzieningGebruikSchemaId = $config['VoorzieningGebruikSchema'];
         $organisatieSchemaId = $config['OrganisatieSchema'];
         $voorzieningAanbodSchemaId = $config['VoorzieningAanbodSchema'];
-        
+
         // Get OpenRegisters instance and set the register
         $openRegisters = $this->objectService->getOpenRegisters();
         $openRegisters->setRegister($registerId);
-        
+
         // Fetch Voorziening objects
         $openRegisters->setSchema($voorzieningSchemaId);
         $objectEntityMapper = $openRegisters->getMapper('objectEntity');
@@ -179,7 +181,7 @@ class RuleService
                 'schema' => $voorzieningSchemaId
             ]
         );
-        
+
         // Fetch VoorzieningGebruik objects
         $openRegisters->setSchema($voorzieningGebruikSchemaId);
         $objectEntityMapper = $openRegisters->getMapper('objectEntity');
@@ -302,7 +304,7 @@ class RuleService
                 $propertyDefinitions[$propertyDefinition['identifier']] = true;
             }
         }
-        
+
         // Add property definitions that don't exist yet
         foreach (self::PROPERTY_DEFINITIONS as $id => $name) {
             if ($propertyDefinitions[$id] === false) {
@@ -494,7 +496,7 @@ class RuleService
 
     /**
      * Recursively processes nodes and their nested nodes to find matches and create subnodes
-     * 
+     *
      * @param array &$nodes The nodes to process
      * @param string|null $matchIdentificatie The identificatie to match against elementRef
      * @param string $newElementId The ID of the new element to reference
@@ -509,7 +511,7 @@ class RuleService
         if ($matchIdentificatie === null) {
             return;
         }
-        
+
         // Loop through each node in the array
         foreach ($nodes as &$node) {
             // Check if current node has an elementRef property and if it matches the target identificatie
@@ -544,11 +546,11 @@ class RuleService
                 $childSpacing = 8;
                 $parentWidth = $node['position']['w'] - ($parentPadding * 2);
                 $parentHeight = $node['position']['h'] - ($parentPadding * 2);
-                
-                // Calculate child width: 
+
+                // Calculate child width:
                 // Available width = (parent width - left/right padding - spacing between children) / number of children
                 $childWidth = min(
-                    ($parentWidth - ($childSpacing * ($totalChildren - 1))) / $totalChildren, 
+                    ($parentWidth - ($childSpacing * ($totalChildren - 1))) / $totalChildren,
                     120 // Maximum width of 120px
                 );
 
@@ -566,7 +568,7 @@ class RuleService
                 // Calculate Y position:
                 // Position from bottom of parent
                 $absoluteY = $node['position']['y'] + ($node['position']['h'] - $childHeight - 10);
-                
+
                 // Add subnode with reference to new element
                 $node['nodes'][] = [
                     'identifier' => $subnodeId,
@@ -613,7 +615,7 @@ class RuleService
                 //     'Specialization'
                 // );
             }
-            
+
             // Process nested nodes recursively if they exist
             if (isset($node['nodes']) === true && is_array($node['nodes']) === true) {
                 // Call this function recursively on the nested nodes
@@ -668,3 +670,74 @@ class RuleService
         return $relationId;
     }
 } 
+
+    private function recursiveConnectNodes (array $objects, string $recursiveKey, int $elementRegister, int $elementSchema) : array
+    {
+        foreach($objects as $key => $object) {
+            $elements = $this->objectService->getOpenRegisters()->findAll(['filters' => ['identifier' =>$object['elementRef'], 'register' => $elementRegister, 'schema' => $elementSchema]]);
+            if(count($elements) !== 1) {
+                continue;
+            }
+            $element = array_shift($elements);
+
+            $elementArray = $element->jsonSerialize();
+            $object['name'] = $elementArray['name'] ?? null;
+            $object['elementType'] = $elementArray['type'] ?? null;
+            $object['documentation'] = $elementArray['documentation'] ?? null;
+            $object['properties'] = $elementArray['properties'] ?? null;
+
+            if(isset($object[$recursiveKey])) {
+                $object[$recursiveKey] = $this->recursiveConnectNodes($object[$recursiveKey], $recursiveKey, $elementRegister, $elementSchema);
+            }
+
+            $objects[$key] = $object;
+        }
+
+        return $objects;
+    }
+
+    private function connectConnections (array $objects, int $relationshipRegister, int $relationshipSchema) {
+        foreach($objects as $key => $object) {
+            $elements = $this->objectService->getOpenRegisters()->findAll(['filters' => ['identifier' =>$object['elementRef'], 'register' => $relationshipRegister, 'schema' => $relationshipSchema]]);
+            if(count($elements) !== 1) {
+                continue;
+            }
+            $element = array_shift($elements);
+
+            $elementArray = $element->jsonSerialize();
+            $object['type'] = $elementArray['type'] ?? null;
+            $object['properties'] = $elementArray['properties'] ?? null;
+        }
+
+        return $objects;
+    }
+
+    private function processCustomConnectionsRule(Rule $rule, array $data): array
+    {
+        $config = $rule->getConfiguration();
+
+        $views = $this->objectService->getOpenRegisters()->findAll([
+            'filters' =>[
+                'register' => $config['viewsRegister'],
+                'schema' => $config['viewsSchema'],
+            ]
+        ]);
+
+        foreach($views as $view) {
+            $serialized = $view->jsonSerialize();
+
+            if(isset($serialized['nodes']) === true) {
+                $serialized['nodes'] = $this->recursiveConnectNodes(objects: $serialized['nodes'], recursiveKey: 'nodes', elementRegister: $config['elementRegister'], elementSchema: $config['elementSchema']);
+            }
+
+            if(isset($serialized['connections']) === true) {
+                $serialized['connections'] = $this->connectConnections(objects: $serialized['connections'], relationshipRegister: $config['relationshipRegister'], relationshipSchema: $config['relationshipSchema']);
+            }
+
+            $this->objectService->getOpenRegisters()->saveObject(object: $serialized, register: $config['viewsRegister'], schema: $config['viewsSchema'], uuid: $serialized['id']);
+
+
+        }
+        return $data;
+    }
+}
