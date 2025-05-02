@@ -160,7 +160,7 @@ class RuleService
     private function processSoftwareCatalogusRule(Rule $rule, array $data): array
     {
         $config = $rule->getConfiguration()['configuration'];
-        
+
         // Get register ID and schema IDs
         $registerId = $config['register'];
         $voorzieningSchemaId = $config['VoorzieningSchema'];
@@ -216,7 +216,7 @@ class RuleService
         $data = $this->processPropertyDefinitionsAndMetadata($data);
 
         // Find and configure organizational folders
-        list($applicationFolderKey, $relationsFolderKey, $applicationFolderCount, $relationsFolderCount) 
+        list($applicationFolderKey, $relationsFolderKey, $applicationFolderCount, $relationsFolderCount)
             = $this->setupOrganizationalFolders($data);
 
         // Process voorzieningen data and add to export
@@ -233,7 +233,7 @@ class RuleService
                 'identifierRef' => $relationId
             ];
         }
-        
+
         // foreach ($voorzieningGebruiken as $voorzieningGebruik) {
         //     $voorzieningGebruik = $voorzieningGebruik->jsonSerialize();
         // }
@@ -271,7 +271,7 @@ class RuleService
         // foreach ($voorzieningAanbod as $voorzieningAanbod) {
         //     $voorzieningAanbod = $voorzieningAanbod->jsonSerialize();
         // }
-        
+
         return $data;
     }
 
@@ -282,20 +282,20 @@ class RuleService
      * basic metadata like export date and file name.
      *
      * @param array $data The data structure to update
-     * 
+     *
      * @return array The updated data
      */
     private function processPropertyDefinitionsAndMetadata(array $data): array
     {
         // Check if property definitions already exist
         $propertyDefinitions = array_fill_keys(array_keys(self::PROPERTY_DEFINITIONS), false);
-        
+
         foreach ($data['body']['propertyDefinitions'] as $propertyDefinition) {
             if (isset($propertyDefinition['identifier']) === true && array_key_exists($propertyDefinition['identifier'], $propertyDefinitions) === true) {
                 // Verify the name matches what we expect
                 if (isset($propertyDefinition['name']) === true && $propertyDefinition['name'] !== self::PROPERTY_DEFINITIONS[$propertyDefinition['identifier']]) {
                     throw new Exception(sprintf(
-                        'Property definition with ID %s has unexpected name: "%s". Expected: "%s"', 
+                        'Property definition with ID %s has unexpected name: "%s". Expected: "%s"',
                         $propertyDefinition['identifier'],
                         $propertyDefinition['name'],
                         self::PROPERTY_DEFINITIONS[$propertyDefinition['identifier']]
@@ -341,7 +341,7 @@ class RuleService
      * and adds appropriate subfolders for the software catalog.
      *
      * @param array $data The data structure to update
-     * 
+     *
      * @return array An array with [$applicationFolderKey, $relationsFolderKey, $applicationFolderCount, $relationsFolderCount]
      */
     private function setupOrganizationalFolders(array &$data): array
@@ -349,7 +349,7 @@ class RuleService
         // Get all folder keys
         $applicationFolderKey = null;
         $relationsFolderKey = null;
-        
+
         foreach ($data['body']['organizations'] as $key => $organization) {
             if (isset($organization['label']) === true) {
                 switch ($organization['label']) {
@@ -380,7 +380,7 @@ class RuleService
             'label' => "Pakketten (Softwarecatalogus)",
             'label-lang' => "nl"
         ];
-        
+
         // Add the Relaties (Softwarecatalogus) folder
         $relationsFolderCount = count($data['body']['organizations'][$relationsFolderKey]['item']); // Index for adding to this organization/folder later on.
         $data['body']['organizations'][$relationsFolderKey]['item'][] = [
@@ -404,7 +404,7 @@ class RuleService
      * @param int $applicationFolderCount The count of items in the Application folder
      * @param string $relationsFolderKey The key of the Relations folder
      * @param int $relationsFolderCount The count of items in the Relations folder
-     * 
+     *
      * @return array The updated data
      */
     private function processVoorzieningenData(
@@ -415,7 +415,7 @@ class RuleService
     ): array {
         // Reset relation IDs array
         $this->createdRelationIds = [];
-        
+
         // Count the total amount of children we are going to add for each referentieComponent.
         $newChildrenCount = [];
         foreach ($voorzieningen as $voorziening) {
@@ -480,7 +480,7 @@ class RuleService
                         }
                     }
                 }
-                
+
                 // Create relation between voorziening and referentieComponent
                 $this->createRelation(
                     $data,
@@ -490,7 +490,7 @@ class RuleService
                 );
             }
         }
-        
+
         return $data;
     }
 
@@ -502,7 +502,7 @@ class RuleService
      * @param string $newElementId The ID of the new element to reference
      * @param int $totalNewChildren The total amount of children we are going to add for the current $matchIdentificatie.
      * @param array &$data The data structure to update
-     * 
+     *
      * @return void
      */
     private function processNodes(array &$nodes, ?string $matchIdentificatie, string $newElementId, int $totalNewChildren, array &$data): void
@@ -525,7 +525,7 @@ class RuleService
                     $this->currentNodeIdIndex++;
                 }
                 $subnodeId = "id-{$subnodeUuid}";
-                
+
                 // Initialize the nodes array if it doesn't exist properly
                 if (isset($node['nodes']) === false || is_array($node['nodes']) === false) {
                     $node['nodes'] = [];
@@ -626,18 +626,18 @@ class RuleService
 
     /**
      * Creates a relation between elements and adds it to the data structure
-     * 
+     *
      * @param array &$data The data structure to update
      * @param string $sourceId The source element ID
      * @param string $targetId The target element ID
      * @param string $relationType The type of relation
-     * 
+     *
      * @return string The relation ID
      */
     private function createRelation(
-        array &$data, 
-        string $sourceId, 
-        string $targetId, 
+        array &$data,
+        string $sourceId,
+        string $targetId,
         string $relationType
     ): string {
         // Create relation UUID
@@ -663,13 +663,12 @@ class RuleService
                 ],
             ],
         ];
-        
+
         // Store relation ID for later folder assignment
         $this->createdRelationIds[] = $relationId;
-        
+
         return $relationId;
     }
-} 
 
     private function recursiveConnectNodes (array $objects, string $recursiveKey, int $elementRegister, int $elementSchema) : array
     {
