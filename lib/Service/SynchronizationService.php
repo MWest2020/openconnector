@@ -7,13 +7,11 @@ use GuzzleHttp\Exception\GuzzleException;
 use JWadhams\JsonLogic;
 use OC\User\NoUserException;
 use OCA\OpenConnector\Db\CallLog;
-use OCA\OpenConnector\Db\Endpoint;
 use OCA\OpenConnector\Db\Mapping;
 use OCA\OpenConnector\Db\Rule;
 use OCA\OpenConnector\Db\RuleMapper;
 use OCA\OpenConnector\Db\Source;
 use OCA\OpenConnector\Db\SourceMapper;
-use OCA\OpenConnector\Db\MappignMapper;
 use OCA\OpenConnector\Db\Synchronization;
 use OCA\OpenConnector\Db\SynchronizationMapper;
 use OCA\OpenConnector\Db\SynchronizationLog;
@@ -30,7 +28,6 @@ use OCP\AppFramework\Http\JSONResponse;
 use OCP\Files\GenericFileException;
 use OCP\Files\NotFoundException;
 use OCP\Files\NotPermittedException;
-use OCP\IRequest;
 use OCP\Lock\LockedException;
 use Psr\Container\ContainerExceptionInterface;
 use Psr\Container\NotFoundExceptionInterface;
@@ -38,17 +35,10 @@ use Symfony\Component\HttpKernel\Exception\TooManyRequestsHttpException;
 use Symfony\Component\Uid\Uuid;
 use OCP\AppFramework\Db\DoesNotExistException;
 use Adbar\Dot;
-use OCP\SystemTag\ISystemTagManager;
-use OCP\SystemTag\ISystemTagObjectMapper;
 use OCP\Files\File;
-use OCP\SystemTag\TagNotFoundException;
-
 use Psr\Container\ContainerInterface;
-use DateInterval;
 use DateTime;
 use OCA\OpenConnector\Db\MappingMapper;
-use OCP\AppFramework\Http\NotFoundResponse;
-use Twig\Environment;
 use Twig\Error\LoaderError;
 use Twig\Error\SyntaxError;
 
@@ -86,8 +76,6 @@ class SynchronizationService
 		private readonly ObjectService   $objectService,
         private readonly StorageService  $storageService,
         private readonly RuleMapper      $ruleMapper,
-        private readonly ISystemTagManager      $systemTagManager,
-        private readonly ISystemTagObjectMapper $systemTagMapper,
 	)
 	{
 		$this->callService = $callService;
@@ -2165,28 +2153,6 @@ class SynchronizationService
 		}
 
 		return $dataDot->jsonSerialize();
-	}
-
-	/**
-	 * Attach tags to a file.
-	 *
-	 * @param string $fileId The fileId.
-	 * @param array $tags Tags to associate with the file.
-	 */
-	private function attachTagsToFile(string $fileId, array $tags): void
-	{
-        $tagIds = [];
-		foreach ($tags as $key => $tagName) {
-            try {
-                $tag = $this->systemTagManager->getTag(tagName: $tagName, userVisible: true, userAssignable: true);
-            } catch (TagNotFoundException $exception) {
-                $tag = $this->systemTagManager->createTag(tagName: $tagName, userVisible: true, userAssignable: true);
-            }
-
-            $tagIds[] = $tag->getId();
-		}
-
-        $this->systemTagMapper->assignTags(objId: $fileId, objectType: $this::FILE_TAG_TYPE, tagIds: $tagIds);
 	}
 
 	/**
