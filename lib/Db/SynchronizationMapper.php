@@ -16,14 +16,31 @@ class SynchronizationMapper extends QBMapper
 		parent::__construct($db, 'openconnector_synchronizations');
 	}
 
-	public function find(int $id): Synchronization
+	public function find(int|string	 $id): Synchronization
 	{
+		if (is_string($id) === true) {
+			return $this->findByUuid($id);
+		}
+
 		$qb = $this->db->getQueryBuilder();
 
 		$qb->select('*')
 			->from('openconnector_synchronizations')
 			->where(
 				$qb->expr()->eq('id', $qb->createNamedParameter($id, IQueryBuilder::PARAM_INT))
+			);
+
+		return $this->findEntity(query: $qb);
+	}
+
+	public function findByUuid(string $uuid): Synchronization
+	{
+		$qb = $this->db->getQueryBuilder();
+
+		$qb->select('*')
+			->from('openconnector_synchronizations')
+			->where(
+				$qb->expr()->eq('uuid', $qb->createNamedParameter($uuid))
 			);
 
 		return $this->findEntity(query: $qb);

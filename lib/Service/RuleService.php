@@ -201,8 +201,27 @@ class RuleService
             }
         }
 
+        // @TODO: replace this with a way to store these uuids somewhere.
+        $uuidList = [
+            [
+                "a1b2c3d4-e5f6-4321-87a9-b1c2d3e4f5g6",
+                "b2c3d4e5-f6a1-4321-87a9-c3d4e5f6a1b2",
+                "c3d4e5f6-a1b2-4321-87a9-d4e5f6a1b2c3"
+            ],
+            [
+                "d4e5f6a1-b2c3-4321-87a9-e5f6a1b2c3d4",
+                "e5f6a1b2-c3d4-4321-87a9-f6a1b2c3d4e5",
+                "f6a1b2c3-d4e5-4321-87a9-a1b2c3d4e5f6"
+            ],
+            [
+                "a2b3c4d5-e6f7-5432-98ba-c2d3e4f5g6h7",
+                "b3c4d5e6-f7a2-5432-98ba-d3e4f5g6h7a2",
+                "c4d5e6f7-a2b3-5432-98ba-e4f5g6h7a2b3"
+            ]
+        ];
+
         // Add voorzieningen (pakketten/applicaties) to response data
-        foreach ($voorzieningen as $voorziening) {
+        foreach ($voorzieningen as $voorzieningIndex => $voorziening) {
             $voorziening = $voorziening->jsonSerialize();
             $elementId = "id-{$voorziening['id']}";
 
@@ -243,7 +262,7 @@ class RuleService
                 ],
             ];
 
-            foreach ($voorziening['referentieComponenten'] as $referentieComponent) {
+            foreach ($voorziening['referentieComponenten'] as $refCompIndex => $referentieComponent) {
                 // Search for nodes with elementRef matching the voorzienings identificatie and create subnodes
                 if (isset($data['body']['views']) && is_array($data['body']['views'])) {
                     foreach ($data['body']['views'] as &$view) {
@@ -254,6 +273,24 @@ class RuleService
                         }
                     }
                 }
+
+                // Add relations between voorziening and referentiecomponent
+                if ($voorzieningIndex <= 2 && $refCompIndex <= 2) {
+                    $relationUuid = $uuidList[$voorzieningIndex][$refCompIndex];
+                }
+                $relationId = "id-{$relationUuid}";
+                $data['body']['relationships'][] = [
+                    'identifier' => $relationId,
+                    'source' => $elementId,
+                    'target' => $referentieComponent,
+                    'type' => 'Specialization',
+                    'properties' => [
+                        0 => [
+                            'propertyDefinitionRef' => 'propid-2', // Object ID
+                            'value' => $relationUuid,
+                        ],
+                    ],
+                ];
             }
         }
         
