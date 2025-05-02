@@ -125,11 +125,17 @@ class SynchronizationService
 	 *
 	 * @return SynchronizationContract|array|null Returns a synchronization contract, an array for test cases, or null if conditions are not met.
 	 */
-	private function synchronizeInternToExtern(Synchronization $synchronization, ?bool $isTest = false, ?bool $force = false, \OCA\OpenRegister\Db\ObjectEntity|array &$object, SynchronizationLog $log, ?string $mutationType = null)
+	private function synchronizeInternToExtern(
+		Synchronization $synchronization, 
+		?bool $isTest = false, 
+		\OCA\OpenRegister\Db\ObjectEntity|array &$object, 
+		SynchronizationLog $log, 
+		?bool $force = false, 
+		?string $mutationType = null
+	): SynchronizationContract|array|null
 	{
 		if ($synchronization->getConditions() !== [] && !JsonLogic::apply($synchronization->getConditions(), $object)) {
-
-			return;
+			return null;
 		}
 
 		$targetConfig = $synchronization->getTargetConfig();
@@ -314,7 +320,7 @@ class SynchronizationService
 	 * @param string|null $source The source to synchronize, if not provided, the synchronization's source will be used
 	 * @param array|null $data The data to add to synchronize, if not provided, the synchronization's data will be used
 	 *
-	 * @return array
+	 * @return array|SynchronizationContract|array|null
 	 * @throws ContainerExceptionInterface
 	 * @throws NotFoundExceptionInterface
 	 * @throws GuzzleException
@@ -333,7 +339,7 @@ class SynchronizationService
 		?string $mutationType = null,
 		?string $source = null,
 		?array $data = null
-	): array
+	): array|SynchronizationContract|null
 	{
 		if ($mutationType !== null && in_array($mutationType, $this::VALID_MUTATION_TYPES) === false) {
 			throw new Exception(sprintf('Invalid mutation type: %s given. Allowed mutation types are: %s', $mutationType, implode(', ', $this::VALID_MUTATION_TYPES)));
@@ -368,7 +374,14 @@ class SynchronizationService
             // lets always create the log entry first, because we need its uuid later on for contractLogs
             $log['result']['type'] = 'internToExtern';
             $log = $this->synchronizationLogMapper->createFromArray($log);
-            return [$this->synchronizeInternToExtern(synchronization: $synchronization, isTest: $isTest, force: $force, object: $object, log: $log, mutationType: $mutationType)];
+            return $this->synchronizeInternToExtern(
+                synchronization: $synchronization, 
+                isTest: $isTest, 
+                object: $object, 
+                log: $log, 
+                force: $force, 
+                mutationType: $mutationType
+            );
         }
 
         $log['result']['type'] = 'externToIntern';
@@ -2583,7 +2596,7 @@ class SynchronizationService
      */
     public function getSynchronization(null|string|int $id = null, array $filters = []) :Synchronization
     {
-        if($id !== null) {
+        if ($id !== null) {
             $id = intval($id);
             return $this->synchronizationMapper->find($id);
         }
@@ -2591,7 +2604,7 @@ class SynchronizationService
         /** @var Synchronization[] $synchronizations */
         $synchronizations = $this->synchronizationMapper->findAll(filters: $filters);
 
-        if($synchronizations === 0) {
+        if(count($synchronizations) === 0) {
             throw new DoesNotExistException('The synchronization you are looking for does not exist');
         }
 
