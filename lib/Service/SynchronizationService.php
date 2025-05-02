@@ -2096,6 +2096,11 @@ class SynchronizationService
 	 */
 	private function processFetchFileRule(Rule $rule, array $data, string $objectId): array
 	{
+        $appManager = \OC::$server->get(\OCP\App\IAppManager::class);
+        if ($appManager->isEnabledForUser('openregister') === false) {
+			throw new Exception('OpenRegister app is required for the fetch file rule and not installed');
+        }
+
 		if (isset($rule->getConfiguration()['fetch_file']) === false) {
 			throw new Exception('No configuration found for fetch_file');
 		}
