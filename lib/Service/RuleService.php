@@ -212,6 +212,11 @@ class RuleService
                 "d4e5f6a1-b2c3-4321-87a9-e5f6a1b2c3d4",
                 "e5f6a1b2-c3d4-4321-87a9-f6a1b2c3d4e5",
                 "f6a1b2c3-d4e5-4321-87a9-a1b2c3d4e5f6"
+            ],
+            [
+                "a2b3c4d5-e6f7-5432-98ba-c2d3e4f5g6h7",
+                "b3c4d5e6-f7a2-5432-98ba-d3e4f5g6h7a2",
+                "c4d5e6f7-a2b3-5432-98ba-e4f5g6h7a2b3"
             ]
         ];
 
