@@ -673,10 +673,16 @@ class RuleService
     private function recursiveConnectNodes (array $objects, string $recursiveKey, int $elementRegister, int $elementSchema) : array
     {
         foreach($objects as $key => $object) {
+            if (isset($object['elementRef']) === false) {
+                continue;
+            }
+
             $elements = $this->objectService->getOpenRegisters()->findAll(['filters' => ['identifier' =>$object['elementRef'], 'register' => $elementRegister, 'schema' => $elementSchema]]);
+
             if(count($elements) !== 1) {
                 continue;
             }
+
             $element = array_shift($elements);
 
             $elementArray = $element->jsonSerialize();
@@ -697,7 +703,7 @@ class RuleService
 
     private function connectConnections (array $objects, int $relationshipRegister, int $relationshipSchema) {
         foreach($objects as $key => $object) {
-            $elements = $this->objectService->getOpenRegisters()->findAll(['filters' => ['identifier' =>$object['elementRef'], 'register' => $relationshipRegister, 'schema' => $relationshipSchema]]);
+            $elements = $this->objectService->getOpenRegisters()->findAll(['filters' => ['identifier' =>$object['relationshipRef'], 'register' => $relationshipRegister, 'schema' => $relationshipSchema]]);
             if(count($elements) !== 1) {
                 continue;
             }
@@ -715,12 +721,19 @@ class RuleService
     {
         $config = $rule->getConfiguration();
 
-        $views = $this->objectService->getOpenRegisters()->findAll([
-            'filters' =>[
-                'register' => $config['viewsRegister'],
-                'schema' => $config['viewsSchema'],
-            ]
-        ]);
+        $filters = [
+            'register' => $config['viewsRegister'],
+            'schema' => $config['viewsSchema'],
+        ];
+        $findConfig = ['filters' => $filters];
+        $explodedPath = explode(separator: '/', string: $data['path']);
+
+        if(is_string(end($explodedPath)) === true && Uuid::isValid(end($explodedPath)) === true) {
+            $findConfig['ids']  = [end($explodedPath)];
+        }
+
+
+        $views = $this->objectService->getOpenRegisters()->findAll(config: $findConfig);
 
         foreach($views as $view) {
             $serialized = $view->jsonSerialize();
