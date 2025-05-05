@@ -725,13 +725,15 @@ class RuleService
             'register' => $config['viewsRegister'],
             'schema' => $config['viewsSchema'],
         ];
+        $findConfig = ['filters' => $filters];
         $explodedPath = explode(separator: '/', string: $data['path']);
 
         if(is_string(end($explodedPath)) === true && Uuid::isValid(end($explodedPath)) === true) {
-            $filters['uuid']  = end($explodedPath);
+            $findConfig['ids']  = [end($explodedPath)];
         }
 
-        $views = $this->objectService->getOpenRegisters()->findAll(['filters' => $filters]);
+
+        $views = $this->objectService->getOpenRegisters()->findAll(config: $findConfig);
 
         foreach($views as $view) {
             $serialized = $view->jsonSerialize();
