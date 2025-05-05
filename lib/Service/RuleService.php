@@ -673,10 +673,16 @@ class RuleService
     private function recursiveConnectNodes (array $objects, string $recursiveKey, int $elementRegister, int $elementSchema) : array
     {
         foreach($objects as $key => $object) {
+            if (isset($object['elementRef']) === false) {
+                continue;
+            }
+
             $elements = $this->objectService->getOpenRegisters()->findAll(['filters' => ['identifier' =>$object['elementRef'], 'register' => $elementRegister, 'schema' => $elementSchema]]);
+
             if(count($elements) !== 1) {
                 continue;
             }
+
             $element = array_shift($elements);
 
             $elementArray = $element->jsonSerialize();
@@ -715,12 +721,17 @@ class RuleService
     {
         $config = $rule->getConfiguration();
 
-        $views = $this->objectService->getOpenRegisters()->findAll([
-            'filters' =>[
-                'register' => $config['viewsRegister'],
-                'schema' => $config['viewsSchema'],
-            ]
-        ]);
+        $filters = [
+            'register' => $config['viewsRegister'],
+            'schema' => $config['viewsSchema'],
+        ];
+        $explodedPath = explode(separator: '/', string: $data['path']);
+
+        if(is_string(end($explodedPath)) === true && Uuid::isValid(end($explodedPath)) === true) {
+            $filters['uuid']  = end($explodedPath);
+        }
+
+        $views = $this->objectService->getOpenRegisters()->findAll(['filters' => $filters]);
 
         foreach($views as $view) {
             $serialized = $view->jsonSerialize();
