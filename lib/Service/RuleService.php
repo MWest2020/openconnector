@@ -703,7 +703,7 @@ class RuleService
 
     private function connectConnections (array $objects, int $relationshipRegister, int $relationshipSchema) {
         foreach($objects as $key => $object) {
-            $elements = $this->objectService->getOpenRegisters()->findAll(['filters' => ['identifier' =>$object['elementRef'], 'register' => $relationshipRegister, 'schema' => $relationshipSchema]]);
+            $elements = $this->objectService->getOpenRegisters()->findAll(['filters' => ['identifier' =>$object['relationshipRef'], 'register' => $relationshipRegister, 'schema' => $relationshipSchema]]);
             if(count($elements) !== 1) {
                 continue;
             }
