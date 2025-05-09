@@ -268,9 +268,7 @@ class SynchronizationService
             }
         }
 
-        $result['objects']['deleted'] = $isTest
-            ? 0
-            : $this->deleteInvalidObjects($synchronization, $synchronizedTargetIds);
+        $result['objects']['deleted'] = $this->deleteInvalidObjects($synchronization, $synchronizedTargetIds);
 
         foreach ($synchronization->getFollowUps() as $followUp) {
             $followUpSynchronization = $this->synchronizationMapper->find($followUp);
@@ -674,7 +672,7 @@ class SynchronizationService
 						if ($synchronizationContract === null) {
 							continue;
 						}
-						$synchronizationContract = $this->updateTarget(synchronizationContract: $synchronizationContract, targetObject: [], action: 'delete');
+						$synchronizationContract = $this->updateTarget(synchronizationContract: $synchronizationContract, action: 'delete');
 						$this->synchronizationContractMapper->update($synchronizationContract);
 						$deletedObjectsCount++;
 					} catch (DoesNotExistException $exception) {
@@ -911,7 +909,7 @@ class SynchronizationService
 				$synchronizationContract->setTargetLastAction($synchronizationContract->getTargetId() ? 'update' : 'create');
 				break;
 			case 'delete':
-				$objectService->deleteObject(register: $register, schema: $schema, uuid: $synchronizationContract->getTargetId());
+				$objectService->delete(object: ['id' => $synchronizationContract->getTargetId()]);
 				$synchronizationContract->setTargetId(null);
 				$synchronizationContract->setTargetLastAction('delete');
 				break;
