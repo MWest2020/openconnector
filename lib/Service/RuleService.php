@@ -204,7 +204,7 @@ class RuleService
             ],
             ids: $voorzieningIds,
         );
-        
+
         // // Fetch Organisatie objects
         // $openRegisters->setSchema($organisatieSchemaId);
         // $objectEntityMapper = $openRegisters->getMapper('objectEntity');
@@ -543,25 +543,66 @@ class RuleService
 
             // Add new nodes and add relations between voorziening and referentiecomponent
             foreach ($voorziening['referentieComponenten'] as $referentieComponent) {
-                if (isset($data['body']['views']) && is_array($data['body']['views'])) {
-                    foreach ($data['body']['views'] as &$view) {
-                        if (isset($view['nodes']) && is_array($view['nodes'])) {
-                            $this->processNodes($view['nodes'], $referentieComponent, $elementId, $newChildrenCount[$referentieComponent] ?? 0, $data);
-                        }
-                    }
-                }
-
                 // Create relation between voorziening and referentieComponent
-                $this->createRelation(
+                $relationId = $this->createRelation(
                     data: $data,
                     sourceId: $elementId,
                     targetId: $referentieComponent,
                     relationType:'Specialization'
                 );
+
+                if (isset($data['body']['views']) && is_array($data['body']['views'])) {
+                    foreach ($data['body']['views'] as &$view) {
+                        $connections = [];
+                        if (isset($view['nodes']) && is_array($view['nodes'])) {
+                            $this->processNodes($view['nodes'], $referentieComponent, $elementId, $newChildrenCount[$referentieComponent] ?? 0, $data, $relationId, $connections);
+                        }
+
+                        if (isset($view['connections']) === false || empty($view['connections']) === true) {
+                            $view['connections'] = [];
+                        }
+
+                        $view['connections'] = array_merge($view['connections'], $connections);
+
+
+                    }
+                }
+
+
             }
         }
 
         return $data;
+    }
+
+    private function createConnection(string $relationId, string $sourceId, string $targetId)
+    {
+        $connectionUuid = Uuid::v4();
+
+
+        return [
+            "identifier" => "id-$connectionUuid",
+            "relationshipRef" => "$relationId",
+            "type" => "Relationship",
+            "source" => $sourceId,
+            "target" => $targetId,
+            "style" => [
+                "lineColor" => [
+                    "r" => "0",
+                    "g" => "0",
+                    "b" => "0"
+                ],
+                "font" => [
+                    "name" => "Segoe UI",
+                    "size" => "9"
+                ],
+                "color" => [
+                    "r" => "0",
+                    "g" => "0",
+                    "b" => "0"
+                ]
+            ]
+        ];
     }
 
     /**
@@ -575,7 +616,7 @@ class RuleService
      *
      * @return void
      */
-    private function processNodes(array &$nodes, ?string $matchIdentificatie, string $newElementId, int $totalNewChildren, array &$data): void
+    private function processNodes(array &$nodes, ?string $matchIdentificatie, string $newElementId, int $totalNewChildren, array &$data, string $relationId, array &$connections): void
     {
         // If matchIdentificatie is null, return early
         if ($matchIdentificatie === null) {
@@ -678,18 +719,15 @@ class RuleService
                 ];
 
                 // @TODO: Create relation between voorziening node and referentieComponent node
-                // $this->createRelation(
-                //     $data,
-                //     $subnodeId,
-                //     $node['identifier'],
-                //     'Specialization'
-                // );
+                 $connections[] = $this->createConnection(
+                     relationId: $relationId, sourceId: $subnodeId, targetId: $node['identifier']
+                 );
             }
 
             // Process nested nodes recursively if they exist
             if (isset($node['nodes']) === true && is_array($node['nodes']) === true) {
                 // Call this function recursively on the nested nodes
-                $this->processNodes($node['nodes'], $matchIdentificatie, $newElementId, $totalNewChildren, $data);
+                $this->processNodes($node['nodes'], $matchIdentificatie, $newElementId, $totalNewChildren, $data, $relationId, $connections);
             }
         }
     }
