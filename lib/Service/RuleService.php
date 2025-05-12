@@ -100,7 +100,8 @@ class RuleService
         'id-b4a7c523-8f19-4e67-9d38-c26517a9e8b4' => 'Omschrijving gebruik',
         'id-a7c84b23-9f56-42e1-b5d7-8c3e9a2f4b8a' => 'Titel view SWC',
         'id-65d23a1f-b9c7-483e-a612-d4f8e7b3c529' => 'Verbindingsrol',
-        'id-f18e5d2c-7b4a-496c-85e3-9a2b1c6d7e4f' => 'Object ID'
+        'id-f18e5d2c-7b4a-496c-85e3-9a2b1c6d7e4f' => 'Object ID',
+        'id-a5524578-7a1c-464e-b628-c6125dc4a6c6' => 'Bron'
     ];
 
     /**
@@ -113,6 +114,7 @@ class RuleService
     private const PROP_TITEL_VIEW = 'id-a7c84b23-9f56-42e1-b5d7-8c3e9a2f4b8a';
     private const PROP_VERBINDINGSROL = 'id-65d23a1f-b9c7-483e-a612-d4f8e7b3c529';
     private const PROP_OBJECT_ID = 'id-f18e5d2c-7b4a-496c-85e3-9a2b1c6d7e4f';
+    private const BRON = 'id-a5524578-7a1c-464e-b628-c6125dc4a6c6';
 
     /**
      * Stores relation IDs created during processing for the software catalog
@@ -175,12 +177,6 @@ class RuleService
         // Fetch Voorziening objects
         $openRegisters->setSchema($voorzieningSchemaId);
         $objectEntityMapper = $openRegisters->getMapper('objectEntity');
-        $voorzieningen = $objectEntityMapper->findAll(
-            filters: [
-                'register' => $registerId,
-                'schema' => $voorzieningSchemaId
-            ]
-        );
 
         // Fetch VoorzieningGebruik objects
         $openRegisters->setSchema($voorzieningGebruikSchemaId);
@@ -188,10 +184,27 @@ class RuleService
         $voorzieningGebruiken = $objectEntityMapper->findAll(
             filters: [
                 'register' => $registerId,
-                'schema' => $voorzieningGebruikSchemaId
+                'schema' => $voorzieningGebruikSchemaId,
+                'organisatieId' => $data['parameters']['organisatie'],
             ]
         );
 
+        $voorzieningIds = array_map(function(ObjectEntity $voorzieningGebruik):?string {
+            $json = $voorzieningGebruik->jsonSerialize();
+
+            return $json['voorzieningId'] ?? null;
+        }, $voorzieningGebruiken);
+
+        $voorzieningIds = array_values(array_filter($voorzieningIds));
+
+        $voorzieningen = $objectEntityMapper->findAll(
+            filters: [
+                'register' => $registerId,
+                'schema' => $voorzieningSchemaId,
+            ],
+            ids: $voorzieningIds,
+        );
+        
         // // Fetch Organisatie objects
         // $openRegisters->setSchema($organisatieSchemaId);
         // $objectEntityMapper = $openRegisters->getMapper('objectEntity');
@@ -234,9 +247,62 @@ class RuleService
             ];
         }
 
-        // foreach ($voorzieningGebruiken as $voorzieningGebruik) {
-        //     $voorzieningGebruik = $voorzieningGebruik->jsonSerialize();
-        // }
+//         foreach ($voorzieningGebruiken as $voorzieningGebruik) {
+//             $voorzieningGebruik = $voorzieningGebruik->jsonSerialize();
+//             $voorziening = "id-{$voorzieningGebruik['voorzieningId']}";
+//
+//
+//             $elementId = "id-{$voorzieningGebruik['id']}";
+//             // Add voorziening to Application folder
+//             $data['body']['organizations'][$applicationFolderKey]['item'][$applicationFolderCount]['item'][] = [
+//                 'identifierRef' => $elementId
+//             ];
+//
+//             // Add voorziening to elements
+//             $data['body']['elements'][] = [
+//                 'identifier' => $elementId,
+//                 'name' => $voorzieningGebruik['naam'],
+//                 'name-lang' => 'nl',
+//                 'documentation' => $voorzieningGebruik['beschrijving'],
+//                 'documentation-lang' => 'nl',
+//                 'type' => 'ApplicationComponent',
+//                 'properties' => [
+//                     [
+//                         'propertyDefinitionRef' => self::PROP_SWC_TYPE, // SWC type
+//                         'value' => 'Pakket',
+//                     ],
+//                     [
+//                         'propertyDefinitionRef' => self::PROP_OBJECT_ID, // Object ID
+//                         'value' => $voorzieningGebruik['id'],
+//                     ],
+//                     [
+//                         'propertyDefinitionRef' => 'propid-39', // URL
+//                         'value' => '',
+//                     ],
+//                     [
+//                         'propertyDefinitionRef' => self::PROP_EXTERN_PAKKET, // Extern Pakket
+//                         'value' => 'n',
+//                     ],
+//                     [
+//                         'propertyDefinitionRef' => self::PROP_OMSCHRIJVING, // Omschrijving gebruik
+//                         'value' => '',
+//                     ],
+//                 ],
+//             ];
+//
+//             if (isset($data['body']['views']) && is_array($data['body']['views'])) {
+//                 foreach ($data['body']['views'] as &$view) {
+//                     if (isset($view['nodes']) && is_array($view['nodes'])) {
+//                         $this->processNodes($view['nodes'], $voorziening, $elementId, 1, $data);
+//                     }
+//                 }
+//             }
+//
+//
+//             $this->createRelation(data: $data, sourceId: $voorziening, targetId: $elementId, relationType: 'Realization');
+//
+//
+//         }
 
         // // Add organisaties (leveranciers) to response data
         // foreach ($organisaties as $organisatie) {
@@ -377,7 +443,7 @@ class RuleService
         $applicationFolderCount = count($data['body']['organizations'][$applicationFolderKey]['item']); // Index for adding to this organization/folder later on.
         $data['body']['organizations'][$applicationFolderKey]['item'][] = [
             'identifier' => "id-29ec7061-0aba-c9eb-25fd-7c9232e4f0",
-            'label' => "Pakketten (Softwarecatalogus)",
+            'label' => "Applicaties (Softwarecatalogus)",
             'label-lang' => "nl"
         ];
 
@@ -468,6 +534,10 @@ class RuleService
                         'propertyDefinitionRef' => self::PROP_OMSCHRIJVING, // Omschrijving gebruik
                         'value' => '',
                     ],
+                    [
+                        'propertyDefinitionRef' => self::BRON, // Omschrijving gebruik
+                        'value' => 'SoftwareCatalogus',
+                    ],
                 ],
             ];
 
@@ -483,10 +553,10 @@ class RuleService
 
                 // Create relation between voorziening and referentieComponent
                 $this->createRelation(
-                    $data,
-                    $elementId,
-                    $referentieComponent,
-                    'Specialization'
+                    data: $data,
+                    sourceId: $elementId,
+                    targetId: $referentieComponent,
+                    relationType:'Specialization'
                 );
             }
         }
