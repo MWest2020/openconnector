@@ -41,13 +41,6 @@ class SoftwareCatalogueService
     private array $relations = [];
 
     /**
-     * Array to store all nodes from the view
-     * 
-     * @var array
-     */
-    private array $nodes = [];
-
-    /**
      * Constructor for SoftwareCatalogueService
      *
      * @param LoggerInterface $logger The logger instance
@@ -75,30 +68,30 @@ class SoftwareCatalogueService
      */
     public function extendView(int $viewId, int $modelId): PromiseInterface
     {
-        // Create a deferred object to manage the promise
+        // Create a deferred object to manage the promise.
         $deferred = new Deferred();
 
-        // Get the OpenRegister service
+        // Get the OpenRegister service.
         $openRegister = $this->objectService->getOpenRegisters();
         if ($openRegister === null) {
             $deferred->reject(new \Exception('OpenRegister service is not available'));
             return $deferred->promise();
         }
 
-        // Fetch both view and model objects
+        // Fetch both view and model objects.
         $viewPromise = $openRegister->find($viewId);
         $modelPromise = $openRegister->find($modelId);        
 
-        // Lets get the extendView from the schema mapper by slug
+        // Lets get the extendView from the schema mapper by slug.
         $extendViewSchema = $this->schemaMapper->find('extendView');
         $viewPromise['view'] =  $viewPromise['id'];
         unset($viewPromise['@self'], $viewPromise['id']);
 
-        // Lets prepare the object service for saving to the extend view
+        // Lets prepare the object service for saving to the extend view.
         $this->objectService->setRegister($viewPromise['register']);
         $this->objectService->setSchema($extendViewSchema['id']);
 
-        // Get elements and relations from the model
+        // Get elements and relations from the model.
         $this->elements = $openRegister->findAll([
             'ids' => $modelPromise['elements']
         ]);
@@ -121,16 +114,16 @@ class SoftwareCatalogueService
                     return;
                 }
 
-                // Process each node in parallel using ReactPHP
+                // Process each node in parallel using ReactPHP.
                 $promises = array_map([$this, 'extendNode'], $nodes);
 
-                // Wait for all node processing to complete
+                // Wait for all node processing to complete.
                 \React\Promise\all($promises)
                     ->then(function (array $extendedNodes) use ($deferred, $view) {
-                        // Update the view with the extended nodes
+                        // Update the view with the extended nodes.
                         $view['nodes'] = $extendedNodes;
                         
-                        // Save the updated view
+                        // Save the updated view.
                         $this->objectService->save($view)
                             ->then(function () use ($deferred) {
                                 $deferred->resolve();
@@ -148,7 +141,7 @@ class SoftwareCatalogueService
             });
 
         return $deferred->promise();
-    }
+    }//end extendView
 
     /**
      * Extends a single node using the global elements and relations.
@@ -163,7 +156,7 @@ class SoftwareCatalogueService
     {
         return new Promise(function ($resolve, $reject) use ($node) {
             try {
-                // Find matching element for this node
+                // Find matching element for this node.
                 $element = $this->findElementForNode($node);
                 if ($element === null) {
                     $this->logger->warning('No matching element found for node', ['node' => $node]);
@@ -171,16 +164,16 @@ class SoftwareCatalogueService
                     return;
                 }
 
-                // Find relations for this element
+                // Find relations for this element.
                 $relations = $this->findRelationsForElement($element);
                 
-                // Extend the node with element properties
+                // Extend the node with element properties.
                 $node['element'] = $element;
                 $node['relations'] = $relations;
 
-                // Check if the node has nested nodes that need to be extended
+                // Check if the node has nested nodes that need to be extended.
                 if (isset($node['nodes']) && is_array($node['nodes'])) {
-                    // Process nested nodes in parallel
+                    // Process nested nodes in parallel.
                     $nestedPromises = array_map([$this, 'extendNode'], $node['nodes']);
                     
                     \React\Promise\all($nestedPromises)
@@ -202,7 +195,7 @@ class SoftwareCatalogueService
                 $reject($e);
             }
         });
-    }
+    }//end extendNode
 
     /**
      * Finds the matching element for a given node
@@ -218,7 +211,7 @@ class SoftwareCatalogueService
             }
         }
         return null;
-    }
+    }//end findElementForNode
 
     /**
      * Finds all relations for a given element
@@ -229,16 +222,16 @@ class SoftwareCatalogueService
     private function findRelationsForElement(array $element): array
     {
         $relations = [];
-        // Iterate over each relation to find those associated with the given element
+        // Iterate over each relation to find those associated with the given element.
         foreach ($this->relations as $relation) {
-            // Check if the element's ID matches the source or target of the relation
+            // Check if the element's ID matches the source or target of the relation.
             if ($relation['source'] === $element['id'] || 
                 $relation['target'] === $element['id']) {
-                // Add the matching relation to the relations array
+                // Add the matching relation to the relations array.
                 $relations[] = $relation;
             }
         }
-        // Return the array of found relations
+        // Return the array of found relations.
         return $relations;
-    }
+    }//end findRelationsForElement.
 }
