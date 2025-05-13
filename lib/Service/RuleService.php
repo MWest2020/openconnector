@@ -536,7 +536,7 @@ class RuleService
                     ],
                     [
                         'propertyDefinitionRef' => self::BRON, // Omschrijving gebruik
-                        'value' => 'SoftwareCatalogus',
+                        'value' => 'Softwarecatalogus',
                     ],
                 ],
             ];
@@ -552,7 +552,23 @@ class RuleService
                 );
 
                 if (isset($data['body']['views']) && is_array($data['body']['views'])) {
-                    foreach ($data['body']['views'] as &$view) {
+                    $viewIds = [];
+                    foreach ($data['body']['views'] as $view) {
+
+                        // Concept softwareCatalogus views
+                        if (
+                            count($properties = array_filter($view['properties'], function($property){return $property['propertyDefinitionRef'] === 'propid-67';})) === 0
+                            || array_shift($properties)['value'] !== 'Softwarecatalogus en GEMMA Online en redactie'
+                        ) {
+                            continue;
+                        }
+
+                        foreach ($view['connections'] as &$connection) {
+                            $connection['source']     = $connection['source'].'-1';
+                            $connection['target']     = $connection['target'].'-1';
+                            $connection['identifier'] = $connection['identifier'].'-1';
+                        }
+
                         $connections = [];
                         if (isset($view['nodes']) && is_array($view['nodes'])) {
                             $this->processNodes($view['nodes'], $referentieComponent, $elementId, $newChildrenCount[$referentieComponent] ?? 0, $data, $relationId, $connections);
@@ -562,10 +578,22 @@ class RuleService
                             $view['connections'] = [];
                         }
 
+
+                        $viewIds[] = $view['identifier'] = 'id-'.Uuid::v4()->jsonSerialize();
                         $view['connections'] = array_merge($view['connections'], $connections);
 
-
+                        $data['body']['views'][] = $view;
                     }
+
+                    $organization = [
+                        "label"      => 'Views (Softwarecatalogus)',
+                        "label-lang" => "en",
+                    ];
+                    foreach($viewIds as $viewId) {
+                        $organization['item'][] = ['identifierRef' => $viewId];
+                    }
+
+                    $data['body']['organizations'][] = $organization;
                 }
 
 
@@ -625,6 +653,7 @@ class RuleService
 
         // Loop through each node in the array
         foreach ($nodes as &$node) {
+
             // Check if current node has an elementRef property and if it matches the target identificatie
             if (isset($node['elementRef']) === true && $node['elementRef'] === $matchIdentificatie) {
                 // Create a subnode with reference to the newly created element
@@ -720,15 +749,24 @@ class RuleService
 
                 // @TODO: Create relation between voorziening node and referentieComponent node
                  $connections[] = $this->createConnection(
-                     relationId: $relationId, sourceId: $subnodeId, targetId: $node['identifier']
+                     relationId: $relationId, sourceId: $subnodeId.'-1', targetId: $node['identifier'].'-1'
                  );
             }
 
             // Process nested nodes recursively if they exist
             if (isset($node['nodes']) === true && is_array($node['nodes']) === true) {
                 // Call this function recursively on the nested nodes
-                $this->processNodes($node['nodes'], $matchIdentificatie, $newElementId, $totalNewChildren, $data, $relationId, $connections);
+                $this->processNodes(
+                    nodes:$node['nodes'],
+                    matchIdentificatie: $matchIdentificatie,
+                    newElementId: $newElementId,
+                    totalNewChildren: $totalNewChildren,
+                    data: $data,
+                    relationId: $relationId,
+                    connections: $connections);
             }
+
+            $node['identifier'] = $node['identifier'].'-1';
         }
     }
 
@@ -769,6 +807,10 @@ class RuleService
                     'propertyDefinitionRef' => self::PROP_OBJECT_ID, // Object ID
                     'value' => $relationUuid,
                 ],
+                [
+                    'propertyDefinitionRef' => self::BRON,
+                    'value' => 'Softwarecatalogus'
+                ]
             ],
         ];
 
