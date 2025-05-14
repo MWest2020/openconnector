@@ -653,6 +653,9 @@ class RuleService
 
         // Loop through each node in the array
         foreach ($nodes as &$node) {
+            if(substr($node['identifier'], -2) !== '-1') {
+                $nodeIdentifier = $node['identifier'] = $node['identifier'].'-1';
+            }
 
             // Check if current node has an elementRef property and if it matches the target identificatie
             if (isset($node['elementRef']) === true && $node['elementRef'] === $matchIdentificatie) {
@@ -749,7 +752,7 @@ class RuleService
 
                 // @TODO: Create relation between voorziening node and referentieComponent node
                  $connections[] = $this->createConnection(
-                     relationId: $relationId, sourceId: $subnodeId.'-1', targetId: $node['identifier'].'-1'
+                     relationId: $relationId, sourceId: $subnodeId.'-1', targetId: $nodeIdentifier
                  );
             }
 
@@ -765,8 +768,6 @@ class RuleService
                     relationId: $relationId,
                     connections: $connections);
             }
-
-            $node['identifier'] = $node['identifier'].'-1';
         }
     }
 
