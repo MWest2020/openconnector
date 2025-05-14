@@ -124,7 +124,8 @@ class RuleService
 
     public function __construct(
         private readonly LoggerInterface $logger,
-        private readonly ObjectService $objectService
+        private readonly ObjectService $objectService,
+        private readonly SoftwareCatalogueService $catalogueService
     )
     {
     }
@@ -837,11 +838,16 @@ class RuleService
         $explodedPath = explode(separator: '/', string: $data['path']);
 
         if(is_string(end($explodedPath)) === true && Uuid::isValid(end($explodedPath)) === true) {
-            $findConfig['ids']  = [end($explodedPath)];
+            $modelId = $data['parameters']['model'];
+
+            $viewPromise = $this->catalogueService->extendView(end($explodedPath), $modelId);
+
+            return $data;
         }
 
 
         $views = $this->objectService->getOpenRegisters()->findAll(config: $findConfig);
+
 
         foreach($views as $view) {
             $serialized = $view->jsonSerialize();
