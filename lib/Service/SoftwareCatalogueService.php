@@ -2,21 +2,23 @@
 
 namespace OCA\OpenConnector\Service;
 
-use OCA\OpenRegister\Service\ObjectService;
+use OCA\OpenConnector\Service\ObjectService;
 use OCA\OpenRegister\Db\ObjectEntity;
 use OCA\OpenRegister\Db\SchemaMapper;
 use Psr\Log\LoggerInterface;
+use React\Promise\Promise;
 use React\Promise\PromiseInterface;
 use React\EventLoop\Loop;
 use React\Promise\Deferred;
 use OCP\AppFramework\Db\DoesNotExistException;
+use function React\Promise\all;
 
 /**
  * Service for handling Software Catalogue operations.
- * 
+ *
  * This service provides functionality for managing software catalogue items,
  * including version management, synchronization, and event handling.
- * 
+ *
  * @category Service
  * @package  OCA\OpenConnector\Service
  * @version  1.0.0
@@ -28,14 +30,14 @@ class SoftwareCatalogueService
 {
     /**
      * Array to store all elements from the model
-     * 
+     *
      * @var array
      */
     private array $elements = [];
 
     /**
      * Array to store all relations from the model
-     * 
+     *
      * @var array
      */
     private array $relations = [];
@@ -44,7 +46,7 @@ class SoftwareCatalogueService
      * Constructor for SoftwareCatalogueService
      *
      * @param LoggerInterface $logger The logger instance
-     * @param ObjectService $objectService The object service for accessing OpenRegister    
+     * @param ObjectService $objectService The object service for accessing OpenRegister
      * @param SchemaMapper $schemaMapper The schema mapper for accessing OpenRegister
      */
     public function __construct(
@@ -59,14 +61,14 @@ class SoftwareCatalogueService
      *
      * @param int $viewId The ID of the view to extend
      * @param int $modelId The ID of the model to use for extending
-     * 
+     *
      * @return PromiseInterface A promise that resolves when all nodes have been processed
-     * 
+     *
      * @throws DoesNotExistException If the view or model does not exist in the object store
-     * 
+     *
      * @psalm-return PromiseInterface<void>
      */
-    public function extendView(int $viewId, int $modelId): PromiseInterface
+    public function extendView(int|string $viewId, int|string $modelId): PromiseInterface
     {
         // Create a deferred object to manage the promise.
         $deferred = new Deferred();
@@ -80,7 +82,7 @@ class SoftwareCatalogueService
 
         // Fetch both view and model objects.
         $viewPromise = $openRegister->find($viewId);
-        $modelPromise = $openRegister->find($modelId);        
+        $modelPromise = $openRegister->find($modelId);
 
         // Lets get the extendView from the schema mapper by slug.
         $extendViewSchema = $this->schemaMapper->find('extendView');
@@ -88,8 +90,8 @@ class SoftwareCatalogueService
         unset($viewPromise['@self'], $viewPromise['id']);
 
         // Lets prepare the object service for saving to the extend view.
-        $this->objectService->setRegister($viewPromise['register']);
-        $this->objectService->setSchema($extendViewSchema['id']);
+        $openRegister->setRegister($viewPromise['register']);
+        $openRegister->setSchema($extendViewSchema['id']);
 
         // Get elements and relations from the model.
         $this->elements = $openRegister->findAll([
@@ -105,7 +107,7 @@ class SoftwareCatalogueService
         ]);
 
         // Process both objects
-        \React\Promise\all([$viewPromise, $modelPromise, $nodes])
+        all([$viewPromise, $modelPromise, $nodes])
             ->then(function (array $results) use ($deferred, $openRegister) {
                 [$view, $model, $nodes] = $results;
 
@@ -118,11 +120,11 @@ class SoftwareCatalogueService
                 $promises = array_map([$this, 'extendNode'], $nodes);
 
                 // Wait for all node processing to complete.
-                \React\Promise\all($promises)
+                all($promises)
                     ->then(function (array $extendedNodes) use ($deferred, $view) {
                         // Update the view with the extended nodes.
                         $view['nodes'] = $extendedNodes;
-                        
+
                         // Save the updated view.
                         $this->objectService->save($view)
                             ->then(function () use ($deferred) {
@@ -147,9 +149,9 @@ class SoftwareCatalogueService
      * Extends a single node using the global elements and relations.
      *
      * @param array $node The node to extend
-     * 
+     *
      * @return PromiseInterface A promise that resolves with the extended node
-     * 
+     *
      * @psalm-return PromiseInterface<array>
      */
     private function extendNode(array $node): PromiseInterface
@@ -166,17 +168,16 @@ class SoftwareCatalogueService
 
                 // Find relations for this element.
                 $relations = $this->findRelationsForElement($element);
-                
+
                 // Extend the node with element properties.
                 $node['element'] = $element;
-                $node['relations'] = $relations;
 
                 // Check if the node has nested nodes that need to be extended.
                 if (isset($node['nodes']) && is_array($node['nodes'])) {
                     // Process nested nodes in parallel.
                     $nestedPromises = array_map([$this, 'extendNode'], $node['nodes']);
-                    
-                    \React\Promise\all($nestedPromises)
+
+                    all($nestedPromises)
                         ->then(function (array $extendedNestedNodes) use ($node, $resolve) {
                             $node['nodes'] = $extendedNestedNodes;
                             $resolve($node);
@@ -205,10 +206,14 @@ class SoftwareCatalogueService
      */
     private function findElementForNode(array $node): ?array
     {
-        foreach ($this->elements as $element) {
-            if ($element['id'] === $node['elementRef']) {
-                return $element;
-            }
+        $index = array_search(
+            needle: $node['elementRef'],
+            haystack: array_column(array: $this->elements, column_key: 'identifier'),
+            strict: true
+        );
+
+        if ($index !== false) {
+            return $this->elements[$index];
         }
         return null;
     }//end findElementForNode
@@ -225,8 +230,8 @@ class SoftwareCatalogueService
         // Iterate over each relation to find those associated with the given element.
         foreach ($this->relations as $relation) {
             // Check if the element's ID matches the source or target of the relation.
-            if ($relation['source'] === $element['id'] || 
-                $relation['target'] === $element['id']) {
+            if ($relation['source'] === $element['identifier'] ||
+                $relation['target'] === $element['identifier']) {
                 // Add the matching relation to the relations array.
                 $relations[] = $relation;
             }
