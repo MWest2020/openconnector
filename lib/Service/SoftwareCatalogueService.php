@@ -104,12 +104,10 @@ class SoftwareCatalogueService
             all($promises)
                 ->then(onRejected: function($error) use ($deferred) {
                     $deferred->reject($error);
-                    var_dump($error->getMessage());
                 });
         });
 
         $deferred->promise()->catch(function($error) {
-            var_dump('ERROR: ' . $error->getMessage());
         });
 
         return $deferred->promise();
@@ -199,7 +197,6 @@ class SoftwareCatalogueService
                 $deferred->reject($error);
             });
         $deferred->promise()->catch(function($error) {
-            var_dump('ERROR: ' . $error->getMessage());
         });
 
         return $deferred->promise();
