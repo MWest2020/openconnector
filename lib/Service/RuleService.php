@@ -5,6 +5,7 @@ namespace OCA\OpenConnector\Service;
 use Exception;
 use OCA\OpenConnector\Db\Rule;
 use OCA\OpenRegister\Db\ObjectEntity;
+use OCP\AppFramework\Http\JSONResponse;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Uid\Uuid;
 use DateTime;
@@ -124,7 +125,8 @@ class RuleService
 
     public function __construct(
         private readonly LoggerInterface $logger,
-        private readonly ObjectService $objectService
+        private readonly ObjectService $objectService,
+        private readonly SoftwareCatalogueService $catalogueService
     )
     {
     }
@@ -137,7 +139,7 @@ class RuleService
      *
      * @return array The updated data array.
      */
-    public function processCustomRule(Rule $rule, array $data): array
+    public function processCustomRule(Rule $rule, array $data): array|JSONResponse
     {
         $type = $rule->getConfiguration()['type'];
 
@@ -825,39 +827,16 @@ class RuleService
         return $objects;
     }
 
-    private function processCustomConnectionsRule(Rule $rule, array $data): array
+    private function processCustomConnectionsRule(Rule $rule, array $data): array|JSONResponse
     {
-        $config = $rule->getConfiguration();
-
-        $filters = [
-            'register' => $config['viewsRegister'],
-            'schema' => $config['viewsSchema'],
-        ];
-        $findConfig = ['filters' => $filters];
         $explodedPath = explode(separator: '/', string: $data['path']);
 
         if(is_string(end($explodedPath)) === true && Uuid::isValid(end($explodedPath)) === true) {
-            $findConfig['ids']  = [end($explodedPath)];
+            $this->catalogueService->extendModel(end($explodedPath));
+
+            return new JSONResponse(['message' => 'Connected views succesfully'], statusCode: 200);
+        } else {
+            return new JSONResponse(['message' => 'model id was not provided'], 200);
         }
-
-
-        $views = $this->objectService->getOpenRegisters()->findAll(config: $findConfig);
-
-        foreach($views as $view) {
-            $serialized = $view->jsonSerialize();
-
-            if(isset($serialized['nodes']) === true) {
-                $serialized['nodes'] = $this->recursiveConnectNodes(objects: $serialized['nodes'], recursiveKey: 'nodes', elementRegister: $config['elementRegister'], elementSchema: $config['elementSchema']);
-            }
-
-            if(isset($serialized['connections']) === true) {
-                $serialized['connections'] = $this->connectConnections(objects: $serialized['connections'], relationshipRegister: $config['relationshipRegister'], relationshipSchema: $config['relationshipSchema']);
-            }
-
-            $this->objectService->getOpenRegisters()->saveObject(object: $serialized, register: $config['viewsRegister'], schema: $config['viewsSchema'], uuid: $serialized['id']);
-
-
-        }
-        return $data;
     }
 }
