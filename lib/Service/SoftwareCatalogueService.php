@@ -60,9 +60,16 @@ class SoftwareCatalogueService
     ) {
     }
 
-
-
-    public function extendViews(int|string $modelId): PromiseInterface
+    /**
+     * Extend all views for a model
+     *
+     * @param int|string $modelId The id of the model for which the views should be extended
+     * @return PromiseInterface The resulting promises
+     *
+     * @throws \Psr\Container\ContainerExceptionInterface
+     * @throws \Psr\Container\NotFoundExceptionInterface
+     */
+    public function extendModel(int|string $modelId): PromiseInterface
     {
         // Create a deferred object to manage the promise.
         $deferred = new Deferred();
@@ -77,14 +84,15 @@ class SoftwareCatalogueService
         $model = $modelObject->jsonSerialize();
         $views = $model['views'];
 
+        // Set the register and schema.
         $openRegister->setRegister($modelObject->getRegister());
         $extendViewSchema = $this->schemaMapper->find('extendview');
         $openRegister->setSchema($extendViewSchema);
 
+        // Find all views that have been extended before.
         $this->existingViews = $openRegister->findAll(['filters' => ['register' => $modelObject->getRegister(), 'schema' => $extendViewSchema->getId()]]);
-//        var_dump(count($this->existingViews));
-//        die;
 
+        // Extend all views.
         all([$views, $model])
         ->then(function($data) use ($deferred, $openRegister) {
             [$views, $model] = $data;
@@ -106,7 +114,7 @@ class SoftwareCatalogueService
 
         return $deferred->promise();
 
-    }
+    }//end extendModel
 
     /**
      * Extends a view by fetching it from the object store and processing its nodes in parallel.
@@ -253,6 +261,12 @@ class SoftwareCatalogueService
         });
     }//end extendNode
 
+    /**
+     * Extend connections in the same way as we extend nodes
+     *
+     * @param array $connection The connection to extend
+     * @return PromiseInterface The resulting promise
+     */
     private function extendConnection(array $connection): PromiseInterface
     {
         return new Promise(function ($resolve, $reject) use ($connection) {
@@ -290,7 +304,7 @@ class SoftwareCatalogueService
                 $reject($e);
             }
         });
-    }
+    }//end extendConnection
 
     /**
      * Finds the matching element for a given node
@@ -312,6 +326,12 @@ class SoftwareCatalogueService
         return null;
     }//end findElementForNode
 
+    /**
+     * Finds the matching element for a given node
+     *
+     * @param array $connection The connection to find an relationship for
+     * @return array|null The matching relationship or null if not found
+     */
     private function findRelationForConnection(array $connection): ?array
     {
         $index = array_search(
@@ -324,7 +344,7 @@ class SoftwareCatalogueService
             return $this->relations[$index];
         }
         return null;
-    }//end findElementForNode
+    }//end findRelationForConnection
 
     /**
      * Finds all relations for a given element

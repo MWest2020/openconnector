@@ -832,7 +832,7 @@ class RuleService
         $explodedPath = explode(separator: '/', string: $data['path']);
 
         if(is_string(end($explodedPath)) === true && Uuid::isValid(end($explodedPath)) === true) {
-            $this->catalogueService->extendViews(end($explodedPath));
+            $this->catalogueService->extendModel(end($explodedPath));
 
             return new JSONResponse(['message' => 'Connected views succesfully'], statusCode: 200);
         } else {
