@@ -44,7 +44,7 @@ class SoftwareCatalogueService
 
     private array $existingViews = [];
 
-    private const SUFFIX = '-sc';
+    public const SUFFIX = '-sc';
 
     /**
      * Constructor for SoftwareCatalogueService

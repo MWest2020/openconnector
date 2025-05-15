@@ -5,6 +5,8 @@ namespace OCA\OpenConnector\Service;
 use Exception;
 use OCA\OpenConnector\Db\Rule;
 use OCA\OpenRegister\Db\ObjectEntity;
+use OCA\OpenRegister\Db\RegisterMapper;
+use OCA\OpenRegister\Db\SchemaMapper;
 use OCP\AppFramework\Http\JSONResponse;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Uid\Uuid;
@@ -126,7 +128,9 @@ class RuleService
     public function __construct(
         private readonly LoggerInterface $logger,
         private readonly ObjectService $objectService,
-        private readonly SoftwareCatalogueService $catalogueService
+        private readonly SoftwareCatalogueService $catalogueService,
+        private readonly RegisterMapper $registerMapper,
+        private readonly SchemaMapper $schemaMapper,
     )
     {
     }
@@ -207,29 +211,28 @@ class RuleService
             ids: $voorzieningIds,
         );
 
-        // // Fetch Organisatie objects
-        // $openRegisters->setSchema($organisatieSchemaId);
-        // $objectEntityMapper = $openRegisters->getMapper('objectEntity');
-        // $organisaties = $objectEntityMapper->findAll(
-        //     filters: [
-        //         'register' => $registerId,
-        //         'schema' => $organisatieSchemaId
-        //     ]
-        // );
-
-        // // Fetch VoorzieningAanbod objects
-        // $openRegisters->setSchema($voorzieningAanbodSchemaId);
-        // $objectEntityMapper = $openRegisters->getMapper('objectEntity');
-        // $voorzieningAanbod = $objectEntityMapper->findAll(
-        //     filters: [
-        //         'register' => $registerId,
-        //         'schema' => $voorzieningAanbodSchemaId
-        //     ]
-        // );
-
         // Process property definitions and update basic metadata
         $data = $this->processPropertyDefinitionsAndMetadata($data);
 
+        $register = $this->registerMapper->find('vng-gemma');
+        $schema = $this->schemaMapper->find('extendview');
+        $addedViews = $this->objectService->getOpenRegisters()->findAll(['filters' => ['register' => $register->getId(), 'schema' => $schema->getId()]]);
+
+        $addedViews = array_map(function(ObjectEntity $view): array {
+            $view = $view->jsonSerialize();
+
+            if(str_ends_with($view['identifier'], SoftwareCatalogueService::SUFFIX) === false) {
+                $view['identifier'] = $view['identifier'].SoftwareCatalogueService::SUFFIX;
+            }
+            return $view;
+        }, $addedViews);
+
+
+        $addedViews = array_filter($addedViews, function (array $view) {
+            return count($properties = array_filter($view['properties'], function($property){return $property['propertyDefinitionRef'] === 'propid-67';})) !== 0
+                && array_shift($properties)['value'] === 'Softwarecatalogus en GEMMA Online en redactie';
+        });
+        
         // Find and configure organizational folders
         list($applicationFolderKey, $relationsFolderKey, $applicationFolderCount, $relationsFolderCount)
             = $this->setupOrganizationalFolders($data);
@@ -239,8 +242,23 @@ class RuleService
             $data,
             $voorzieningen,
             $applicationFolderKey,
-            $applicationFolderCount
+            $applicationFolderCount,
+            $addedViews
         );
+
+        $data['body']['views'] = array_merge($data['body']['views'], $addedViews);
+
+        $viewIds = array_column($addedViews, 'identifier');
+
+        $organization = [
+            "label"      => 'Views (Softwarecatalogus)',
+            "label-lang" => "en",
+        ];
+        foreach($viewIds as $viewId) {
+            $organization['item'][] = ['identifierRef' => $viewId];
+        }
+
+        $data['body']['organizations'][] = $organization;
 
         // Add all created relations to the Relations folder
         foreach ($this->createdRelationIds as $relationId) {
@@ -248,63 +266,6 @@ class RuleService
                 'identifierRef' => $relationId
             ];
         }
-
-//         foreach ($voorzieningGebruiken as $voorzieningGebruik) {
-//             $voorzieningGebruik = $voorzieningGebruik->jsonSerialize();
-//             $voorziening = "id-{$voorzieningGebruik['voorzieningId']}";
-//
-//
-//             $elementId = "id-{$voorzieningGebruik['id']}";
-//             // Add voorziening to Application folder
-//             $data['body']['organizations'][$applicationFolderKey]['item'][$applicationFolderCount]['item'][] = [
-//                 'identifierRef' => $elementId
-//             ];
-//
-//             // Add voorziening to elements
-//             $data['body']['elements'][] = [
-//                 'identifier' => $elementId,
-//                 'name' => $voorzieningGebruik['naam'],
-//                 'name-lang' => 'nl',
-//                 'documentation' => $voorzieningGebruik['beschrijving'],
-//                 'documentation-lang' => 'nl',
-//                 'type' => 'ApplicationComponent',
-//                 'properties' => [
-//                     [
-//                         'propertyDefinitionRef' => self::PROP_SWC_TYPE, // SWC type
-//                         'value' => 'Pakket',
-//                     ],
-//                     [
-//                         'propertyDefinitionRef' => self::PROP_OBJECT_ID, // Object ID
-//                         'value' => $voorzieningGebruik['id'],
-//                     ],
-//                     [
-//                         'propertyDefinitionRef' => 'propid-39', // URL
-//                         'value' => '',
-//                     ],
-//                     [
-//                         'propertyDefinitionRef' => self::PROP_EXTERN_PAKKET, // Extern Pakket
-//                         'value' => 'n',
-//                     ],
-//                     [
-//                         'propertyDefinitionRef' => self::PROP_OMSCHRIJVING, // Omschrijving gebruik
-//                         'value' => '',
-//                     ],
-//                 ],
-//             ];
-//
-//             if (isset($data['body']['views']) && is_array($data['body']['views'])) {
-//                 foreach ($data['body']['views'] as &$view) {
-//                     if (isset($view['nodes']) && is_array($view['nodes'])) {
-//                         $this->processNodes($view['nodes'], $voorziening, $elementId, 1, $data);
-//                     }
-//                 }
-//             }
-//
-//
-//             $this->createRelation(data: $data, sourceId: $voorziening, targetId: $elementId, relationType: 'Realization');
-//
-//
-//         }
 
         // // Add organisaties (leveranciers) to response data
         // foreach ($organisaties as $organisatie) {
@@ -479,7 +440,8 @@ class RuleService
         array $data,
         array $voorzieningen,
         string $applicationFolderKey,
-        int $applicationFolderCount
+        int $applicationFolderCount,
+        array &$views,
     ): array {
         // Reset relation IDs array
         $this->createdRelationIds = [];
@@ -552,10 +514,7 @@ class RuleService
                     targetId: $referentieComponent,
                     relationType:'Specialization'
                 );
-
-                if (isset($data['body']['views']) && is_array($data['body']['views'])) {
-                    $viewIds = [];
-                    foreach ($data['body']['views'] as $view) {
+                    foreach ($views as &$view) {
 
                         // Concept softwareCatalogus views
                         if (
@@ -580,27 +539,12 @@ class RuleService
                             $view['connections'] = [];
                         }
 
-
-                        $viewIds[] = $view['identifier'] = 'id-'.Uuid::v4()->jsonSerialize();
                         $view['connections'] = array_merge($view['connections'], $connections);
-
-                        $data['body']['views'][] = $view;
                     }
-
-                    $organization = [
-                        "label"      => 'Views (Softwarecatalogus)',
-                        "label-lang" => "en",
-                    ];
-                    foreach($viewIds as $viewId) {
-                        $organization['item'][] = ['identifierRef' => $viewId];
-                    }
-
-                    $data['body']['organizations'][] = $organization;
                 }
 
 
             }
-        }
 
         return $data;
     }
@@ -821,53 +765,6 @@ class RuleService
         $this->createdRelationIds[] = $relationId;
 
         return $relationId;
-    }
-
-    private function recursiveConnectNodes (array $objects, string $recursiveKey, int $elementRegister, int $elementSchema) : array
-    {
-        foreach($objects as $key => $object) {
-            if (isset($object['elementRef']) === false) {
-                continue;
-            }
-
-            $elements = $this->objectService->getOpenRegisters()->findAll(['filters' => ['identifier' =>$object['elementRef'], 'register' => $elementRegister, 'schema' => $elementSchema]]);
-
-            if(count($elements) !== 1) {
-                continue;
-            }
-
-            $element = array_shift($elements);
-
-            $elementArray = $element->jsonSerialize();
-            $object['name'] = $elementArray['name'] ?? null;
-            $object['elementType'] = $elementArray['type'] ?? null;
-            $object['documentation'] = $elementArray['documentation'] ?? null;
-            $object['properties'] = $elementArray['properties'] ?? null;
-
-            if(isset($object[$recursiveKey])) {
-                $object[$recursiveKey] = $this->recursiveConnectNodes($object[$recursiveKey], $recursiveKey, $elementRegister, $elementSchema);
-            }
-
-            $objects[$key] = $object;
-        }
-
-        return $objects;
-    }
-
-    private function connectConnections (array $objects, int $relationshipRegister, int $relationshipSchema) {
-        foreach($objects as $key => $object) {
-            $elements = $this->objectService->getOpenRegisters()->findAll(['filters' => ['identifier' =>$object['relationshipRef'], 'register' => $relationshipRegister, 'schema' => $relationshipSchema]]);
-            if(count($elements) !== 1) {
-                continue;
-            }
-            $element = array_shift($elements);
-
-            $elementArray = $element->jsonSerialize();
-            $object['type'] = $elementArray['type'] ?? null;
-            $object['properties'] = $elementArray['properties'] ?? null;
-        }
-
-        return $objects;
     }
 
     private function processCustomConnectionsRule(Rule $rule, array $data): array|JSONResponse
