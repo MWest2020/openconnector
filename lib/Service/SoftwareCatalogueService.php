@@ -311,6 +311,10 @@ class SoftwareCatalogueService
      */
     private function findElementForNode(array $node): ?array
     {
+        if(isset($node['elementRef']) === false) {
+            return null;
+        }
+
         $index = array_search(
             needle: $node['elementRef'],
             haystack: array_column(array: $this->elements, column_key: 'identifier'),
@@ -331,6 +335,10 @@ class SoftwareCatalogueService
      */
     private function findRelationForConnection(array $connection): ?array
     {
+        if(isset($node['relationshipRef']) === false) {
+            return null;
+        }
+
         $index = array_search(
             needle: $connection['relationshipRef'],
             haystack: array_column(array: $this->relations, column_key: 'identifier'),
