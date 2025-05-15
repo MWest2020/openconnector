@@ -42,6 +42,8 @@ class SoftwareCatalogueService
      */
     private array $relations = [];
 
+    private const SUFFIX = '-sc';
+
     /**
      * Constructor for SoftwareCatalogueService
      *
@@ -80,36 +82,31 @@ class SoftwareCatalogueService
             return $deferred->promise();
         }
 
+//        var_dump('hello darkness my old friend');
         // Fetch both view and model objects.
-        $viewPromise = $openRegister->find($viewId);
-        $modelPromise = $openRegister->find($modelId);
+        $viewPromise = $openRegister->find($viewId, register: 'vng-gemma', schema: 'view')->jsonSerialize();
+//        var_dump('came here to talk to you again');
+        $modelPromise = $openRegister->find($modelId, register: 'vng-gemma', schema: 'model')->jsonSerialize();
+//        var_dump('For a vision softly creeping');
 
         // Lets get the extendView from the schema mapper by slug.
-        $extendViewSchema = $this->schemaMapper->find('extendView');
-        $viewPromise['view'] =  $viewPromise['id'];
+        $extendViewSchema = $this->schemaMapper->find('extendview');
+//        $viewPromise['view'] =  $viewPromise['id'];
         unset($viewPromise['@self'], $viewPromise['id']);
 
         // Lets prepare the object service for saving to the extend view.
-        $openRegister->setRegister($viewPromise['register']);
-        $openRegister->setSchema($extendViewSchema['id']);
+//        $openRegister->setRegister($viewPromise['register']);
+        $openRegister->setSchema($extendViewSchema);
 
-        // Get elements and relations from the model.
-        $this->elements = $openRegister->findAll([
-            'ids' => $modelPromise['elements']
-        ]);
-
-        $this->relations = $openRegister->findAll([
-            'ids' => $modelPromise['relations']
-        ]);
-
-        $nodes = $openRegister->findAll([
-            'ids' => $viewPromise['nodes']
-        ]);
+        $this->elements = $modelPromise['elements'];
+        $this->relations = $modelPromise['relationships'];
+        $nodes = $viewPromise['nodes'];
+        $connections = $viewPromise['connections'];
 
         // Process both objects
-        all([$viewPromise, $modelPromise, $nodes])
+        all([$viewPromise, $modelPromise, $nodes, $connections])
             ->then(function (array $results) use ($deferred, $openRegister) {
-                [$view, $model, $nodes] = $results;
+                [$view, $model, $nodes, $connections] = $results;
 
                 if ($view === null || $model === null) {
                     $deferred->reject(new DoesNotExistException('View or model not found'));
@@ -117,22 +114,22 @@ class SoftwareCatalogueService
                 }
 
                 // Process each node in parallel using ReactPHP.
-                $promises = array_map([$this, 'extendNode'], $nodes);
+                $promisesNodes = array_map([$this, 'extendNode'], $nodes);
+                $promisesConnections = array_map([$this, 'extendConnection'], $connections);
+
+                $promises = array_merge($promisesNodes, $promisesConnections);
 
                 // Wait for all node processing to complete.
                 all($promises)
-                    ->then(function (array $extendedNodes) use ($deferred, $view) {
+                    ->then(function (array $results) use ($deferred, $view) {
+
+
                         // Update the view with the extended nodes.
-                        $view['nodes'] = $extendedNodes;
+                        $view['nodes'] = array_values(array_filter($results, function ($result) { return $result['type'] !== 'Relationship';}));
+                        $view['connections'] = array_values(array_filter($results, function ($result) { return $result['type'] === 'Relationship';}));
 
                         // Save the updated view.
-                        $this->objectService->save($view)
-                            ->then(function () use ($deferred) {
-                                $deferred->resolve();
-                            })
-                            ->otherwise(function ($error) use ($deferred) {
-                                $deferred->reject($error);
-                            });
+                        $this->objectService->getOpenRegisters()->saveObject($view);
                     })
                     ->otherwise(function ($error) use ($deferred) {
                         $deferred->reject($error);
@@ -141,6 +138,10 @@ class SoftwareCatalogueService
             ->otherwise(function ($error) use ($deferred) {
                 $deferred->reject($error);
             });
+        $deferred->promise()->catch(function($error) {
+            var_dump('hello darkness');
+            var_dump($error->getMessage(), $error->getTrace());
+        });
 
         return $deferred->promise();
     }//end extendView
@@ -158,6 +159,9 @@ class SoftwareCatalogueService
     {
         return new Promise(function ($resolve, $reject) use ($node) {
             try {
+                if (str_ends_with($node['identifier'], self::SUFFIX) === false) {
+                    $node['identifier'] = $node['identifier'].self::SUFFIX;
+                }
                 // Find matching element for this node.
                 $element = $this->findElementForNode($node);
                 if ($element === null) {
@@ -198,6 +202,45 @@ class SoftwareCatalogueService
         });
     }//end extendNode
 
+    private function extendConnection(array $connection): PromiseInterface
+    {
+        return new Promise(function ($resolve, $reject) use ($connection) {
+            try {
+                if (str_ends_with($connection['identifier'], self::SUFFIX) === false) {
+                    $connection['identifier'] = $connection['identifier'].self::SUFFIX;
+                }
+                // Find matching element for this node.
+                $relationship = $this->findRelationForConnection($connection);
+                if ($relationship === null) {
+                    $this->logger->warning('No matching element found for node', ['node' => $connection]);
+                    $resolve($connection);
+                    return;
+                }
+
+                // Find relations for this element.
+
+                // Extend the node with element properties.
+                $connection['relationship'] = $relationship;
+
+                if(str_ends_with(haystack: $connection['source'], needle: self::SUFFIX) === false) {
+                    $connection['source'] = $connection['source'].self::SUFFIX;
+                }
+                if(str_ends_with(haystack: $connection['target'], needle: self::SUFFIX) === false) {
+                    $connection['target'] = $connection['target'].self::SUFFIX;
+                }
+
+
+                $resolve($connection);
+            } catch (\Exception $e) {
+                $this->logger->error('Failed to extend node: ' . $e->getMessage(), [
+                    'exception' => $e,
+                    'node' => $connection
+                ]);
+                $reject($e);
+            }
+        });
+    }
+
     /**
      * Finds the matching element for a given node
      *
@@ -214,6 +257,20 @@ class SoftwareCatalogueService
 
         if ($index !== false) {
             return $this->elements[$index];
+        }
+        return null;
+    }//end findElementForNode
+
+    private function findRelationForConnection(array $connection): ?array
+    {
+        $index = array_search(
+            needle: $connection['relationshipRef'],
+            haystack: array_column(array: $this->relations, column_key: 'identifier'),
+            strict: true
+        );
+
+        if ($index !== false) {
+            return $this->relations[$index];
         }
         return null;
     }//end findElementForNode
