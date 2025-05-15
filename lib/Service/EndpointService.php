@@ -1227,7 +1227,7 @@ class EndpointService
      *
      * @return array The updated data array.
      */
-    private function processCustomRule(Rule $rule, array $data): array
+    private function processCustomRule(Rule $rule, array $data): array|JSONResponse
     {
         return $this->ruleService->processCustomRule(rule: $rule, data: $data);
     }

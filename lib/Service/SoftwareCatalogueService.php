@@ -42,6 +42,8 @@ class SoftwareCatalogueService
      */
     private array $relations = [];
 
+    private array $existingViews = [];
+
     private const SUFFIX = '-sc';
 
     /**
@@ -58,6 +60,54 @@ class SoftwareCatalogueService
     ) {
     }
 
+
+
+    public function extendViews(int|string $modelId): PromiseInterface
+    {
+        // Create a deferred object to manage the promise.
+        $deferred = new Deferred();
+
+        // Get the OpenRegister service.
+        $openRegister = $this->objectService->getOpenRegisters();
+        if ($openRegister === null) {
+            $deferred->reject(new \Exception('OpenRegister service is not available'));
+            return $deferred->promise();
+        }
+        $modelObject = $openRegister->find($modelId, register: 'vng-gemma', schema: 'model');
+        $model = $modelObject->jsonSerialize();
+        $views = $model['views'];
+
+        $openRegister->setRegister($modelObject->getRegister());
+        $extendViewSchema = $this->schemaMapper->find('extendview');
+        $openRegister->setSchema($extendViewSchema);
+
+        $this->existingViews = $openRegister->findAll(['filters' => ['register' => $modelObject->getRegister(), 'schema' => $extendViewSchema->getId()]]);
+//        var_dump(count($this->existingViews));
+//        die;
+
+        all([$views, $model])
+        ->then(function($data) use ($deferred, $openRegister) {
+            [$views, $model] = $data;
+
+            $promises = array_map(function($view) use ($model) {
+                $this->extendView($view, $model);
+            }, $views);
+
+            all($promises)
+                ->then(onRejected: function($error) use ($deferred) {
+                    $deferred->reject($error);
+                    var_dump($error->getMessage());
+                });
+        });
+
+        $deferred->promise()->catch(function($error) {
+            var_dump('ERROR: ' . $error->getMessage());
+        });
+
+        return $deferred->promise();
+
+    }
+
     /**
      * Extends a view by fetching it from the object store and processing its nodes in parallel.
      *
@@ -70,7 +120,7 @@ class SoftwareCatalogueService
      *
      * @psalm-return PromiseInterface<void>
      */
-    public function extendView(int|string $viewId, int|string $modelId): PromiseInterface
+    public function extendView(array $viewPromise, array $modelPromise): PromiseInterface
     {
         // Create a deferred object to manage the promise.
         $deferred = new Deferred();
@@ -81,21 +131,23 @@ class SoftwareCatalogueService
             $deferred->reject(new \Exception('OpenRegister service is not available'));
             return $deferred->promise();
         }
-
-//        var_dump('hello darkness my old friend');
         // Fetch both view and model objects.
-        $viewPromise = $openRegister->find($viewId, register: 'vng-gemma', schema: 'view')->jsonSerialize();
-//        var_dump('came here to talk to you again');
-        $modelPromise = $openRegister->find($modelId, register: 'vng-gemma', schema: 'model')->jsonSerialize();
-//        var_dump('For a vision softly creeping');
 
         // Lets get the extendView from the schema mapper by slug.
         $extendViewSchema = $this->schemaMapper->find('extendview');
-//        $viewPromise['view'] =  $viewPromise['id'];
         unset($viewPromise['@self'], $viewPromise['id']);
 
+        $existingObjects = array_filter($this->existingViews, function(ObjectEntity $view) use ($viewPromise) {
+            return $view->jsonSerialize()['identifier'] === $viewPromise['identifier'];
+        });
+
+        $id = null;
+
+        if($existingObjects !== []) {
+            $id = array_shift($existingObjects)->getUuid();
+        }
+
         // Lets prepare the object service for saving to the extend view.
-//        $openRegister->setRegister($viewPromise['register']);
         $openRegister->setSchema($extendViewSchema);
 
         $this->elements = $modelPromise['elements'];
@@ -105,7 +157,7 @@ class SoftwareCatalogueService
 
         // Process both objects
         all([$viewPromise, $modelPromise, $nodes, $connections])
-            ->then(function (array $results) use ($deferred, $openRegister) {
+            ->then(function (array $results) use ($deferred, $openRegister, $id) {
                 [$view, $model, $nodes, $connections] = $results;
 
                 if ($view === null || $model === null) {
@@ -121,7 +173,7 @@ class SoftwareCatalogueService
 
                 // Wait for all node processing to complete.
                 all($promises)
-                    ->then(function (array $results) use ($deferred, $view) {
+                    ->then(function (array $results) use ($deferred, $view, $id) {
 
 
                         // Update the view with the extended nodes.
@@ -129,7 +181,7 @@ class SoftwareCatalogueService
                         $view['connections'] = array_values(array_filter($results, function ($result) { return $result['type'] === 'Relationship';}));
 
                         // Save the updated view.
-                        $this->objectService->getOpenRegisters()->saveObject($view);
+                        $this->objectService->getOpenRegisters()->saveObject($view, uuid: $id);
                     })
                     ->otherwise(function ($error) use ($deferred) {
                         $deferred->reject($error);
@@ -139,8 +191,7 @@ class SoftwareCatalogueService
                 $deferred->reject($error);
             });
         $deferred->promise()->catch(function($error) {
-            var_dump('hello darkness');
-            var_dump($error->getMessage(), $error->getTrace());
+            var_dump('ERROR: ' . $error->getMessage());
         });
 
         return $deferred->promise();
