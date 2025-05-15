@@ -232,7 +232,7 @@ class RuleService
             return count($properties = array_filter($view['properties'], function($property){return $property['propertyDefinitionRef'] === 'propid-67';})) !== 0
                 && array_shift($properties)['value'] === 'Softwarecatalogus en GEMMA Online en redactie';
         });
-        
+
         // Find and configure organizational folders
         list($applicationFolderKey, $relationsFolderKey, $applicationFolderCount, $relationsFolderCount)
             = $this->setupOrganizationalFolders($data);
