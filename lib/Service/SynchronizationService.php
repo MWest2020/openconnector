@@ -115,11 +115,11 @@ class SynchronizationService
 	 * @return SynchronizationContract|array|null Returns a synchronization contract, an array for test cases, or null if conditions are not met.
 	 */
 	private function synchronizeInternToExtern(
-		Synchronization $synchronization, 
-		?bool $isTest = false, 
-		\OCA\OpenRegister\Db\ObjectEntity|array &$object, 
-		SynchronizationLog $log, 
-		?bool $force = false, 
+		Synchronization $synchronization,
+		?bool $isTest = false,
+		\OCA\OpenRegister\Db\ObjectEntity|array &$object,
+		SynchronizationLog $log,
+		?bool $force = false,
 		?string $mutationType = null
 	): SynchronizationContract|array|null
 	{
@@ -262,7 +262,13 @@ class SynchronizationService
                 log: $log
             );
 
+
+
             $result = $processResult['result'];
+            $result['_embed']['contracts'] = array_map(function($contractId) {
+                $contracts = $this->synchronizationContractMapper->findAll(filters: ['uuid' => $contractId]);
+                return array_shift($contracts)->jsonSerialize();
+            }, $result['contracts']);
 
             if ($processResult['targetId'] !== null) {
                 $synchronizedTargetIds[] = $processResult['targetId'];
@@ -362,11 +368,11 @@ class SynchronizationService
             $log['result']['type'] = 'internToExtern';
             $log = $this->synchronizationLogMapper->createFromArray($log);
             return $this->synchronizeInternToExtern(
-                synchronization: $synchronization, 
-                isTest: $isTest, 
-                object: $object, 
-                log: $log, 
-                force: $force, 
+                synchronization: $synchronization,
+                isTest: $isTest,
+                object: $object,
+                log: $log,
+                force: $force,
                 mutationType: $mutationType
             );
         }
@@ -1161,7 +1167,7 @@ class SynchronizationService
 	 * @param Synchronization $synchronization
 	 * @param bool|null $isTest False by default, currently added for synchronziation-test endpoint
 	 * @param array|null $data The data to add to synchronize, if not provided, the synchronization's data will be used
-	 * 
+	 *
 	 * @return array
 	 * @throws ContainerExceptionInterface
 	 * @throws GuzzleException
@@ -1639,7 +1645,7 @@ class SynchronizationService
 					$targetId = $bodyDot->get($targetConfig['idposition']);
                 }
             }
-			
+
 			$contract->setTargetId($targetId);
 			return $contract;
 		}
@@ -2231,7 +2237,7 @@ class SynchronizationService
 
                     $objectService = $this->containerInterface->get('OCA\OpenRegister\Service\ObjectService');
                     $objectEntity = $objectService->findByUuid(uuid: $objectId);
-                    
+
                     // Write file with OpenRegister ObjectService.
                     $fileService = $this->containerInterface->get('OCA\OpenRegister\Service\FileService');
                     $file = $fileService->addFile(objectEntity: $objectEntity, fileName: $fileName, content: $content, share: false, tags: $tags);
@@ -2251,7 +2257,7 @@ class SynchronizationService
 
             try {
                 $tags = array_merge($config['tags'] ?? [], ["object:$objectId"]);
-                
+
                 $objectService = $this->containerInterface->get('OCA\OpenRegister\Service\ObjectService');
                 $objectEntity = $objectService->findByUuid(uuid: $objectId);
 
@@ -2477,7 +2483,7 @@ class SynchronizationService
         if (isset($sourceConfig[$this::EXTRA_DATA_BEFORE_CONDITIONS_LOCATION]) === true && ($sourceConfig[$this::EXTRA_DATA_BEFORE_CONDITIONS_LOCATION] === true || $sourceConfig[$this::EXTRA_DATA_BEFORE_CONDITIONS_LOCATION] === 'true')) {
             $object = $this->fetchMultipleExtraData(synchronization: $synchronization, sourceConfig: $sourceConfig, object: $object);
         }
-        
+
 		$conditionsObject = $this->encodeArrayKeys($object, '.', '&#46;');
 
 		// Check if object adheres to conditions.
