@@ -163,7 +163,7 @@ class SynchronizationContractMapper extends QBMapper
             ->from('openconnector_synchronization_contracts', 'c')
             ->innerJoin(
                 'c',
-                'oc_openregister_objects',
+                'openregister_objects',
                 'o',
                 $qb->expr()->eq('c.target_id', 'o.uuid')
             )

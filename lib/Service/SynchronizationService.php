@@ -54,14 +54,15 @@ class SynchronizationService
 	private SynchronizationContractLogMapper $synchronizationContractLogMapper;
 	private SynchronizationLogMapper $synchronizationLogMapper;
 
-    const EXTRA_DATA_CONFIGS_LOCATION          = 'extraDataConfigs';
-    const EXTRA_DATA_DYNAMIC_ENDPOINT_LOCATION = 'dynamicEndpointLocation';
-    const EXTRA_DATA_STATIC_ENDPOINT_LOCATION  = 'staticEndpoint';
-    const KEY_FOR_EXTRA_DATA_LOCATION          = 'keyToSetExtraData';
-    const MERGE_EXTRA_DATA_OBJECT_LOCATION     = 'mergeExtraData';
-    const UNSET_CONFIG_KEY_LOCATION            = 'unsetConfigKey';
-    const FILE_TAG_TYPE                        = 'files';
-    const VALID_MUTATION_TYPES                 = ['create', 'update', 'delete'];
+    const EXTRA_DATA_CONFIGS_LOCATION           = 'extraDataConfigs';
+    const EXTRA_DATA_DYNAMIC_ENDPOINT_LOCATION  = 'dynamicEndpointLocation';
+    const EXTRA_DATA_STATIC_ENDPOINT_LOCATION   = 'staticEndpoint';
+    const KEY_FOR_EXTRA_DATA_LOCATION           = 'keyToSetExtraData';
+    const MERGE_EXTRA_DATA_OBJECT_LOCATION      = 'mergeExtraData';
+    const UNSET_CONFIG_KEY_LOCATION             = 'unsetConfigKey';
+    const EXTRA_DATA_BEFORE_CONDITIONS_LOCATION = 'fetchExtraDataBeforeConditions';
+    const FILE_TAG_TYPE                         = 'files';
+    const VALID_MUTATION_TYPES                  = ['create', 'update', 'delete'];
 
 	public function __construct(
 		CallService                      $callService,
@@ -268,9 +269,7 @@ class SynchronizationService
             }
         }
 
-        $result['objects']['deleted'] = $isTest
-            ? 0
-            : $this->deleteInvalidObjects($synchronization, $synchronizedTargetIds);
+        $result['objects']['deleted'] = $this->deleteInvalidObjects($synchronization, $synchronizedTargetIds);
 
         foreach ($synchronization->getFollowUps() as $followUp) {
             $followUpSynchronization = $this->synchronizationMapper->find($followUp);
@@ -674,7 +673,7 @@ class SynchronizationService
 						if ($synchronizationContract === null) {
 							continue;
 						}
-						$synchronizationContract = $this->updateTarget(synchronizationContract: $synchronizationContract, targetObject: [], action: 'delete');
+						$synchronizationContract = $this->updateTarget(synchronizationContract: $synchronizationContract, action: 'delete');
 						$this->synchronizationContractMapper->update($synchronizationContract);
 						$deletedObjectsCount++;
 					} catch (DoesNotExistException $exception) {
@@ -737,7 +736,10 @@ class SynchronizationService
 		$sourceConfig = $this->callService->applyConfigDot($synchronization->getSourceConfig());
 
 		// Check if extra data needs to be fetched
-		$object = $this->fetchMultipleExtraData(synchronization: $synchronization, sourceConfig: $sourceConfig, object: $object);
+        // If not fetched before conditions, fetch now
+        if (isset($sourceConfig[$this::EXTRA_DATA_BEFORE_CONDITIONS_LOCATION]) === false || ($sourceConfig[$this::EXTRA_DATA_BEFORE_CONDITIONS_LOCATION] !== true && $sourceConfig[$this::EXTRA_DATA_BEFORE_CONDITIONS_LOCATION] !== 'true')) {
+		    $object = $this->fetchMultipleExtraData(synchronization: $synchronization, sourceConfig: $sourceConfig, object: $object);
+        }
 
 		// Get mapped hash object (some fields can make it look the object has changed even if it hasn't)
 		$hashObject = $this->mapHashObject(synchronization: $synchronization, object: $object);
@@ -911,7 +913,7 @@ class SynchronizationService
 				$synchronizationContract->setTargetLastAction($synchronizationContract->getTargetId() ? 'update' : 'create');
 				break;
 			case 'delete':
-				$objectService->deleteObject(register: $register, schema: $schema, uuid: $synchronizationContract->getTargetId());
+				$objectService->delete(object: ['id' => $synchronizationContract->getTargetId()]);
 				$synchronizationContract->setTargetId(null);
 				$synchronizationContract->setTargetLastAction('delete');
 				break;
@@ -2470,6 +2472,12 @@ class SynchronizationService
 			return ['result' => $result, 'targetId' => null];
 		}
 
+        $sourceConfig = $this->callService->applyConfigDot($synchronization->getSourceConfig());
+        // Optional to fetch extra data now instead of later in ->synchronizeContract
+        if (isset($sourceConfig[$this::EXTRA_DATA_BEFORE_CONDITIONS_LOCATION]) === true && ($sourceConfig[$this::EXTRA_DATA_BEFORE_CONDITIONS_LOCATION] === true || $sourceConfig[$this::EXTRA_DATA_BEFORE_CONDITIONS_LOCATION] === 'true')) {
+            $object = $this->fetchMultipleExtraData(synchronization: $synchronization, sourceConfig: $sourceConfig, object: $object);
+        }
+        
 		$conditionsObject = $this->encodeArrayKeys($object, '.', '&#46;');
 
 		// Check if object adheres to conditions.
