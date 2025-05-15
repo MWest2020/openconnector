@@ -335,7 +335,7 @@ class SoftwareCatalogueService
      */
     private function findRelationForConnection(array $connection): ?array
     {
-        if(isset($node['relationshipRef']) === false) {
+        if(isset($connection['relationshipRef']) === false) {
             return null;
         }
 
