@@ -462,6 +462,11 @@ class RuleService
         // Add voorzieningen (pakketten/applicaties) to response data
         foreach ($voorzieningen as $voorziening) {
             $voorziening = $voorziening->jsonSerialize();
+
+            if(isset($voorziening['id']) === false) {
+                $voorziening['id'] = $voorziening['@self']['id'];
+            }
+
             $elementId = "id-{$voorziening['id']}";
 
             // Add voorziening to Application folder
