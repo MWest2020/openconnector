@@ -671,7 +671,7 @@ class EndpointService
 
         } catch (Exception $exception) {
             if (in_array(get_class($exception), ['OCA\OpenRegister\Exception\ValidationException', 'OCA\OpenRegister\Exception\CustomValidationException']) === true) {
-                return $mapper->handleValidationException(exception: $exception);
+                return $mapper->getValidateHandler()->handleValidationException(exception: $exception);
             }
 
             throw $exception;
