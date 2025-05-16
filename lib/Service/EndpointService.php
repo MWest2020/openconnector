@@ -637,21 +637,21 @@ class EndpointService
                     return new JSONResponse(
                         $this->replaceInternalReferences(
                             mapper: $mapper,
-                            serializedObject: $mapper->createFromArray(object: $parameters)
+                            serializedObject: $mapper->createFromArray(object: $parameters)->jsonSerialize()
                         )
                     );
                 case 'PUT':
                     return new JSONResponse(
                         $this->replaceInternalReferences(
                             mapper: $mapper,
-                            serializedObject: $mapper->updateFromArray($parameters['id'], $request->getParams(), true, false)
+                            serializedObject: $mapper->updateFromArray($parameters['id'], $request->getParams(), true, false)->jsonSerialize()
                         )
                     );
                 case 'PATCH':
                     return new JSONResponse(
                         $this->replaceInternalReferences(
                             mapper: $mapper,
-                            serializedObject: $mapper->updateFromArray($parameters['id'], $request->getParams(), true, true)
+                            serializedObject: $mapper->updateFromArray($parameters['id'], $request->getParams(), true, true)->jsonSerialize()
                         )
                     );
                 case 'DELETE':
@@ -671,7 +671,7 @@ class EndpointService
 
         } catch (Exception $exception) {
             if (in_array(get_class($exception), ['OCA\OpenRegister\Exception\ValidationException', 'OCA\OpenRegister\Exception\CustomValidationException']) === true) {
-                return $mapper->handleValidationException(exception: $exception);
+                return $mapper->getValidateHandler()->handleValidationException(exception: $exception);
             }
 
             throw $exception;
