@@ -179,9 +179,9 @@ class SoftwareCatalogueService
 
                 // Wait for all node processing to complete.
                 all($promises)
-                    ->then(function (array $results) use ($deferred, $view, $id) {
+                    ->then(function (array $results) use ($deferred, $view, $id, $model) {
 
-
+                        $view['model'] = $model['id'] ?? $model['@self']['id'];
                         // Update the view with the extended nodes.
                         $view['nodes'] = array_values(array_filter($results, function ($result) { return $result['type'] !== 'Relationship';}));
                         $view['connections'] = array_values(array_filter($results, function ($result) { return $result['type'] === 'Relationship';}));
