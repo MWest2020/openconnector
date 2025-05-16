@@ -211,6 +211,7 @@ class RuleService
             ids: $voorzieningIds,
         );
 
+
         // Process property definitions and update basic metadata
         $data = $this->processPropertyDefinitionsAndMetadata($data);
 
@@ -227,9 +228,10 @@ class RuleService
             return $view;
         }, $addedViews);
 
+        $publishPropertyId = $this->getPublishPropertyId($data['body']['propertyDefinitions']);
 
-        $addedViews = array_filter($addedViews, function (array $view) {
-            return count($properties = array_filter($view['properties'], function($property){return $property['propertyDefinitionRef'] === 'propid-67';})) !== 0
+        $addedViews = array_filter($addedViews, function (array $view) use ($publishPropertyId) {
+            return count($properties = array_filter($view['properties'], function($property) use ($publishPropertyId) {return $property['propertyDefinitionRef'] === $publishPropertyId;})) !== 0
                 && array_shift($properties)['value'] === 'Softwarecatalogus en GEMMA Online en redactie';
         });
 
@@ -303,6 +305,21 @@ class RuleService
 
         return $data;
     }
+
+    /**
+     * Find the 'publiceren' property by name in the list of propertyDefinitions
+     *
+     * @param array $propertyDefinitions The list of propertyDefinitions
+     * @return string The id of the 'Publiceren' property
+     */
+    private function getPublishPropertyId(array $propertyDefinitions): string
+    {
+        $ids = array_column(array_filter($propertyDefinitions, function($propertyDefinition){
+            return $propertyDefinition['name'] === 'Publiceren';
+        }), 'identifier');
+
+        return array_shift($ids);
+    }//end getPublishPropertyId
 
     /**
      * Process property definitions and update basic metadata in the data structure
@@ -521,18 +538,10 @@ class RuleService
                 );
                     foreach ($views as &$view) {
 
-                        // Concept softwareCatalogus views
-                        if (
-                            count($properties = array_filter($view['properties'], function($property){return $property['propertyDefinitionRef'] === 'propid-67';})) === 0
-                            || array_shift($properties)['value'] !== 'Softwarecatalogus en GEMMA Online en redactie'
-                        ) {
-                            continue;
-                        }
-
                         foreach ($view['connections'] as &$connection) {
-                            $connection['source']     = $connection['source'].'-1';
-                            $connection['target']     = $connection['target'].'-1';
-                            $connection['identifier'] = $connection['identifier'].'-1';
+                            $connection['source']     = $connection['source'];
+                            $connection['target']     = $connection['target'];
+                            $connection['identifier'] = $connection['identifier'];
                         }
 
                         $connections = [];
@@ -604,9 +613,6 @@ class RuleService
 
         // Loop through each node in the array
         foreach ($nodes as &$node) {
-            if(substr($node['identifier'], -2) !== '-1') {
-                $nodeIdentifier = $node['identifier'] = $node['identifier'].'-1';
-            }
 
             // Check if current node has an elementRef property and if it matches the target identificatie
             if (isset($node['elementRef']) === true && $node['elementRef'] === $matchIdentificatie) {
@@ -703,7 +709,7 @@ class RuleService
 
                 // @TODO: Create relation between voorziening node and referentieComponent node
                  $connections[] = $this->createConnection(
-                     relationId: $relationId, sourceId: $subnodeId.'-1', targetId: $nodeIdentifier
+                     relationId: $relationId, sourceId: $subnodeId, targetId: $node['identifier']
                  );
             }
 
