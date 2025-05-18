@@ -80,6 +80,7 @@ class Version1Date20250515232835 extends SimpleMigrationStep {
 
 					// Add index for the slug column
 					$table->addIndex(['slug'], 'idx_' . $tableName . '_slug');
+					$table->addUniqueConstraint(['slug'], 'idx_' . $tableName . '_slug_unique');
 				}
 			}
 		}
@@ -117,5 +118,76 @@ class Version1Date20250515232835 extends SimpleMigrationStep {
 	 * @param array $options
 	 */
 	public function postSchemaChange(IOutput $output, Closure $schemaClosure, array $options): void {
+		// Get the database connection
+		$connection = \OC::$server->get(\OCP\IDBConnection::class);
+		
+		// List of tables that need slug updates
+		$tables = [
+			'openconnector_sources' => 'name',
+			'openconnector_endpoints' => 'name',
+			'openconnector_mappings' => 'name',
+			'openconnector_rules' => 'name',
+			'openconnector_jobs' => 'name',
+			'openconnector_synchronizations' => 'name'
+		];
+
+		// Update slugs for each table
+		foreach ($tables as $tableName => $nameColumn) {
+			// First, update any null or empty slugs using the name column
+			$query = $connection->getQueryBuilder();
+			$query->update($tableName)
+				->set('slug', $query->createFunction('LOWER(REPLACE(REPLACE(REPLACE(' . $nameColumn . ', \' \', \'-\'), \'.\', \'-\'), \'_\', \'-\'))'))
+				->where($query->expr()->orX(
+					$query->expr()->isNull('slug'),
+					$query->expr()->eq('slug', $query->createNamedParameter(''))
+				));
+			$query->execute();
+
+			// Then, ensure uniqueness across all tables
+			$query = $connection->getQueryBuilder();
+			$query->select('id', 'slug')
+				->from($tableName)
+				->orderBy('id', 'ASC');
+			$result = $query->execute();
+			$slugs = [];
+			$updates = [];
+
+			while ($row = $result->fetch()) {
+				$originalSlug = $row['slug'];
+				$newSlug = $originalSlug;
+				$counter = 1;
+
+				// If slug is empty or null, use a default
+				if (empty($originalSlug)) {
+					$newSlug = 'item-' . $row['id'];
+				} else {
+					// Handle duplicate slugs
+					while (isset($slugs[$newSlug])) {
+						$newSlug = $originalSlug . '-' . $counter;
+						$counter++;
+					}
+				}
+
+				if ($newSlug !== $originalSlug) {
+					$updates[] = [
+						'id' => $row['id'],
+						'slug' => $newSlug
+					];
+				}
+				$slugs[$newSlug] = true;
+			}
+			$result->closeCursor();
+
+			// Apply the updates
+			foreach ($updates as $update) {
+				$query = $connection->getQueryBuilder();
+				$query->update($tableName)
+					->set('slug', $query->createNamedParameter($update['slug']))
+					->where($query->expr()->eq('id', $query->createNamedParameter($update['id'])));
+				$query->execute();
+			}
+
+			$output->info("Updated slugs for table: " . $tableName);
+		}
 	}
 }
