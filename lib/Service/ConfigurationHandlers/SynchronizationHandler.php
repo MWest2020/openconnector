@@ -153,15 +153,6 @@ class SynchronizationHandler implements ConfigurationHandlerInterface
      */
     public function import(array $data, array $mappings): Entity
     {
-        // Check if synchronization with this slug already exists.
-        if (isset($data['slug']) && isset($mappings['synchronization']['slugToId'][$data['slug']])) {
-            // Update existing synchronization.
-            $synchronization = $this->synchronizationMapper->find($mappings['synchronization']['slugToId'][$data['slug']]);
-        } else {
-            // Create new synchronization.
-            $synchronization = new Synchronization();
-        }
-
         // Convert source slugs back to IDs.
         if (isset($data['sourceId']) && isset($data['sourceType'])) {
             switch ($data['sourceType']) {
@@ -199,7 +190,7 @@ class SynchronizationHandler implements ConfigurationHandlerInterface
             }
         }
 
-        // Convert target slugs back to IDs
+        // Convert target slugs back to IDs.
         if (isset($data['targetId']) && isset($data['targetType'])) {
             switch ($data['targetType']) {
                 case 'api':
@@ -236,7 +227,7 @@ class SynchronizationHandler implements ConfigurationHandlerInterface
             }
         }
 
-        // Handle mapping IDs.
+        // Convert mapping slugs back to IDs.
         if (isset($data['sourceTargetMapping']) && isset($mappings['mapping']['slugToId'][$data['sourceTargetMapping']])) {
             $data['sourceTargetMapping'] = $mappings['mapping']['slugToId'][$data['sourceTargetMapping']];
         }
@@ -244,14 +235,36 @@ class SynchronizationHandler implements ConfigurationHandlerInterface
             $data['targetSourceMapping'] = $mappings['mapping']['slugToId'][$data['targetSourceMapping']];
         }
 
-        // Update synchronization with new data.
-        $synchronization->hydrate($data);
-
-        // Save changes.
-        if ($synchronization->getId() === null) {
-            return $this->synchronizationMapper->insert($synchronization);
+        // Convert arrays of slugs back to IDs
+        $idArrays = ['actions', 'followUps', 'conditions'];
+        foreach ($idArrays as $arrayKey) {
+            if (isset($data[$arrayKey]) && is_array($data[$arrayKey])) {
+                $data[$arrayKey] = array_map(function($slug) use ($mappings, $arrayKey) {
+                    // For actions, use rule mapping
+                    if ($arrayKey === 'actions' && isset($mappings['rule']['slugToId'][$slug])) {
+                        return $mappings['rule']['slugToId'][$slug];
+                    }
+                    // For followUps, use synchronization mapping
+                    if ($arrayKey === 'followUps' && isset($mappings['synchronization']['slugToId'][$slug])) {
+                        return $mappings['synchronization']['slugToId'][$slug];
+                    }
+                    // For conditions, use rule mapping
+                    if ($arrayKey === 'conditions' && isset($mappings['rule']['slugToId'][$slug])) {
+                        return $mappings['rule']['slugToId'][$slug];
+                    }
+                    return $slug;
+                }, $data[$arrayKey]);
+            }
         }
-        return $this->synchronizationMapper->update($synchronization);
+
+        // Check if synchronization with this slug already exists.
+        if (isset($data['slug']) && isset($mappings['synchronization']['slugToId'][$data['slug']])) {
+            // Update existing synchronization.
+            return $this->synchronizationMapper->updateFromArray($mappings['synchronization']['slugToId'][$data['slug']], $data);
+        }
+        
+        // Create new synchronization.
+        return $this->synchronizationMapper->createFromArray($data);
     }
 
     /**

@@ -68,15 +68,6 @@ class JobHandler implements ConfigurationHandlerInterface
      */
     public function import(array $data, array $mappings): Entity
     {
-        // Check if job with this slug already exists.
-        if (isset($data['slug']) && isset($mappings['job']['slugToId'][$data['slug']])) {
-            // Update existing job.
-            $job = $this->jobMapper->find($mappings['job']['slugToId'][$data['slug']]);
-        } else {
-            // Create new job.
-            $job = new Job();
-        }
-
         // Convert slugs back to IDs in arguments JSON.
         if (isset($data['arguments'])) {
             $arguments = json_decode($data['arguments'], true);
@@ -94,14 +85,14 @@ class JobHandler implements ConfigurationHandlerInterface
             }
         }
 
-        // Update job with new data.
-        $job->hydrate($data);
-
-        // Save changes.
-        if ($job->getId() === null) {
-            return $this->jobMapper->insert($job);
+        // Check if job with this slug already exists.
+        if (isset($data['slug']) && isset($mappings['job']['slugToId'][$data['slug']])) {
+            // Update existing job.
+            return $this->jobMapper->updateFromArray($mappings['job']['slugToId'][$data['slug']], $data);
         }
-        return $this->jobMapper->update($job);
+        
+        // Create new job.
+        return $this->jobMapper->createFromArray($data);
     }
 
     /**

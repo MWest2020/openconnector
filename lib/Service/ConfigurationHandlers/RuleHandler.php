@@ -87,15 +87,6 @@ class RuleHandler implements ConfigurationHandlerInterface
      */
     public function import(array $data, array $mappings): Entity
     {
-        // Check if rule with this slug already exists
-        if (isset($data['slug']) && isset($mappings['rule']['slugToId'][$data['slug']])) {
-            // Update existing rule
-            $rule = $this->ruleMapper->find($mappings['rule']['slugToId'][$data['slug']]);
-        } else {
-            // Create new rule
-            $rule = new Rule();
-        }
-
         // Convert slugs back to IDs
         if (isset($data['source_id']) && isset($mappings['source']['slugToId'][$data['source_id']])) {
             $data['source_id'] = $mappings['source']['slugToId'][$data['source_id']];
@@ -104,14 +95,52 @@ class RuleHandler implements ConfigurationHandlerInterface
             $data['target_id'] = $mappings['source']['slugToId'][$data['target_id']];
         }
 
-        // Update rule with new data
-        $rule->hydrate($data);
-
-        // Save changes
-        if ($rule->getId() === null) {
-            return $this->ruleMapper->insert($rule);
+        // Handle nested configuration structures
+        if (isset($data['configuration']) && is_array($data['configuration'])) {
+            $data['configuration'] = $this->convertSlugsToIds($data['configuration'], $mappings);
         }
-        return $this->ruleMapper->update($rule);
+
+        // Check if rule with this slug already exists
+        if (isset($data['slug']) && isset($mappings['rule']['slugToId'][$data['slug']])) {
+            // Update existing rule
+            return $this->ruleMapper->updateFromArray($mappings['rule']['slugToId'][$data['slug']], $data);
+        }
+        
+        // Create new rule
+        return $this->ruleMapper->createFromArray($data);
+    }
+
+    /**
+     * Recursively convert slugs to IDs in configuration arrays
+     *
+     * @param array $config The configuration array to process
+     * @param array $mappings The mappings array containing slugToId mappings
+     * @return array The processed configuration with slugs converted to IDs
+     */
+    private function convertSlugsToIds(array $config, array $mappings): array
+    {
+        $entityTypes = ['source', 'job', 'endpoint', 'mapping', 'register', 'schema'];
+        
+        foreach ($config as $key => $value) {
+            if (is_array($value)) {
+                // Recursively process nested arrays
+                $config[$key] = $this->convertSlugsToIds($value, $mappings);
+            } else {
+                // Check if the key is an entity reference
+                foreach ($entityTypes as $type) {
+                    // Check for exact match (e.g., 'source')
+                    if ($key === $type && isset($mappings[$type]['slugToId'][$value])) {
+                        $config[$key] = $mappings[$type]['slugToId'][$value];
+                    }
+                    // Check for ID suffix (e.g., 'sourceId')
+                    if (str_ends_with($key, $type . 'Id') && isset($mappings[$type]['slugToId'][$value])) {
+                        $config[$key] = $mappings[$type]['slugToId'][$value];
+                    }
+                }
+            }
+        }
+
+        return $config;
     }
 
     /**

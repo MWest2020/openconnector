@@ -26,20 +26,36 @@ class RuleMapper extends QBMapper
 	}
 
 	/**
-	 * Find a rule by ID
+	 * Find a rule by ID, UUID, or slug
 	 *
-	 * @param int $id
+	 * @param int|string $id The ID, UUID, or slug of the rule to find
 	 * @return Rule
+	 * @throws \OCP\AppFramework\Db\DoesNotExistException
+	 * @throws \OCP\AppFramework\Db\MultipleObjectsReturnedException
 	 */
-	public function find(int $id): Rule
+	public function find(int|string $id): Rule
 	{
 		$qb = $this->db->getQueryBuilder();
 
 		$qb->select('*')
-			->from('openconnector_rules')
-			->where(
+			->from('openconnector_rules');
+
+		// If it's a string but can be converted to a numeric value without data loss, use as ID
+		if (is_string($id) && ctype_digit($id) === false) {
+			// For non-numeric strings, search in uuid and slug columns
+			$qb->where(
+				$qb->expr()->orX(
+					$qb->expr()->eq('uuid', $qb->createNamedParameter($id)),
+					$qb->expr()->eq('slug', $qb->createNamedParameter($id)),
+					$qb->expr()->eq('id', $qb->createNamedParameter($id))
+				)
+			);
+		} else {
+			// For numeric values, search in id column
+			$qb->where(
 				$qb->expr()->eq('id', $qb->createNamedParameter($id, IQueryBuilder::PARAM_INT))
 			);
+		}
 
 		return $this->findEntity($qb);
 	}

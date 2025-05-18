@@ -16,15 +16,37 @@ class MappingMapper extends QBMapper
 		parent::__construct($db, 'openconnector_mappings');
 	}
 
-	public function find(int $id): Mapping
+	/**
+	 * Find a mapping by ID, UUID, or slug
+	 *
+	 * @param int|string $id The ID, UUID, or slug of the mapping to find
+	 * @return Mapping
+	 * @throws \OCP\AppFramework\Db\DoesNotExistException
+	 * @throws \OCP\AppFramework\Db\MultipleObjectsReturnedException
+	 */
+	public function find(int|string $id): Mapping
 	{
 		$qb = $this->db->getQueryBuilder();
 
 		$qb->select('*')
-			->from('openconnector_mappings')
-			->where(
+			->from('openconnector_mappings');
+
+		// If it's a string but can be converted to a numeric value without data loss, use as ID
+		if (is_string($id) && ctype_digit($id) === false) {
+			// For non-numeric strings, search in uuid and slug columns
+			$qb->where(
+				$qb->expr()->orX(
+					$qb->expr()->eq('uuid', $qb->createNamedParameter($id)),
+					$qb->expr()->eq('slug', $qb->createNamedParameter($id)),
+					$qb->expr()->eq('id', $qb->createNamedParameter($id))
+				)
+			);
+		} else {
+			// For numeric values, search in id column
+			$qb->where(
 				$qb->expr()->eq('id', $qb->createNamedParameter($id, IQueryBuilder::PARAM_INT))
 			);
+		}
 
 		return $this->findEntity(query: $qb);
 	}

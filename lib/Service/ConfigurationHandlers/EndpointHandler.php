@@ -94,15 +94,6 @@ class EndpointHandler implements ConfigurationHandlerInterface
      */
     public function import(array $data, array $mappings): Entity
     {
-        // Check if endpoint with this slug already exists.
-        if (isset($data['slug']) && isset($mappings['endpoint']['slugToId'][$data['slug']])) {
-            // Update existing endpoint.
-            $endpoint = $this->endpointMapper->find($mappings['endpoint']['slugToId'][$data['slug']]);
-        } else {
-            // Create new endpoint.
-            $endpoint = new Endpoint();
-        }
-
         // Convert slugs back to IDs.
         if (isset($data['targetId']) && isset($data['targetType'])) {
             switch ($data['targetType']) {
@@ -148,14 +139,14 @@ class EndpointHandler implements ConfigurationHandlerInterface
             $data['outputMapping'] = $mappings['mapping']['slugToId'][$data['outputMapping']];
         }
 
-        // Update endpoint with new data.
-        $endpoint->hydrate($data);
-
-        // Save changes.
-        if ($endpoint->getId() === null) {
-            return $this->endpointMapper->insert($endpoint);
+        // Check if endpoint with this slug already exists.
+        if (isset($data['slug']) && isset($mappings['endpoint']['slugToId'][$data['slug']])) {
+            // Update existing endpoint.
+            return $this->endpointMapper->updateFromArray($mappings['endpoint']['slugToId'][$data['slug']], $data);
         }
-        return $this->endpointMapper->update($endpoint);
+        
+        // Create new endpoint.
+        return $this->endpointMapper->createFromArray($data);
     }
 
     /**

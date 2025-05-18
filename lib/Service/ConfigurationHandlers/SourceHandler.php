@@ -80,20 +80,11 @@ class SourceHandler implements ConfigurationHandlerInterface
         // Check if source with this slug already exists.
         if (isset($data['slug']) && isset($mappings['source']['slugToId'][$data['slug']])) {
             // Update existing source
-            $source = $this->sourceMapper->find($mappings['source']['slugToId'][$data['slug']]);
-        } else {
-            // Create new source.
-            $source = new Source();
+            return $this->sourceMapper->updateFromArray($mappings['source']['slugToId'][$data['slug']], $data);
         }
-
-        // Update source with new data.
-        $source->hydrate($data);
-
-        // Save changes.
-        if ($source->getId() === null) {
-            return $this->sourceMapper->insert($source);
-        }
-        return $this->sourceMapper->update($source);
+        
+        // Create new source.
+        return $this->sourceMapper->createFromArray($data);
     }
 
     /**

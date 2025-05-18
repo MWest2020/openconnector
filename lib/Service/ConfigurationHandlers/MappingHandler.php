@@ -57,15 +57,6 @@ class MappingHandler implements ConfigurationHandlerInterface
      */
     public function import(array $data, array $mappings): Entity
     {
-        // Check if mapping with this slug already exists.
-        if (isset($data['slug']) && isset($mappings['mapping']['slugToId'][$data['slug']])) {
-            // Update existing mapping.
-            $mapping = $this->mappingMapper->find($mappings['mapping']['slugToId'][$data['slug']]);
-        } else {
-            // Create new mapping.
-            $mapping = new Mapping();
-        }
-
         // Convert slugs back to IDs.
         if (isset($data['source_id']) && isset($mappings['source']['slugToId'][$data['source_id']])) {
             $data['source_id'] = $mappings['source']['slugToId'][$data['source_id']];
@@ -74,14 +65,14 @@ class MappingHandler implements ConfigurationHandlerInterface
             $data['target_id'] = $mappings['source']['slugToId'][$data['target_id']];
         }
 
-        // Update mapping with new data.
-        $mapping->hydrate($data);
-
-        // Save changes
-        if ($mapping->getId() === null) {
-            return $this->mappingMapper->insert($mapping);
+        // Check if mapping with this slug already exists.
+        if (isset($data['slug']) && isset($mappings['mapping']['slugToId'][$data['slug']])) {
+            // Update existing mapping.
+            return $this->mappingMapper->updateFromArray($mappings['mapping']['slugToId'][$data['slug']], $data);
         }
-        return $this->mappingMapper->update($mapping);
+        
+        // Create new mapping.
+        return $this->mappingMapper->createFromArray($data);
     }
 
     /**
