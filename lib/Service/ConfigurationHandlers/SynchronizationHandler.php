@@ -71,7 +71,8 @@ class SynchronizationHandler implements ConfigurationHandlerInterface
                             $schemaSlug = $schemaId; // Fallback to original ID if no mapping found.
                         }
 
-                        // Combine the slugs.isterSlug . '/' . $schemaSlug;
+                        // Combine the slugs
+                        $syncArray['sourceId'] = $registerSlug . '/' . $schemaSlug;
                     }
                     break;
             }
@@ -107,19 +108,41 @@ class SynchronizationHandler implements ConfigurationHandlerInterface
                             $schemaSlug = $schemaId; // Fallback to original ID if no mapping found.
                         }
 
-                        // Combine the slugs.
+                        // Combine the slugs
                         $syncArray['targetId'] = $registerSlug . '/' . $schemaSlug;
                     }
                     break;
             }
         }
 
-        // Handle mapping IDs.
+        // Handle mapping IDs
         if (isset($syncArray['sourceTargetMapping']) && isset($mappings['mapping']['idToSlug'][$syncArray['sourceTargetMapping']])) {
             $syncArray['sourceTargetMapping'] = $mappings['mapping']['idToSlug'][$syncArray['sourceTargetMapping']];
         }
         if (isset($syncArray['targetSourceMapping']) && isset($mappings['mapping']['idToSlug'][$syncArray['targetSourceMapping']])) {
             $syncArray['targetSourceMapping'] = $mappings['mapping']['idToSlug'][$syncArray['targetSourceMapping']];
+        }
+
+        // Handle arrays of IDs that need to be converted to slugs
+        $idArrays = ['actions', 'followUps', 'conditions'];
+        foreach ($idArrays as $arrayKey) {
+            if (isset($syncArray[$arrayKey]) && is_array($syncArray[$arrayKey])) {
+                $syncArray[$arrayKey] = array_map(function($id) use ($mappings, $arrayKey) {
+                    // For actions, use rule mapping
+                    if ($arrayKey === 'actions' && isset($mappings['rule']['idToSlug'][$id])) {
+                        return $mappings['rule']['idToSlug'][$id];
+                    }
+                    // For followUps, use synchronization mapping
+                    if ($arrayKey === 'followUps' && isset($mappings['synchronization']['idToSlug'][$id])) {
+                        return $mappings['synchronization']['idToSlug'][$id];
+                    }
+                    // For conditions, use rule mapping
+                    if ($arrayKey === 'conditions' && isset($mappings['rule']['idToSlug'][$id])) {
+                        return $mappings['rule']['idToSlug'][$id];
+                    }
+                    return $id;
+                }, $syncArray[$arrayKey]);
+            }
         }
 
         return $syncArray;
