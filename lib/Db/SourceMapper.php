@@ -182,4 +182,42 @@ class SourceMapper extends QBMapper
         $sql = 'SELECT * FROM `' . $this->getTableName() . '` WHERE JSON_CONTAINS(configurations, ?)';
         return $this->findEntities($sql, [$configurationId]);
     }
+
+    /**
+     * Get all source ID to slug mappings
+     *
+     * @return array<string,string> Array mapping source IDs to their slugs
+     */
+    public function getIdToSlugMap(): array
+    {
+        $qb = $this->db->getQueryBuilder();
+        $qb->select('id', 'slug')
+            ->from($this->getTableName());
+
+        $result = $qb->execute();
+        $mappings = [];
+        while ($row = $result->fetch()) {
+            $mappings[$row['id']] = $row['slug'];
+        }
+        return $mappings;
+    }
+
+    /**
+     * Get all source slug to ID mappings
+     *
+     * @return array<string,string> Array mapping source slugs to their IDs
+     */
+    public function getSlugToIdMap(): array
+    {
+        $qb = $this->db->getQueryBuilder();
+        $qb->select('id', 'slug')
+            ->from($this->getTableName());
+
+        $result = $qb->execute();
+        $mappings = [];
+        while ($row = $result->fetch()) {
+            $mappings[$row['slug']] = $row['id'];
+        }
+        return $mappings;
+    }
 }

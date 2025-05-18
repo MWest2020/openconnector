@@ -199,4 +199,42 @@ class JobMapper extends QBMapper
 
         return $this->findEntities($qb);
     }
+
+    /**
+     * Get all job ID to slug mappings
+     *
+     * @return array<string,string> Array mapping job IDs to their slugs
+     */
+    public function getIdToSlugMap(): array
+    {
+        $qb = $this->db->getQueryBuilder();
+        $qb->select('id', 'slug')
+            ->from($this->getTableName());
+
+        $result = $qb->execute();
+        $mappings = [];
+        while ($row = $result->fetch()) {
+            $mappings[$row['id']] = $row['slug'];
+        }
+        return $mappings;
+    }
+
+    /**
+     * Get all job slug to ID mappings
+     *
+     * @return array<string,string> Array mapping job slugs to their IDs
+     */
+    public function getSlugToIdMap(): array
+    {
+        $qb = $this->db->getQueryBuilder();
+        $qb->select('id', 'slug')
+            ->from($this->getTableName());
+
+        $result = $qb->execute();
+        $mappings = [];
+        while ($row = $result->fetch()) {
+            $mappings[$row['slug']] = $row['id'];
+        }
+        return $mappings;
+    }
 }
