@@ -419,7 +419,14 @@ class ConfigurationService
         $this->resetMappings();
 
         $components = [
-            'components' => [],
+            'components' => [
+                'mappings' => [],
+                'sources' => [],
+                'rules' => [],
+                'endpoints' => [],
+                'synchronizations' => [],
+                'jobs' => []
+            ],
         ];
 
         // Collect all entity IDs for batch processing
@@ -447,6 +454,13 @@ class ConfigurationService
                 if ($endpoint->getTargetType() === 'api') {
                     $sourceIds[] = $endpoint->getTargetId();
                 }
+                
+                // Check if endpoint has rules and collect rule IDs
+                if (property_exists($endpoint, 'rules') && is_array($endpoint->getRules())) {
+                    $ruleIds = array_merge($ruleIds, $endpoint->getRules());
+                }
+                
+                $components['components']['endpoints'][$endpoint->getSlug()] = $this->exportEndpoint($endpoint);
             }
         }
 
@@ -473,24 +487,32 @@ class ConfigurationService
                 if ($synchronization->getTargetType() === 'api') {
                     $sourceIds[] = $synchronization->getTargetId();
                 }
+                // Check if synchronization has actions and collect rule IDs
+                if (property_exists($synchronization, 'actions') && is_array($synchronization->getActions())) {
+                    $ruleIds = array_merge($ruleIds, $synchronization->getActions());
+                }
+                
+
+                $components['components']['synchronizations'][$synchronization->getSlug()] = $this->exportSynchronization($synchronization);
             }
         }
 
-        // Remove duplicates from collected IDs
-        $ruleIds = array_unique($ruleIds);
-        $mappingIds = array_unique($mappingIds);
-        $sourceIds = array_unique($sourceIds);
-        $endpointIds = array_unique($endpointIds);
-        $synchronizationIds = array_unique($synchronizationIds);
-        $registerIds = array_unique($registerIds);
-        $schemaIds = array_unique($schemaIds);
+        // Remove duplicates from collected IDs and unset any empty values
+        $ruleIds = array_filter(array_unique($ruleIds));
+        $mappingIds = array_filter(array_unique($mappingIds));
+        $sourceIds = array_filter(array_unique($sourceIds));
+        $endpointIds = array_filter(array_unique($endpointIds));
+        $synchronizationIds = array_filter(array_unique($synchronizationIds));
+        $registerIds = array_filter(array_unique($registerIds));
+        $schemaIds = array_filter(array_unique($schemaIds));
+
 
         // Build initial ID to slug maps for registers and schemas
         $this->buildRegisterAndSchemaMappings($registerIds, $schemaIds);
 
         // Batch fetch and export related entities
         if (!empty($mappingIds)) {
-            $mappings = $this->mappingMapper->findAll(filters: ['id' => $mappingIds]);
+            $mappings = $this->mappingMapper->findAll(ids: ['id' => $mappingIds]);
             $indexedMappings = [];
             foreach ($mappings as $mapping) {
                 $indexedMappings[$mapping->getSlug()] = $this->exportMapping($mapping);
@@ -499,7 +521,7 @@ class ConfigurationService
         }
 
         if (!empty($sourceIds)) {
-            $sources = $this->sourceMapper->findAll(filters: ['id' => $sourceIds]);
+            $sources = $this->sourceMapper->findAll(ids: ['id' => $sourceIds]);
             $indexedSources = [];
             foreach ($sources as $source) {
                 $indexedSources[$source->getSlug()] = $this->exportSource($source);
@@ -508,34 +530,13 @@ class ConfigurationService
         }
 
         if (!empty($ruleIds)) {
-            $rules = $this->ruleMapper->findAll(filters: ['id' => $ruleIds]);
+            $rules = $this->ruleMapper->findAll(ids: ['id' => $ruleIds]);
             $indexedRules = [];
             foreach ($rules as $rule) {
                 $indexedRules[$rule->getSlug()] = $this->exportRule($rule);
             }
             $components['components']['rules'] = $indexedRules;
         }
-
-        // Export endpoints
-        if ($includeEndpoints && !empty($endpointIds)) {
-            $endpoints = $this->endpointMapper->findAll(filters: ['id' => $endpointIds]);
-            $indexedEndpoints = [];
-            foreach ($endpoints as $endpoint) {
-                $indexedEndpoints[$endpoint->getSlug()] = $this->exportEndpoint($endpoint);
-            }
-            $components['components']['endpoints'] = $indexedEndpoints;
-        }
-
-        // Export synchronizations
-        if ($includeSynchronizations && !empty($synchronizationIds)) {
-            $synchronizations = $this->synchronizationMapper->findAll(filters: ['id' => $synchronizationIds]);
-            $indexedSynchronizations = [];
-            foreach ($synchronizations as $synchronization) {
-                $indexedSynchronizations[$synchronization->getSlug()] = $this->exportSynchronization($synchronization);
-            }
-            $components['components']['synchronizations'] = $indexedSynchronizations;
-        }
-
         // Get and export related jobs
         if (!empty($endpointIds) || !empty($synchronizationIds) || !empty($sourceIds)) {
             $jobs = $this->jobMapper->findByArgumentIds(

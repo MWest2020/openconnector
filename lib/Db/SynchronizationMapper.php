@@ -61,8 +61,25 @@ class SynchronizationMapper extends QBMapper
 		return $this->findEntities(query: $qb);
 	}
 
-	public function findAll(?int $limit = null, ?int $offset = null, ?array $filters = [], ?array $searchConditions = [], ?array $searchParams = []): array
-	{
+	/**
+	 * Find all synchronizations matching the given criteria
+	 *
+	 * @param int|null $limit Maximum number of results to return
+	 * @param int|null $offset Number of results to skip
+	 * @param array<string,mixed> $filters Array of field => value pairs to filter by
+	 * @param array<string> $searchConditions Array of search conditions to apply
+	 * @param array<string,mixed> $searchParams Array of parameters for the search conditions
+	 * @param array<string,array<string>> $ids Array of IDs to search for, keyed by type ('id', 'uuid', or 'slug')
+	 * @return array<Synchronization> Array of Synchronization entities
+	 */
+	public function findAll(
+		?int $limit = null,
+		?int $offset = null,
+		?array $filters = [],
+		?array $searchConditions = [],
+		?array $searchParams = [],
+		?array $ids = []
+	): array {
 		$qb = $this->db->getQueryBuilder();
 
 		$qb->select('*')
@@ -70,7 +87,29 @@ class SynchronizationMapper extends QBMapper
 			->setMaxResults($limit)
 			->setFirstResult($offset);
 
-        foreach ($filters as $filter => $value) {
+		// Apply ID filters if provided
+		if (!empty($ids)) {
+			$idConditions = [];
+			
+			if (!empty($ids['id'])) {
+				$idConditions[] = $qb->expr()->in('id', $qb->createNamedParameter($ids['id'], IQueryBuilder::PARAM_INT_ARRAY));
+			}
+			
+			if (!empty($ids['uuid'])) {
+				$idConditions[] = $qb->expr()->in('uuid', $qb->createNamedParameter($ids['uuid'], IQueryBuilder::PARAM_STR_ARRAY));
+			}
+			
+			if (!empty($ids['slug'])) {
+				$idConditions[] = $qb->expr()->in('slug', $qb->createNamedParameter($ids['slug'], IQueryBuilder::PARAM_STR_ARRAY));
+			}
+			
+			if (!empty($idConditions)) {
+				$qb->andWhere($qb->expr()->orX(...$idConditions));
+			}
+		}
+
+		// Apply regular filters
+		foreach ($filters as $filter => $value) {
 			if ($value === 'IS NOT NULL') {
 				$qb->andWhere($qb->expr()->isNotNull($filter));
 			} elseif ($value === 'IS NULL') {
@@ -78,14 +117,14 @@ class SynchronizationMapper extends QBMapper
 			} else {
 				$qb->andWhere($qb->expr()->eq($filter, $qb->createNamedParameter($value)));
 			}
-        }
+		}
 
 		if (empty($searchConditions) === false) {
-            $qb->andWhere('(' . implode(' OR ', $searchConditions) . ')');
-            foreach ($searchParams as $param => $value) {
-                $qb->setParameter($param, $value);
-            }
-        }
+			$qb->andWhere('(' . implode(' OR ', $searchConditions) . ')');
+			foreach ($searchParams as $param => $value) {
+				$qb->setParameter($param, $value);
+			}
+		}
 
 		return $this->findEntities(query: $qb);
 	}

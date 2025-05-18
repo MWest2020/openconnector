@@ -41,21 +41,23 @@ class JobHandler implements ConfigurationHandlerInterface
         $jobArray = $entity->jsonSerialize();
         unset($jobArray['id'], $jobArray['uuid']);
 
-        // Replace IDs with slugs in arguments JSON.
-        if (isset($jobArray['arguments'])) {
-            $arguments = json_decode($jobArray['arguments'], true);
-            if (is_array($arguments)) {
-                if (isset($arguments['synchronizationId']) && isset($mappings['synchronization']['idToSlug'][$arguments['synchronizationId']])) {
-                    $arguments['synchronizationId'] = $mappings['synchronization']['idToSlug'][$arguments['synchronizationId']];
+        // Replace IDs with slugs in arguments
+        if (isset($jobArray['arguments']) && is_array($jobArray['arguments'])) {
+            $arguments = $jobArray['arguments'];
+            // Convert synchronizationId from integer to string if it exists
+            if (isset($arguments['synchronizationId'])) {
+                $synchronizationId = (string)$arguments['synchronizationId'];
+                if (isset($mappings['synchronization']['idToSlug'][$synchronizationId])) {
+                    $arguments['synchronizationId'] = $mappings['synchronization']['idToSlug'][$synchronizationId];
                 }
-                if (isset($arguments['endpointId']) && isset($mappings['endpoint']['idToSlug'][$arguments['endpointId']])) {
-                    $arguments['endpointId'] = $mappings['endpoint']['idToSlug'][$arguments['endpointId']];
-                }
-                if (isset($arguments['sourceId']) && isset($mappings['source']['idToSlug'][$arguments['sourceId']])) {
-                    $arguments['sourceId'] = $mappings['source']['idToSlug'][$arguments['sourceId']];
-                }
-                $jobArray['arguments'] = json_encode($arguments);
             }
+            if (isset($arguments['endpointId']) && isset($mappings['endpoint']['idToSlug'][$arguments['endpointId']])) {
+                $arguments['endpointId'] = $mappings['endpoint']['idToSlug'][$arguments['endpointId']];
+            }
+            if (isset($arguments['sourceId']) && isset($mappings['source']['idToSlug'][$arguments['sourceId']])) {
+                $arguments['sourceId'] = $mappings['source']['idToSlug'][$arguments['sourceId']];
+            }
+            $jobArray['arguments'] = $arguments;
         }
 
         return $jobArray;

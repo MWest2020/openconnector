@@ -66,15 +66,22 @@ class RuleMapper extends QBMapper
 	/**
 	 * Find all rules with optional filtering
 	 *
-	 * @param int|null $limit
-	 * @param int|null $offset
-	 * @param array<string,mixed> $filters
-	 * @param array<string> $searchConditions
-	 * @param array<string,mixed> $searchParams
-	 * @return array<Rule>
+	 * @param int|null $limit Maximum number of results to return
+	 * @param int|null $offset Number of results to skip
+	 * @param array<string,mixed> $filters Array of field => value pairs to filter by
+	 * @param array<string> $searchConditions Array of search conditions to apply
+	 * @param array<string,mixed> $searchParams Array of parameters for the search conditions
+	 * @param array<string,array<string>> $ids Array of IDs to search for, keyed by type ('id', 'uuid', or 'slug')
+	 * @return array<Rule> Array of Rule entities
 	 */
-	public function findAll(?int $limit = null, ?int $offset = null, ?array $filters = [], ?array $searchConditions = [], ?array $searchParams = []): array
-	{
+	public function findAll(
+		?int $limit = null,
+		?int $offset = null,
+		?array $filters = [],
+		?array $searchConditions = [],
+		?array $searchParams = [],
+		?array $ids = []
+	): array {
 		$qb = $this->db->getQueryBuilder();
 
 		$qb->select('*')
@@ -83,6 +90,28 @@ class RuleMapper extends QBMapper
 			->setMaxResults($limit)
 			->setFirstResult($offset);
 
+		// Apply ID filters if provided
+		if (!empty($ids)) {
+			$idConditions = [];
+			
+			if (!empty($ids['id'])) {
+				$idConditions[] = $qb->expr()->in('id', $qb->createNamedParameter($ids['id'], IQueryBuilder::PARAM_INT_ARRAY));
+			}
+			
+			if (!empty($ids['uuid'])) {
+				$idConditions[] = $qb->expr()->in('uuid', $qb->createNamedParameter($ids['uuid'], IQueryBuilder::PARAM_STR_ARRAY));
+			}
+			
+			if (!empty($ids['slug'])) {
+				$idConditions[] = $qb->expr()->in('slug', $qb->createNamedParameter($ids['slug'], IQueryBuilder::PARAM_STR_ARRAY));
+			}
+			
+			if (!empty($idConditions)) {
+				$qb->andWhere($qb->expr()->orX(...$idConditions));
+			}
+		}
+
+		// Apply regular filters
 		foreach ($filters as $filter => $value) {
 			if ($value === 'IS NOT NULL') {
 				$qb->andWhere($qb->expr()->isNotNull($filter));
