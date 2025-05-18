@@ -16,6 +16,12 @@ use OCA\OpenConnector\Db\JobMapper;
 use OCA\OpenConnector\Db\SynchronizationMapper;
 use OCA\OpenRegister\Db\RegisterMapper;
 use OCA\OpenRegister\Db\SchemaMapper;
+use OCA\OpenConnector\Service\ConfigurationHandlers\EndpointHandler;
+use OCA\OpenConnector\Service\ConfigurationHandlers\SynchronizationHandler;
+use OCA\OpenConnector\Service\ConfigurationHandlers\MappingHandler;
+use OCA\OpenConnector\Service\ConfigurationHandlers\JobHandler;
+use OCA\OpenConnector\Service\ConfigurationHandlers\SourceHandler;
+use OCA\OpenConnector\Service\ConfigurationHandlers\RuleHandler;
 
 /**
  * Class ConfigurationService
@@ -71,6 +77,11 @@ class ConfigurationService
      * @var SchemaMapper
      */
     private SchemaMapper $schemaMapper;
+
+    /**
+     * @var array<string,ConfigurationHandlerInterface>
+     */
+    private array $handlers = [];
 
     /**
      * Global mapping structure for entity ID and slug relationships.
@@ -137,6 +148,12 @@ class ConfigurationService
      * @param SynchronizationMapper $synchronizationMapper
      * @param RegisterMapper $registerMapper
      * @param SchemaMapper $schemaMapper
+     * @param EndpointHandler $endpointHandler
+     * @param SynchronizationHandler $synchronizationHandler
+     * @param MappingHandler $mappingHandler
+     * @param JobHandler $jobHandler
+     * @param SourceHandler $sourceHandler
+     * @param RuleHandler $ruleHandler
      */
     public function __construct(
         SourceMapper $sourceMapper,
@@ -146,7 +163,13 @@ class ConfigurationService
         JobMapper $jobMapper,
         SynchronizationMapper $synchronizationMapper,
         RegisterMapper $registerMapper,
-        SchemaMapper $schemaMapper
+        SchemaMapper $schemaMapper,
+        EndpointHandler $endpointHandler,
+        SynchronizationHandler $synchronizationHandler,
+        MappingHandler $mappingHandler,
+        JobHandler $jobHandler,
+        SourceHandler $sourceHandler,
+        RuleHandler $ruleHandler
     ) {
         $this->sourceMapper = $sourceMapper;
         $this->endpointMapper = $endpointMapper;
@@ -156,6 +179,14 @@ class ConfigurationService
         $this->synchronizationMapper = $synchronizationMapper;
         $this->registerMapper = $registerMapper;
         $this->schemaMapper = $schemaMapper;
+
+        // Register handlers
+        $this->handlers['endpoint'] = $endpointHandler;
+        $this->handlers['synchronization'] = $synchronizationHandler;
+        $this->handlers['mapping'] = $mappingHandler;
+        $this->handlers['job'] = $jobHandler;
+        $this->handlers['source'] = $sourceHandler;
+        $this->handlers['rule'] = $ruleHandler;
     }
 
     /**
@@ -335,9 +366,7 @@ class ConfigurationService
      */
     private function exportSource(Source $source): array
     {
-        $sourceArray = $source->jsonSerialize();
-        unset($sourceArray['id'], $sourceArray['uuid']);
-        return $sourceArray;
+        return $this->handlers['source']->export($source, $this->mappings);
     }
 
     /**
@@ -348,55 +377,7 @@ class ConfigurationService
      */
     private function exportEndpoint(Endpoint $endpoint): array
     {
-        $endpointArray = $endpoint->jsonSerialize();
-        unset($endpointArray['id'], $endpointArray['uuid']);
-
-        // Replace IDs with slugs where applicable
-        if (isset($endpointArray['inputMapping']) && isset($this->mappings['mapping']['idToSlug'][$endpointArray['inputMapping']])) {
-            $endpointArray['inputMapping'] = $this->mappings['mapping']['idToSlug'][$endpointArray['inputMapping']];
-        }
-        if (isset($endpointArray['outputMapping']) && isset($this->mappings['mapping']['idToSlug'][$endpointArray['outputMapping']])) {
-            $endpointArray['outputMapping'] = $this->mappings['mapping']['idToSlug'][$endpointArray['outputMapping']];
-        }
-
-        // Handle targetId based on targetType
-        if (isset($endpointArray['targetId']) && isset($endpointArray['targetType'])) {
-            switch ($endpointArray['targetType']) {
-                case 'api':
-                case 'database':
-                    // For api/database targets, use source mapping
-                    if (isset($this->mappings['source']['idToSlug'][$endpointArray['targetId']])) {
-                        $endpointArray['targetId'] = $this->mappings['source']['idToSlug'][$endpointArray['targetId']];
-                    }
-                    break;
-
-                case 'register/schema':
-                    // For register/schema targets, split the ID and map both parts
-                    if (str_contains($endpointArray['targetId'], '/')) {
-                        [$registerId, $schemaId] = explode('/', $endpointArray['targetId']);
-                        
-                        // Map register ID to slug
-                        if (isset($this->mappings['register']['idToSlug'][$registerId])) {
-                            $registerSlug = $this->mappings['register']['idToSlug'][$registerId];
-                        } else {
-                            $registerSlug = $registerId; // Fallback to original ID if no mapping found
-                        }
-
-                        // Map schema ID to slug
-                        if (isset($this->mappings['schema']['idToSlug'][$schemaId])) {
-                            $schemaSlug = $this->mappings['schema']['idToSlug'][$schemaId];
-                        } else {
-                            $schemaSlug = $schemaId; // Fallback to original ID if no mapping found
-                        }
-
-                        // Combine the slugs
-                        $endpointArray['targetId'] = $registerSlug . '/' . $schemaSlug;
-                    }
-                    break;
-            }
-        }
-
-        return $endpointArray;
+        return $this->handlers['endpoint']->export($endpoint, $this->mappings);
     }
 
     /**
@@ -407,18 +388,7 @@ class ConfigurationService
      */
     private function exportMapping(Mapping $mapping): array
     {
-        $mappingArray = $mapping->jsonSerialize();
-        unset($mappingArray['id'], $mappingArray['uuid']);
-
-        // Replace IDs with slugs where applicable
-        if (isset($mappingArray['source_id']) && isset($this->mappings['source']['idToSlug'][$mappingArray['source_id']])) {
-            $mappingArray['source_id'] = $this->mappings['source']['idToSlug'][$mappingArray['source_id']];
-        }
-        if (isset($mappingArray['target_id']) && isset($this->mappings['source']['idToSlug'][$mappingArray['target_id']])) {
-            $mappingArray['target_id'] = $this->mappings['source']['idToSlug'][$mappingArray['target_id']];
-        }
-
-        return $mappingArray;
+        return $this->handlers['mapping']->export($mapping, $this->mappings);
     }
 
     /**
@@ -429,18 +399,7 @@ class ConfigurationService
      */
     private function exportRule(Rule $rule): array
     {
-        $ruleArray = $rule->jsonSerialize();
-        unset($ruleArray['id'], $ruleArray['uuid']);
-
-        // Replace IDs with slugs where applicable
-        if (isset($ruleArray['source_id']) && isset($this->mappings['source']['idToSlug'][$ruleArray['source_id']])) {
-            $ruleArray['source_id'] = $this->mappings['source']['idToSlug'][$ruleArray['source_id']];
-        }
-        if (isset($ruleArray['target_id']) && isset($this->mappings['source']['idToSlug'][$ruleArray['target_id']])) {
-            $ruleArray['target_id'] = $this->mappings['source']['idToSlug'][$ruleArray['target_id']];
-        }
-
-        return $ruleArray;
+        return $this->handlers['rule']->export($rule, $this->mappings);
     }
 
     /**
@@ -451,27 +410,7 @@ class ConfigurationService
      */
     private function exportJob(Job $job): array
     {
-        $jobArray = $job->jsonSerialize();
-        unset($jobArray['id'], $jobArray['uuid']);
-
-        // Replace IDs with slugs in arguments JSON
-        if (isset($jobArray['arguments'])) {
-            $arguments = json_decode($jobArray['arguments'], true);
-            if (is_array($arguments)) {
-                if (isset($arguments['synchronizationId']) && isset($this->mappings['synchronization']['idToSlug'][$arguments['synchronizationId']])) {
-                    $arguments['synchronizationId'] = $this->mappings['synchronization']['idToSlug'][$arguments['synchronizationId']];
-                }
-                if (isset($arguments['endpointId']) && isset($this->mappings['endpoint']['idToSlug'][$arguments['endpointId']])) {
-                    $arguments['endpointId'] = $this->mappings['endpoint']['idToSlug'][$arguments['endpointId']];
-                }
-                if (isset($arguments['sourceId']) && isset($this->mappings['source']['idToSlug'][$arguments['sourceId']])) {
-                    $arguments['sourceId'] = $this->mappings['source']['idToSlug'][$arguments['sourceId']];
-                }
-                $jobArray['arguments'] = json_encode($arguments);
-            }
-        }
-
-        return $jobArray;
+        return $this->handlers['job']->export($job, $this->mappings);
     }
 
     /**
@@ -482,92 +421,7 @@ class ConfigurationService
      */
     private function exportSynchronization(Synchronization $synchronization): array
     {
-        $syncArray = $synchronization->jsonSerialize();
-        unset($syncArray['id'], $syncArray['uuid']);
-
-        // Handle sourceId based on sourceType
-        if (isset($syncArray['sourceId']) && isset($syncArray['sourceType'])) {
-            switch ($syncArray['sourceType']) {
-                case 'api':
-                case 'database':
-                    // For api/database sources, use source mapping
-                    if (isset($this->mappings['source']['idToSlug'][$syncArray['sourceId']])) {
-                        $syncArray['sourceId'] = $this->mappings['source']['idToSlug'][$syncArray['sourceId']];
-                    }
-                    break;
-
-                case 'register/schema':
-                    // For register/schema sources, split the ID and map both parts
-                    if (str_contains($syncArray['sourceId'], '/')) {
-                        [$registerId, $schemaId] = explode('/', $syncArray['sourceId']);
-                        
-                        // Map register ID to slug
-                        if (isset($this->mappings['register']['idToSlug'][$registerId])) {
-                            $registerSlug = $this->mappings['register']['idToSlug'][$registerId];
-                        } else {
-                            $registerSlug = $registerId; // Fallback to original ID if no mapping found
-                        }
-
-                        // Map schema ID to slug
-                        if (isset($this->mappings['schema']['idToSlug'][$schemaId])) {
-                            $schemaSlug = $this->mappings['schema']['idToSlug'][$schemaId];
-                        } else {
-                            $schemaSlug = $schemaId; // Fallback to original ID if no mapping found
-                        }
-
-                        // Combine the slugs
-                        $syncArray['sourceId'] = $registerSlug . '/' . $schemaSlug;
-                    }
-                    break;
-            }
-        }
-
-        // Handle targetId based on targetType
-        if (isset($syncArray['targetId']) && isset($syncArray['targetType'])) {
-            switch ($syncArray['targetType']) {
-                case 'api':
-                case 'database':
-                    // For api/database targets, use source mapping
-                    if (isset($this->mappings['source']['idToSlug'][$syncArray['targetId']])) {
-                        $syncArray['targetId'] = $this->mappings['source']['idToSlug'][$syncArray['targetId']];
-                    }
-                    break;
-
-                case 'register/schema':
-                    // For register/schema targets, split the ID and map both parts
-                    if (str_contains($syncArray['targetId'], '/')) {
-                        [$registerId, $schemaId] = explode('/', $syncArray['targetId']);
-                        
-                        // Map register ID to slug
-                        if (isset($this->mappings['register']['idToSlug'][$registerId])) {
-                            $registerSlug = $this->mappings['register']['idToSlug'][$registerId];
-                        } else {
-                            $registerSlug = $registerId; // Fallback to original ID if no mapping found
-                        }
-
-                        // Map schema ID to slug
-                        if (isset($this->mappings['schema']['idToSlug'][$schemaId])) {
-                            $schemaSlug = $this->mappings['schema']['idToSlug'][$schemaId];
-                        } else {
-                            $schemaSlug = $schemaId; // Fallback to original ID if no mapping found
-                        }
-
-                        // Combine the slugs
-                        $syncArray['targetId'] = $registerSlug . '/' . $schemaSlug;
-                    }
-                    break;
-            }
-        }
-
-        // Handle mapping IDs
-        if (isset($syncArray['sourceTargetMapping']) && isset($this->mappings['mapping']['idToSlug'][$syncArray['sourceTargetMapping']])) {
-            $syncArray['sourceTargetMapping'] = $this->mappings['mapping']['idToSlug'][$syncArray['sourceTargetMapping']];
-        }
-        if (isset($syncArray['targetSourceMapping']) && isset($this->mappings['mapping']['idToSlug'][$syncArray['targetSourceMapping']])) {
-            $syncArray['targetSourceMapping'] = $this->mappings['mapping']['idToSlug'][$syncArray['targetSourceMapping']];
-        }
-
-        return $syncArray;
+        return $this->handlers['synchronization']->export($synchronization, $this->mappings);
     }
 
     /**
@@ -756,5 +610,101 @@ class ConfigurationService
         }
 
         return $components;
+    }
+
+    /**
+     * Import a complete configuration from an OAS array.
+     * Components are processed in the correct order to maintain dependencies:
+     * 1. Sources (no dependencies)
+     * 2. Mappings (depends on sources)
+     * 3. Rules (depends on sources)
+     * 4. Endpoints (depends on sources and mappings)
+     * 5. Synchronizations (depends on sources, mappings, and endpoints)
+     * 6. Jobs (depends on synchronizations, endpoints, and sources)
+     *
+     * The function preserves all relationships and target types as specified in the OAS,
+     * allowing for flexible configuration imports that may target different types of entities.
+     *
+     * @param array $oas The OpenAPI Specification array containing components
+     * @return array<string,array> Array containing all imported entities grouped by type
+     * @throws \InvalidArgumentException If required components are missing or invalid
+     */
+    public function importConfiguration(array $oas): array
+    {
+        // Reset all mappings.
+        $this->resetMappings();
+
+        // Initialize result array.
+        $result = [
+            'sources' => [],
+            'mappings' => [],
+            'rules' => [],
+            'endpoints' => [],
+            'synchronizations' => [],
+            'jobs' => []
+        ];
+
+        // Validate OAS structure.
+        if (!isset($oas['components'])) {
+            throw new \InvalidArgumentException('OAS must contain a components property');
+        }
+
+        $components = $oas['components'];
+
+        // 1. Import sources first (no dependencies).
+        if (isset($components['sources'])) {
+            foreach ($components['sources'] as $sourceSlug => $sourceData) {
+                $source = $this->handlers['source']->import($sourceData, $this->mappings);
+                $result['sources'][$sourceSlug] = $source;
+                $this->addEntityToMap($source);
+            }
+        }
+
+        // 2. Import mappings (depends on sources).
+        if (isset($components['mappings'])) {
+            foreach ($components['mappings'] as $mappingSlug => $mappingData) {
+                $mapping = $this->handlers['mapping']->import($mappingData, $this->mappings);
+                $result['mappings'][$mappingSlug] = $mapping;
+                $this->addEntityToMap($mapping);
+            }
+        }
+
+        // 3. Import rules (depends on sources).
+        if (isset($components['rules'])) {
+            foreach ($components['rules'] as $ruleSlug => $ruleData) {
+                $rule = $this->handlers['rule']->import($ruleData, $this->mappings);
+                $result['rules'][$ruleSlug] = $rule;
+                $this->addEntityToMap($rule);
+            }
+        }
+
+        // 4. Import endpoints (depends on sources and mappings).
+        if (isset($components['endpoints'])) {
+            foreach ($components['endpoints'] as $endpointSlug => $endpointData) {
+                $endpoint = $this->handlers['endpoint']->import($endpointData, $this->mappings);
+                $result['endpoints'][$endpointSlug] = $endpoint;
+                $this->addEntityToMap($endpoint);
+            }
+        }
+
+        // 5. Import synchronizations (depends on sources, mappings, and endpoints).
+        if (isset($components['synchronizations'])) {
+            foreach ($components['synchronizations'] as $syncSlug => $syncData) {
+                $synchronization = $this->handlers['synchronization']->import($syncData, $this->mappings);
+                $result['synchronizations'][$syncSlug] = $synchronization;
+                $this->addEntityToMap($synchronization);
+            }
+        }
+
+        // 6. Import jobs (depends on synchronizations, endpoints, and sources).
+        if (isset($components['jobs'])) {
+            foreach ($components['jobs'] as $jobSlug => $jobData) {
+                $job = $this->handlers['job']->import($jobData, $this->mappings);
+                $result['jobs'][$jobSlug] = $job;
+                $this->addEntityToMap($job);
+            }
+        }
+
+        return $result;
     }
 } 
