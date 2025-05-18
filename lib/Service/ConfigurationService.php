@@ -121,23 +121,6 @@ class ConfigurationService
     private array $mappings = [];
 
     /**
-     * Map of entity IDs to their full entities.
-     * Used during import to resolve references and maintain entity relationships.
-     *
-     * Structure:
-     * [
-     *     'entityType' => [
-     *         'id1' => EntityObject1,
-     *         'id2' => EntityObject2,
-     *         ...
-     *     ]
-     * ]
-     *
-     * @var array<string,array<string,Entity>>
-     */
-    private array $entityMap = [];
-
-    /**
      * ConfigurationService constructor.
      *
      * @param SourceMapper $sourceMapper
@@ -223,36 +206,6 @@ class ConfigurationService
         $this->mappings['register']['slugToId'] = $this->registerMapper->getSlugToIdMap();
         $this->mappings['schema']['idToSlug'] = $this->schemaMapper->getIdToSlugMap();
         $this->mappings['schema']['slugToId'] = $this->schemaMapper->getSlugToIdMap();
-    }
-
-    /**
-     * Add an entity to the entity map
-     *
-     * @param Entity $entity The entity to add
-     */
-    private function addEntityToMap(Entity $entity): void
-    {
-        $id = $entity->getId();
-        if ($id === null) {
-            return;
-        }
-
-        // Determine entity type
-        $type = match(true) {
-            $entity instanceof Endpoint => 'endpoint',
-            $entity instanceof Job => 'job',
-            $entity instanceof Synchronization => 'synchronization',
-            $entity instanceof Mapping => 'mapping',
-            $entity instanceof Rule => 'rule',
-            $entity instanceof Source => 'source',
-            $entity instanceof Register => 'register',
-            $entity instanceof Schema => 'schema',
-            default => null
-        };
-
-        if ($type !== null) {
-            $this->entityMap[$type][$id] = $entity;
-        }
     }
 
     /**
@@ -435,17 +388,11 @@ class ConfigurationService
         // Get register slugs
         if (!empty($registerIds)) {
             $registers = $this->registerMapper->findAll(filters: ['id' => $registerIds]);
-            foreach ($registers as $register) {
-                $this->addEntityToMap($register);
-            }
         }
 
         // Get schema slugs
         if (!empty($schemaIds)) {
             $schemas = $this->schemaMapper->findAll(filters: ['id' => $schemaIds]);
-            foreach ($schemas as $schema) {
-                $this->addEntityToMap($schema);
-            }
         }
     }
 
@@ -546,7 +493,6 @@ class ConfigurationService
             $mappings = $this->mappingMapper->findAll(filters: ['id' => $mappingIds]);
             $indexedMappings = [];
             foreach ($mappings as $mapping) {
-                $this->addEntityToMap($mapping);
                 $indexedMappings[$mapping->getSlug()] = $this->exportMapping($mapping);
             }
             $components['components']['mappings'] = $indexedMappings;
@@ -556,7 +502,6 @@ class ConfigurationService
             $sources = $this->sourceMapper->findAll(filters: ['id' => $sourceIds]);
             $indexedSources = [];
             foreach ($sources as $source) {
-                $this->addEntityToMap($source);
                 $indexedSources[$source->getSlug()] = $this->exportSource($source);
             }
             $components['components']['sources'] = $indexedSources;
@@ -566,7 +511,6 @@ class ConfigurationService
             $rules = $this->ruleMapper->findAll(filters: ['id' => $ruleIds]);
             $indexedRules = [];
             foreach ($rules as $rule) {
-                $this->addEntityToMap($rule);
                 $indexedRules[$rule->getSlug()] = $this->exportRule($rule);
             }
             $components['components']['rules'] = $indexedRules;
@@ -577,7 +521,6 @@ class ConfigurationService
             $endpoints = $this->endpointMapper->findAll(filters: ['id' => $endpointIds]);
             $indexedEndpoints = [];
             foreach ($endpoints as $endpoint) {
-                $this->addEntityToMap($endpoint);
                 $indexedEndpoints[$endpoint->getSlug()] = $this->exportEndpoint($endpoint);
             }
             $components['components']['endpoints'] = $indexedEndpoints;
@@ -588,7 +531,6 @@ class ConfigurationService
             $synchronizations = $this->synchronizationMapper->findAll(filters: ['id' => $synchronizationIds]);
             $indexedSynchronizations = [];
             foreach ($synchronizations as $synchronization) {
-                $this->addEntityToMap($synchronization);
                 $indexedSynchronizations[$synchronization->getSlug()] = $this->exportSynchronization($synchronization);
             }
             $components['components']['synchronizations'] = $indexedSynchronizations;
@@ -603,7 +545,6 @@ class ConfigurationService
             );
             $indexedJobs = [];
             foreach ($jobs as $job) {
-                $this->addEntityToMap($job);
                 $indexedJobs[$job->getSlug()] = $this->exportJob($job);
             }
             $components['components']['jobs'] = $indexedJobs;
@@ -656,7 +597,6 @@ class ConfigurationService
             foreach ($components['sources'] as $sourceSlug => $sourceData) {
                 $source = $this->handlers['source']->import($sourceData, $this->mappings);
                 $result['sources'][$sourceSlug] = $source;
-                $this->addEntityToMap($source);
             }
         }
 
@@ -665,7 +605,6 @@ class ConfigurationService
             foreach ($components['mappings'] as $mappingSlug => $mappingData) {
                 $mapping = $this->handlers['mapping']->import($mappingData, $this->mappings);
                 $result['mappings'][$mappingSlug] = $mapping;
-                $this->addEntityToMap($mapping);
             }
         }
 
@@ -674,7 +613,6 @@ class ConfigurationService
             foreach ($components['rules'] as $ruleSlug => $ruleData) {
                 $rule = $this->handlers['rule']->import($ruleData, $this->mappings);
                 $result['rules'][$ruleSlug] = $rule;
-                $this->addEntityToMap($rule);
             }
         }
 
@@ -683,7 +621,6 @@ class ConfigurationService
             foreach ($components['endpoints'] as $endpointSlug => $endpointData) {
                 $endpoint = $this->handlers['endpoint']->import($endpointData, $this->mappings);
                 $result['endpoints'][$endpointSlug] = $endpoint;
-                $this->addEntityToMap($endpoint);
             }
         }
 
@@ -692,7 +629,6 @@ class ConfigurationService
             foreach ($components['synchronizations'] as $syncSlug => $syncData) {
                 $synchronization = $this->handlers['synchronization']->import($syncData, $this->mappings);
                 $result['synchronizations'][$syncSlug] = $synchronization;
-                $this->addEntityToMap($synchronization);
             }
         }
 
@@ -701,7 +637,6 @@ class ConfigurationService
             foreach ($components['jobs'] as $jobSlug => $jobData) {
                 $job = $this->handlers['job']->import($jobData, $this->mappings);
                 $result['jobs'][$jobSlug] = $job;
-                $this->addEntityToMap($job);
             }
         }
 

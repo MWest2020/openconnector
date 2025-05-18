@@ -226,4 +226,46 @@ class RuleMapper extends QBMapper
 		$sql = 'SELECT * FROM `' . $this->getTableName() . '` WHERE JSON_CONTAINS(configurations, ?)';
 		return $this->findEntities($sql, [$configurationId]);
 	}
+
+	/**
+	 * Get a map of rule IDs to their corresponding slugs
+	 *
+	 * @return array<string,string> Array mapping rule IDs to slugs
+	 */
+	public function getIdToSlugMap(): array
+	{
+		$qb = $this->db->getQueryBuilder();
+		$qb->select('id', 'slug')
+		   ->from($this->getTableName());
+
+		$result = $qb->execute();
+		$map = [];
+		while ($row = $result->fetch()) {
+			$map[$row['id']] = $row['slug'];
+		}
+		$result->closeCursor();
+
+		return $map;
+	}
+
+	/**
+	 * Get a map of rule slugs to their corresponding IDs
+	 *
+	 * @return array<string,string> Array mapping rule slugs to IDs
+	 */
+	public function getSlugToIdMap(): array
+	{
+		$qb = $this->db->getQueryBuilder();
+		$qb->select('id', 'slug')
+		   ->from($this->getTableName());
+
+		$result = $qb->execute();
+		$map = [];
+		while ($row = $result->fetch()) {
+			$map[$row['slug']] = $row['id'];
+		}
+		$result->closeCursor();
+
+		return $map;
+	}
 }
