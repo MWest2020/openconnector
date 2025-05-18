@@ -189,4 +189,136 @@ class ConfigurationService
         return 'default';
     }
 
+    /**
+     * Export all entities (endpoints and synchronizations) connected to a specific register.
+     * Entities are organized by their type and indexed by slug.
+     * Also includes related rules, mappings, and sources.
+     *
+     * @param string $registerId The ID of the register to export entities for
+     * @param bool $includeEndpoints Whether to include endpoints in the export (default: true)
+     * @param bool $includeSynchronizations Whether to include synchronizations in the export (default: true)
+     * @param bool $searchSource Whether to search in source fields for synchronizations (default: true)
+     * @param bool $searchTarget Whether to search in target fields for synchronizations (default: true)
+     * @return array<string,array> JSON-serializable array containing all connected entities
+     */
+    public function exportRegister(
+        string $registerId,
+        bool $includeEndpoints = true,
+        bool $includeSynchronizations = true,
+        bool $searchSource = true,
+        bool $searchTarget = true
+    ): array {
+        $components = [
+            'components' => [],
+        ];
+
+        // Collect all entity IDs for batch processing
+        $ruleIds = [];
+        $mappingIds = [];
+        $sourceIds = [];
+        $endpointIds = [];
+        $synchronizationIds = [];
+
+        // Get and organize endpoints if requested
+        if ($includeEndpoints) {
+            $endpoints = $this->endpointMapper->getByTarget(registerId: $registerId);
+            $indexedEndpoints = [];
+            foreach ($endpoints as $endpoint) {
+                $indexedEndpoints[$endpoint->getSlug()] = $endpoint;
+                $endpointIds[] = $endpoint->getId();
+                
+                // Collect related IDs
+                if ($endpoint->getInputMapping() !== null) {
+                    $mappingIds[] = $endpoint->getInputMapping();
+                }
+                if ($endpoint->getOutputMapping() !== null) {
+                    $mappingIds[] = $endpoint->getOutputMapping();
+                }
+                if ($endpoint->getTargetType() === 'api') {
+                    $sourceIds[] = $endpoint->getTargetId();
+                }
+            }
+            $components['components']['endpoints'] = $indexedEndpoints;
+        }
+
+        // Get and organize synchronizations if requested
+        if ($includeSynchronizations) {
+            $synchronizations = $this->synchronizationMapper->getByTarget(
+                registerId: $registerId,
+                searchSource: $searchSource,
+                searchTarget: $searchTarget
+            );
+            $indexedSynchronizations = [];
+            foreach ($synchronizations as $synchronization) {
+                $indexedSynchronizations[$synchronization->getSlug()] = $synchronization;
+                $synchronizationIds[] = $synchronization->getId();
+                
+                // Collect related IDs
+                if ($synchronization->getSourceTargetMapping() !== null) {
+                    $mappingIds[] = $synchronization->getSourceTargetMapping();
+                }
+                if ($synchronization->getTargetSourceMapping() !== null) {
+                    $mappingIds[] = $synchronization->getTargetSourceMapping();
+                }
+                if ($synchronization->getSourceType() === 'api') {
+                    $sourceIds[] = $synchronization->getSourceId();
+                }
+                if ($synchronization->getTargetType() === 'api') {
+                    $sourceIds[] = $synchronization->getTargetId();
+                }
+            }
+            $components['components']['synchronizations'] = $indexedSynchronizations;
+        }
+
+        // Remove duplicates from collected IDs
+        $ruleIds = array_unique($ruleIds);
+        $mappingIds = array_unique($mappingIds);
+        $sourceIds = array_unique($sourceIds);
+        $endpointIds = array_unique($endpointIds);
+        $synchronizationIds = array_unique($synchronizationIds);
+
+        // Batch fetch related entities
+        if (!empty($mappingIds)) {
+            $mappings = $this->mappingMapper->findAll(filters: ['id' => $mappingIds]);
+            $indexedMappings = [];
+            foreach ($mappings as $mapping) {
+                $indexedMappings[$mapping->getSlug()] = $mapping;
+            }
+            $components['components']['mappings'] = $indexedMappings;
+        }
+
+        if (!empty($sourceIds)) {
+            $sources = $this->sourceMapper->findAll(filters: ['id' => $sourceIds]);
+            $indexedSources = [];
+            foreach ($sources as $source) {
+                $indexedSources[$source->getSlug()] = $source;
+            }
+            $components['components']['sources'] = $indexedSources;
+        }
+
+        if (!empty($ruleIds)) {
+            $rules = $this->ruleMapper->findAll(filters: ['id' => $ruleIds]);
+            $indexedRules = [];
+            foreach ($rules as $rule) {
+                $indexedRules[$rule->getSlug()] = $rule;
+            }
+            $components['components']['rules'] = $indexedRules;
+        }
+
+        // Get related jobs
+        if (!empty($endpointIds) || !empty($synchronizationIds) || !empty($sourceIds)) {
+            $jobs = $this->jobMapper->findByArgumentIds(
+                synchronizationIds: $synchronizationIds,
+                endpointIds: $endpointIds,
+                sourceIds: $sourceIds
+            );
+            $indexedJobs = [];
+            foreach ($jobs as $job) {
+                $indexedJobs[$job->getSlug()] = $job;
+            }
+            $components['components']['jobs'] = $indexedJobs;
+        }
+
+        return $components;
+    }
 } 

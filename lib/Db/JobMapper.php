@@ -141,4 +141,62 @@ class JobMapper extends QBMapper
         $sql = 'SELECT * FROM `' . $this->getTableName() . '` WHERE JSON_CONTAINS(configurations, ?)';
         return $this->findEntities($sql, [$configurationId]);
     }
+
+    /**
+     * Find all jobs that have any of the given IDs in their arguments.
+     * This will search through the arguments JSON field for specific ID types.
+     *
+     * @param array<string> $synchronizationIds Array of synchronization IDs to search for
+     * @param array<string> $endpointIds Array of endpoint IDs to search for
+     * @param array<string> $sourceIds Array of source IDs to search for
+     * @return array<Job> Array of Job entities
+     */
+    public function findByArgumentIds(
+        array $synchronizationIds = [],
+        array $endpointIds = [],
+        array $sourceIds = []
+    ): array {
+        if (empty($synchronizationIds) && empty($endpointIds) && empty($sourceIds)) {
+            return [];
+        }
+
+        $qb = $this->db->getQueryBuilder();
+        $qb->select('*')
+            ->from($this->getTableName());
+
+        // Build conditions for each type of ID
+        $conditions = [];
+
+        // Add conditions for synchronization IDs
+        if (!empty($synchronizationIds)) {
+            $syncConditions = [];
+            foreach ($synchronizationIds as $id) {
+                $syncConditions[] = $qb->expr()->like('arguments', $qb->createNamedParameter('%"synchronizationId":"' . $id . '"%'));
+            }
+            $conditions[] = $qb->expr()->orX(...$syncConditions);
+        }
+
+        // Add conditions for endpoint IDs
+        if (!empty($endpointIds)) {
+            $endpointConditions = [];
+            foreach ($endpointIds as $id) {
+                $endpointConditions[] = $qb->expr()->like('arguments', $qb->createNamedParameter('%"endpointId":"' . $id . '"%'));
+            }
+            $conditions[] = $qb->expr()->orX(...$endpointConditions);
+        }
+
+        // Add conditions for source IDs
+        if (!empty($sourceIds)) {
+            $sourceConditions = [];
+            foreach ($sourceIds as $id) {
+                $sourceConditions[] = $qb->expr()->like('arguments', $qb->createNamedParameter('%"sourceId":"' . $id . '"%'));
+            }
+            $conditions[] = $qb->expr()->orX(...$sourceConditions);
+        }
+
+        // Combine all conditions with OR
+        $qb->where($qb->expr()->orX(...$conditions));
+
+        return $this->findEntities($qb);
+    }
 }

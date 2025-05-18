@@ -160,4 +160,73 @@ class SynchronizationMapper extends QBMapper
         $sql = 'SELECT * FROM `' . $this->getTableName() . '` WHERE JSON_CONTAINS(configurations, ?)';
         return $this->findEntities($sql, [$configurationId]);
     }
+
+    /**
+     * Find all synchronizations that are connected to a specific register and/or schema.
+     * Synchronizations are considered connected if:
+     * 1. Their sourceType or targetType is 'register/schema'
+     * 2. The sourceId or targetId matches the provided register and/or schema
+     *
+     * @param string|null $registerId The ID of the register to find synchronizations for
+     * @param string|null $schemaId The ID of the schema to find synchronizations for
+     * @param bool $searchSource Whether to search in source fields (default: true)
+     * @param bool $searchTarget Whether to search in target fields (default: true)
+     * @return array<Synchronization> Array of Synchronization entities
+     * @throws \InvalidArgumentException If neither registerId nor schemaId is provided
+     */
+    public function getByTarget(?string $registerId = null, ?string $schemaId = null, bool $searchSource = true, bool $searchTarget = true): array
+    {
+        // Validate that at least one parameter is provided
+        if ($registerId === null && $schemaId === null) {
+            throw new \InvalidArgumentException('Either registerId or schemaId must be provided');
+        }
+
+        // Validate that at least one search location is specified
+        if (!$searchSource && !$searchTarget) {
+            throw new \InvalidArgumentException('At least one of searchSource or searchTarget must be true');
+        }
+
+        $qb = $this->db->getQueryBuilder();
+        $qb->select('*')
+            ->from($this->getTableName());
+
+        // Build the conditions for source and target
+        $conditions = [];
+        $params = [];
+
+        if ($searchSource) {
+            $sourceConditions = [];
+            $sourceConditions[] = $qb->expr()->eq('source_type', $qb->createNamedParameter('register/schema'));
+            
+            if ($registerId !== null && $schemaId !== null) {
+                $sourceConditions[] = $qb->expr()->eq('source_id', $qb->createNamedParameter($registerId . '/' . $schemaId));
+            } elseif ($registerId !== null) {
+                $sourceConditions[] = $qb->expr()->like('source_id', $qb->createNamedParameter($registerId . '/%'));
+            } else {
+                $sourceConditions[] = $qb->expr()->like('source_id', $qb->createNamedParameter('%/' . $schemaId));
+            }
+            
+            $conditions[] = $qb->expr()->andX(...$sourceConditions);
+        }
+
+        if ($searchTarget) {
+            $targetConditions = [];
+            $targetConditions[] = $qb->expr()->eq('target_type', $qb->createNamedParameter('register/schema'));
+            
+            if ($registerId !== null && $schemaId !== null) {
+                $targetConditions[] = $qb->expr()->eq('target_id', $qb->createNamedParameter($registerId . '/' . $schemaId));
+            } elseif ($registerId !== null) {
+                $targetConditions[] = $qb->expr()->like('target_id', $qb->createNamedParameter($registerId . '/%'));
+            } else {
+                $targetConditions[] = $qb->expr()->like('target_id', $qb->createNamedParameter('%/' . $schemaId));
+            }
+            
+            $conditions[] = $qb->expr()->andX(...$targetConditions);
+        }
+
+        // Combine conditions with OR
+        $qb->where($qb->expr()->orX(...$conditions));
+
+        return $this->findEntities($qb);
+    }
 }

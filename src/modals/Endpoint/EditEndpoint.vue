@@ -42,6 +42,10 @@ import { Endpoint } from '../../entities/index.js'
 						label="Endpoint Regex"
 						:value.sync="endpointItem.endpointRegex" />
 
+					<NcTextField
+						label="Slug"
+						:value.sync="endpointItem.slug" />
+
 					<div>
 						<NcSelect v-bind="methodOptions"
 							v-model="methodOptions.value" />
@@ -62,6 +66,14 @@ import { Endpoint } from '../../entities/index.js'
 							v-model="schemaOptions.value"
 							:disabled="!registerOptions.value || schemasLoading"
 							input-label="Schema" />
+					</div>
+
+					<div>
+						<NcSelect v-bind="configurationOptions"
+							v-model="configurationOptions.value"
+							input-label="Configurations"
+							:multiple="true"
+							:disabled="configurationsLoading" />
 					</div>
 				</div>
 			</form>
@@ -116,6 +128,8 @@ export default {
 				method: '',
 				targetType: '',
 				targetId: '',
+				slug: '',
+				configurations: [],
 			},
 			success: null,
 			loading: false,
@@ -150,11 +164,16 @@ export default {
 				options: [],
 				value: null,
 			},
+			configurationOptions: {
+				options: [],
+				value: [],
+			},
 			schemas: [],
 			hasUpdated: false,
 			closeTimeoutFunc: null,
 			registersLoading: false,
 			schemasLoading: false,
+			configurationsLoading: false,
 			initialSchemaSet: false,
 		}
 	},
@@ -170,6 +189,7 @@ export default {
 		this.initializeEndpointItem()
 		this.fetchRegisters()
 		this.fetchSchemas()
+		this.fetchConfigurations()
 	},
 	updated() {
 		if (navigationStore.modal === 'editEndpoint' && !this.hasUpdated) {
@@ -191,12 +211,22 @@ export default {
 					method: endpointStore.endpointItem.method,
 					targetType: this.targetTypeOptions.options.find(i => i.label === endpointStore.endpointItem.targetType),
 					targetId: endpointStore.endpointItem.targetId,
+					slug: endpointStore.endpointItem.slug,
+					configurations: endpointStore.endpointItem.configurations || [],
 				}
 
 				// If the method of the endpointItem exists on the methodOptions, apply it to the value
 				// this is done for future proofing incase we were to change the method options
 				if (this.methodOptions.options.map(i => i.label).indexOf(endpointStore.endpointItem.method) >= 0) {
 					this.methodOptions.value = { label: endpointStore.endpointItem.method }
+				}
+
+				// Set the configurations value if there are any
+				if (this.endpointItem.configurations?.length > 0) {
+					this.configurationOptions.value = this.endpointItem.configurations.map(id => ({
+						id,
+						label: this.configurationOptions.options.find(opt => opt.id === id)?.label || id,
+					}))
 				}
 			}
 		},
@@ -216,6 +246,8 @@ export default {
 				method: '',
 				targetType: '',
 				targetId: '',
+				slug: '',
+				configurations: [],
 			}
 			this.methodOptions.value = { label: 'GET' }
 			this.targetTypeOptions.value = { label: 'register/schema' }
@@ -308,7 +340,49 @@ export default {
 
 			this.schemasLoading = false
 		},
+		async fetchConfigurations() {
+			this.configurationsLoading = true
 
+			try {
+				console.info('Fetching configurations from Open Register')
+				const response = await fetch('/index.php/apps/openregister/api/configurations', {
+					headers: {
+						accept: '*/*',
+						'accept-language': 'en-US,en;q=0.9,nl;q=0.8',
+						'cache-control': 'no-cache',
+						pragma: 'no-cache',
+						'x-requested-with': 'XMLHttpRequest',
+					},
+					referrerPolicy: 'no-referrer',
+					body: null,
+					method: 'GET',
+					mode: 'cors',
+					credentials: 'include',
+				})
+
+				if (!response.ok) {
+					console.info('Failed to fetch configurations')
+					return
+				}
+
+				const responseData = (await response.json()).results
+
+				this.configurationOptions = {
+					options: responseData.map((config) => ({
+						id: config.id,
+						label: config.name,
+					})),
+					value: this.endpointItem.configurations?.map(id => ({
+						id,
+						label: responseData.find(c => c.id === id)?.name || id,
+					})) || [],
+				}
+			} catch (error) {
+				console.error('Error fetching configurations:', error)
+			} finally {
+				this.configurationsLoading = false
+			}
+		},
 		setSchemaOptions(register) {
 			const schemaId = endpointStore.endpointItem?.targetId.split('/')[1]
 
@@ -334,7 +408,6 @@ export default {
 			this.initialSchemaSet = true
 
 		},
-
 		async editEndpoint() {
 			this.loading = true
 
@@ -344,6 +417,7 @@ export default {
 				method: this.methodOptions.value.label,
 				targetType: this.targetTypeOptions.value.label,
 				targetId: `${this.registerOptions.value.id}/${this.schemaOptions.value.id}`,
+				configurations: this.configurationOptions.value.map(v => v.id),
 			})
 
 			await endpointStore.saveEndpoint(endpointItem)

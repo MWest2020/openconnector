@@ -204,4 +204,51 @@ class EndpointMapper extends QBMapper
         $sql = 'SELECT * FROM `' . $this->getTableName() . '` WHERE JSON_CONTAINS(configurations, ?)';
         return $this->findEntities($sql, [$configurationId]);
     }
+
+    /**
+     * Find all endpoints that are connected to a specific register and/or schema.
+     * Endpoints are considered connected if:
+     * 1. Their targetType is 'register/schema'
+     * 2. The targetId matches the provided register and/or schema
+     *
+     * @param string|null $registerId The ID of the register to find endpoints for
+     * @param string|null $schemaId The ID of the schema to find endpoints for
+     * @return array<Endpoint> Array of Endpoint entities
+     * @throws \InvalidArgumentException If neither registerId nor schemaId is provided
+     */
+    public function getByTarget(?string $registerId = null, ?string $schemaId = null): array
+    {
+        // Validate that at least one parameter is provided
+        if ($registerId === null && $schemaId === null) {
+            throw new \InvalidArgumentException('Either registerId or schemaId must be provided');
+        }
+
+        $qb = $this->db->getQueryBuilder();
+
+        $qb->select('*')
+            ->from($this->getTableName())
+            ->where(
+                $qb->expr()->eq('target_type', $qb->createNamedParameter('register/schema'))
+            );
+
+        // Build the target_id condition based on provided parameters
+        if ($registerId !== null && $schemaId !== null) {
+            // Both register and schema are provided - exact match
+            $qb->andWhere(
+                $qb->expr()->eq('target_id', $qb->createNamedParameter($registerId . '/' . $schemaId))
+            );
+        } elseif ($registerId !== null) {
+            // Only register is provided - match any schema
+            $qb->andWhere(
+                $qb->expr()->like('target_id', $qb->createNamedParameter($registerId . '/%'))
+            );
+        } else {
+            // Only schema is provided - match any register
+            $qb->andWhere(
+                $qb->expr()->like('target_id', $qb->createNamedParameter('%/' . $schemaId))
+            );
+        }
+
+        return $this->findEntities($qb);
+    }
 }
