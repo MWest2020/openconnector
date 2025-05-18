@@ -176,7 +176,7 @@ class Endpoint extends Entity implements JsonSerializable
             'outputMapping' => $this->outputMapping,
             'rules' => $this->rules,
             'configurations' => $this->configurations,
-            'slug' => $this->slug,
+            'slug' => $this->getSlug(),
             'created' => isset($this->created) ? $this->created->format('c') : null,
             'updated' => isset($this->updated) ? $this->updated->format('c') : null
         ];

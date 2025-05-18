@@ -256,7 +256,7 @@ class Synchronization extends Entity implements JsonSerializable
 			'actions' => $this->actions,
 			'configurations' => $this->configurations,
 			'status' => $this->status,
-			'slug' => $this->slug,
+			'slug' => $this->getSlug(),
 		];
 	}
 }

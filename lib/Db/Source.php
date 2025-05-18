@@ -285,7 +285,7 @@ class Source extends Entity implements JsonSerializable
 			'dateCreated' => isset($this->dateCreated) ? $this->dateCreated->format('c') : null,
 			'dateModified' => isset($this->dateModified) ? $this->dateModified->format('c') : null,
 			'configurations' => $this->configurations,
-			'slug' => $this->slug,
+			'slug' => $this->getSlug(),
 		];
 	}
 }

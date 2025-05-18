@@ -160,7 +160,7 @@ class Mapping extends Entity implements JsonSerializable
 			'configurations' => $this->configurations,
 			'dateCreated' => isset($this->dateCreated) ? $this->dateCreated->format('c') : null,
 			'dateModified' => isset($this->dateModified) ? $this->dateModified->format('c') : null,
-			'slug' => $this->slug,
+			'slug' => $this->getSlug(),
 		];
 	}
 }

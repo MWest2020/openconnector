@@ -168,7 +168,7 @@ class Rule extends Entity implements JsonSerializable
             'configurations' => $this->configurations,
             'created' => isset($this->created) ? $this->created->format('c') : null,
             'updated' => isset($this->updated) ? $this->updated->format('c') : null,
-            'slug' => $this->slug,
+            'slug' => $this->getSlug(),
         ];
     }
 }

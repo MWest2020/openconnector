@@ -39,7 +39,36 @@ class SourceHandler implements ConfigurationHandlerInterface
         }
 
         $sourceArray = $entity->jsonSerialize();
-        unset($sourceArray['id'], $sourceArray['uuid']);
+        
+        // Remove sensitive data
+        unset(
+            $sourceArray['id'],
+            $sourceArray['uuid'],
+            $sourceArray['authorizationHeader'],
+            $sourceArray['auth'],
+            $sourceArray['authenticationConfig'],
+            $sourceArray['authorizationPassthroughMethod'],
+            $sourceArray['jwt'],
+            $sourceArray['jwtId'],
+            $sourceArray['secret'],
+            $sourceArray['username'],
+            $sourceArray['password'],
+            $sourceArray['apikey']
+        );
+
+        // Sanitize configuration to remove sensitive headers
+        if (isset($sourceArray['configuration']) && is_array($sourceArray['configuration'])) {
+            foreach ($sourceArray['configuration'] as $key => $value) {
+                if (str_starts_with($key, 'headers.') && 
+                    (str_contains(strtolower($key), 'authorization') || 
+                     str_contains(strtolower($key), 'token') || 
+                     str_contains(strtolower($key), 'key') || 
+                     str_contains(strtolower($key), 'secret'))) {
+                    unset($sourceArray['configuration'][$key]);
+                }
+            }
+        }
+
         return $sourceArray;
     }
 
