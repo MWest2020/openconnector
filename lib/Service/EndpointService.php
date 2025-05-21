@@ -207,7 +207,24 @@ class EndpointService
                     return $ruleResult;
                 }
 
-                return new JSONResponse($ruleResult['body'], 200, $ruleResult['headers']);
+                // Set the proper status code for the method.
+                //@TODO: we might want an override from rule processing.
+                switch ($incomingMethod) {
+                    case 'POST':
+                        $statusCode = Http::STATUS_CREATED;
+                        break;
+                    case 'DELETE':
+                        $statusCode = Http::STATUS_NO_CONTENT;
+                        break;
+                    case 'GET':
+                    case 'PUT':
+                    case 'PATCH':
+                    default:
+                        $statusCode = Http::STATUS_OK;
+                        break;
+                }
+
+                return new JSONResponse(data: $ruleResult['body'], statusCode: $statusCode, headers: $ruleResult['headers']);
             }
 
             // Check if endpoint connects to a source
