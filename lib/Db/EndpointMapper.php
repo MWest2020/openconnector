@@ -96,19 +96,19 @@ class EndpointMapper extends QBMapper
 		// Apply ID filters if provided
 		if (!empty($ids)) {
 			$idConditions = [];
-			
+
 			if (!empty($ids['id'])) {
 				$idConditions[] = $qb->expr()->in('id', $qb->createNamedParameter($ids['id'], IQueryBuilder::PARAM_INT_ARRAY));
 			}
-			
+
 			if (!empty($ids['uuid'])) {
 				$idConditions[] = $qb->expr()->in('uuid', $qb->createNamedParameter($ids['uuid'], IQueryBuilder::PARAM_STR_ARRAY));
 			}
-			
+
 			if (!empty($ids['slug'])) {
 				$idConditions[] = $qb->expr()->in('slug', $qb->createNamedParameter($ids['slug'], IQueryBuilder::PARAM_STR_ARRAY));
 			}
-			
+
 			if (!empty($idConditions)) {
 				$qb->andWhere($qb->expr()->orX(...$idConditions));
 			}
@@ -175,7 +175,9 @@ class EndpointMapper extends QBMapper
 		}
 
 		// Endpoint-specific logic
-		$obj->setEndpointRegex($this->createEndpointRegex($obj->getEndpoint()));
+		if($obj->getEndpointRegex() === null) {
+			$obj->setEndpointRegex($this->createEndpointRegex($obj->getEndpoint()));
+		}
 		$obj->setEndpointArray(explode('/', $obj->getEndpoint()));
 
 		return $this->insert(entity: $obj);
@@ -197,10 +199,16 @@ class EndpointMapper extends QBMapper
 			}
 		}
 
+		if($obj->getEndpoint() !== $object['endpoint']) {
+			$updateRegex = true;
+		}
+
 		$obj->hydrate($object);
 
 		// Endpoint-specific logic
-		$obj->setEndpointRegex($this->createEndpointRegex($obj->getEndpoint()));
+		if($updateRegex === true) {
+			$obj->setEndpointRegex($this->createEndpointRegex($obj->getEndpoint()));
+		}
 		$obj->setEndpointArray(explode('/', $obj->getEndpoint()));
 
 		return $this->update($obj);
