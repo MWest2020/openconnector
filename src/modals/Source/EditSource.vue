@@ -25,8 +25,8 @@ import { Source } from '../../entities/index.js'
 						:value.sync="sourceItem.name" />
 
 					<NcTextArea
-						resize="vertical"
 						id="description"
+						resize="vertical"
 						label="Description"
 						:value.sync="sourceItem.description" />
 

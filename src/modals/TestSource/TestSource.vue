@@ -29,8 +29,8 @@ import { sourceStore, navigationStore } from '../../store/store.js'
 							:value.sync="testSourceItem.endpoint" />
 					</div>
 					<NcTextArea
-						resize="vertical"
 						id="body"
+						resize="vertical"
 						label="Body"
 						:value.sync="testSourceItem.body" />
 				</div>
