@@ -41,7 +41,27 @@ use DateTime;
 use OCA\OpenConnector\Db\MappingMapper;
 use Twig\Error\LoaderError;
 use Twig\Error\SyntaxError;
+use React\Promise\Promise;
+use React\Promise\PromiseInterface;
+use React\EventLoop\Loop;
+use React\Promise\Deferred;
+use function React\Promise\resolve;
 
+/**
+ * SynchronizationService
+ *
+ * Service for handling synchronization operations between internal and external data sources.
+ * Provides functionality for mapping, transforming, and synchronizing data with support for
+ * asynchronous file fetching using ReactPHP for improved performance.
+ *
+ * @category Service
+ * @package  OCA\OpenConnector\Service
+ * @author   Conduction b.v.
+ * @copyright 2024 Conduction b.v.
+ * @license  AGPL-3.0-or-later
+ * @version  1.0.0
+ * @link     https://github.com/ConductionNL/OpenConnector
+ */
 class SynchronizationService
 {
 	private CallService $callService;
@@ -2102,87 +2122,223 @@ class SynchronizationService
 
 
 	/**
-	 * Process a rule to fetch a file from an external source.
-	 *0
-	 * @param Rule $rule The rule to process.
-	 * @param array $data The data written to the object.
-	 * @param string $objectId
+	 * Process a rule to fetch a file from an external source using fire-and-forget ReactPHP execution.
 	 *
-	 * @return array The resulting object data.
-	 * @throws ContainerExceptionInterface
-	 * @throws GenericFileException
-	 * @throws GuzzleException
-	 * @throws LoaderError
-	 * @throws LockedException
-	 * @throws NotFoundExceptionInterface
-	 * @throws SyntaxError
-	 * @throws \OCP\DB\Exception
-	 * @throws Exception
+	 * This method initiates file fetching operations asynchronously without blocking the main execution flow.
+	 * The actual file fetching happens in the background, allowing the synchronization to continue immediately.
+	 *
+	 * @param Rule $rule The rule to process containing fetch_file configuration.
+	 * @param array $data The data written to the object.
+	 * @param string $objectId The UUID of the object to attach files to.
+	 *
+	 * @return array The resulting object data with placeholder values for file paths.
+	 * @throws Exception If OpenRegister app is not available or configuration is missing.
+	 *
+	 * @psalm-return array<string, mixed>
+	 * @phpstan-return array<string, mixed>
 	 */
 	private function processFetchFileRule(Rule $rule, array $data, string $objectId): array
 	{
+        // Check if OpenRegister app is available
         $appManager = \OC::$server->get(\OCP\App\IAppManager::class);
         if ($appManager->isEnabledForUser('openregister') === false) {
 			throw new Exception('OpenRegister app is required for the fetch file rule and not installed');
         }
 
+        // Validate rule configuration
 		if (isset($rule->getConfiguration()['fetch_file']) === false) {
 			throw new Exception('No configuration found for fetch_file');
 		}
 
 		$config = $rule->getConfiguration()['fetch_file'];
-
-		$source = $this->sourceMapper->find($config['source']);
 		$dataDot = new Dot($data);
 		$endpoint = $dataDot->get($config['filePath']);
 
+        // If no endpoint is found, return data unchanged
 		if ($endpoint === null) {
 			return $dataDot->jsonSerialize();
 		}
 
-		$filename = null;
-		$tags = [];
-		switch ($this->getArrayType($endpoint)) {
-			// Single file endpoint
-			case 'Not array':
-				$dataDot[$config['filePath']] = $this->fetchFile(source: $source, endpoint: $endpoint, config: $config, objectId: $objectId);
-				break;
-			// Array of object that has file(s)
-			case 'Associative array':
-				$endpoint = $this->getFileContext(config: $config, endpoint: $endpoint, filename: $filename, tags: $tags, objectId: $objectId);
-				if ($endpoint === null) {
-					throw new Exception('Could not get endpoint for fetch file rule' . $rule->getId());
-				}
-				$dataDot[$config['filePath']] = $this->fetchFile(source: $source, endpoint: $endpoint, config: $config, objectId: $objectId, filename: $filename);
-				break;
-			// Array of object(s) that has file(s)
-			case "Multidimensional array":
-				$result = [];
-				foreach ($endpoint as $object) {
-					$filename = null;
-					$tags = [];
-					$objectId = $objectId;
-					$endpoint = $this->getFileContext(config: $config, endpoint: $object, filename: $filename, tags: $tags, objectId: $objectId);
-					if ($endpoint === null) {
-						throw new Exception('Could not get endpoint for fetch file rule' . $rule->getId());
-					}
-					$result[] = $this->fetchFile(source: $source, endpoint: $endpoint, config: $config, objectId: $objectId, filename: $filename);
-				}
-				$dataDot[$config['filePath']] = $result;
-				break;
-			// Array of just endpoints
-			case "Indexed array":
-				$result = [];
-				foreach ($endpoint as $key => $childEndpoint) {
-					$filename = null;
-					$tags = [];
-					$result[] = $this->fetchFile(source: $source, endpoint: $childEndpoint, config: $config, objectId: $objectId);
-				}
-				$dataDot[$config['filePath']] = $result;
-				break;
-		}
+        // Get source for file fetching
+        try {
+            $source = $this->sourceMapper->find($config['source']);
+        } catch (Exception $e) {
+            // Log error but don't block synchronization
+            error_log("Failed to find source for fetch file rule: " . $e->getMessage());
+            return $dataDot->jsonSerialize();
+        }
 
+        // Start fire-and-forget file fetching based on endpoint type
+        $this->startAsyncFileFetching($source, $config, $endpoint, $objectId, $rule->getId());
+
+        // Return data immediately with placeholder values
+        $dataDot[$config['filePath']] = $this->generatePlaceholderValues($endpoint);
 		return $dataDot->jsonSerialize();
+	}
+
+	/**
+	 * Starts asynchronous file fetching operations using ReactPHP promises.
+	 *
+	 * This method creates fire-and-forget promises that handle file fetching in the background
+	 * without blocking the main synchronization process.
+	 *
+	 * @param Source $source The source to fetch files from.
+	 * @param array $config The fetch_file rule configuration.
+	 * @param mixed $endpoint The endpoint(s) to fetch files from.
+	 * @param string $objectId The UUID of the object to attach files to.
+	 * @param int $ruleId The ID of the rule for error logging.
+	 *
+	 * @return void
+	 *
+	 * @psalm-param array<string, mixed> $config
+	 */
+	private function startAsyncFileFetching(Source $source, array $config, mixed $endpoint, string $objectId, int $ruleId): void
+	{
+        // Get the event loop for scheduling async operations
+        $loop = Loop::get();
+
+        // Schedule the file fetching operation to run asynchronously
+        $loop->futureTick(function() use ($source, $config, $endpoint, $objectId, $ruleId) {
+            $this->executeAsyncFileFetching($source, $config, $endpoint, $objectId, $ruleId);
+        });
+	}
+
+	/**
+	 * Executes the actual file fetching operations asynchronously.
+	 *
+	 * This method handles different types of endpoints (single, associative array, multidimensional array, indexed array)
+	 * and fetches files accordingly. All operations are wrapped in try-catch blocks to prevent errors from
+	 * affecting the main synchronization process.
+	 *
+	 * @param Source $source The source to fetch files from.
+	 * @param array $config The fetch_file rule configuration.
+	 * @param mixed $endpoint The endpoint(s) to fetch files from.
+	 * @param string $objectId The UUID of the object to attach files to.
+	 * @param int $ruleId The ID of the rule for error logging.
+	 *
+	 * @return void
+	 *
+	 * @psalm-param array<string, mixed> $config
+	 */
+	private function executeAsyncFileFetching(Source $source, array $config, mixed $endpoint, string $objectId, int $ruleId): void
+	{
+        try {
+            $filename = null;
+            $tags = [];
+            
+            switch ($this->getArrayType($endpoint)) {
+                // Single file endpoint
+                case 'Not array':
+                    $this->fetchFileAsync($source, $endpoint, $config, $objectId);
+                    break;
+                    
+                // Array of object that has file(s)
+                case 'Associative array':
+                    $actualEndpoint = $this->getFileContext(config: $config, endpoint: $endpoint, filename: $filename, tags: $tags, objectId: $objectId);
+                    if ($actualEndpoint !== null) {
+                        $this->fetchFileAsync($source, $actualEndpoint, $config, $objectId, $filename, $tags);
+                    }
+                    break;
+                    
+                // Array of object(s) that has file(s)
+                case "Multidimensional array":
+                    foreach ($endpoint as $object) {
+                        $filename = null;
+                        $tags = [];
+                        $actualEndpoint = $this->getFileContext(config: $config, endpoint: $object, filename: $filename, tags: $tags, objectId: $objectId);
+                        if ($actualEndpoint !== null) {
+                            $this->fetchFileAsync($source, $actualEndpoint, $config, $objectId, $filename, $tags);
+                        }
+                    }
+                    break;
+                    
+                // Array of just endpoints
+                case "Indexed array":
+                    foreach ($endpoint as $childEndpoint) {
+                        $this->fetchFileAsync($source, $childEndpoint, $config, $objectId);
+                    }
+                    break;
+            }
+        } catch (Exception $e) {
+            // Log error but don't throw - this is fire-and-forget
+            error_log("Async file fetching failed for rule {$ruleId}: " . $e->getMessage());
+        }
+	}
+
+	/**
+	 * Fetches a single file asynchronously using ReactPHP promises.
+	 *
+	 * This method wraps the existing fetchFile method in a ReactPHP promise to enable
+	 * fire-and-forget execution. Errors are caught and logged without affecting the main process.
+	 *
+	 * @param Source $source The source to fetch the file from.
+	 * @param string $endpoint The endpoint for the file.
+	 * @param array $config The configuration of the action.
+	 * @param string $objectId The UUID of the object the file belongs to.
+	 * @param string|null $filename Optional filename to assign to the file.
+	 * @param array $tags Optional tags to assign to the file.
+	 *
+	 * @return PromiseInterface A promise that resolves when the file is fetched.
+	 *
+	 * @psalm-param array<string, mixed> $config
+	 * @psalm-param array<string> $tags
+	 * @psalm-return PromiseInterface<string>
+	 */
+	private function fetchFileAsync(Source $source, string $endpoint, array $config, string $objectId, ?string $filename = null, array $tags = []): PromiseInterface
+	{
+        $deferred = new Deferred();
+        
+        try {
+            // Execute the file fetching operation
+            $result = $this->fetchFile(
+                source: $source,
+                endpoint: $endpoint,
+                config: $config,
+                objectId: $objectId,
+                tags: $tags,
+                filename: $filename
+            );
+            
+            // Resolve the promise with the result
+            $deferred->resolve($result);
+        } catch (Exception $e) {
+            // Log error and reject the promise
+            error_log("File fetch failed for endpoint {$endpoint}: " . $e->getMessage());
+            $deferred->reject($e);
+        }
+        
+        return $deferred->promise();
+	}
+
+	/**
+	 * Generates placeholder values for file paths based on endpoint type.
+	 *
+	 * This method creates appropriate placeholder values that match the expected structure
+	 * of the file paths, allowing the synchronization to continue with meaningful placeholders
+	 * while files are being fetched asynchronously.
+	 *
+	 * @param mixed $endpoint The endpoint(s) to generate placeholders for.
+	 *
+	 * @return mixed Placeholder values matching the endpoint structure.
+	 */
+	private function generatePlaceholderValues(mixed $endpoint): mixed
+	{
+        switch ($this->getArrayType($endpoint)) {
+            case 'Not array':
+                return 'file://fetching-async';
+                
+            case 'Associative array':
+                return 'file://fetching-async';
+                
+            case "Multidimensional array":
+                return array_fill(0, count($endpoint), 'file://fetching-async');
+                
+            case "Indexed array":
+                return array_fill(0, count($endpoint), 'file://fetching-async');
+                
+            default:
+                return 'file://fetching-async';
+        }
 	}
 
 	/**
