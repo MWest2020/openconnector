@@ -1260,7 +1260,7 @@ export default {
 				break
 			case 'locking':
 				configuration.locking = {
-					action: this.ruleItem.configuration.locking.action,
+					action: this.ruleItem.configuration.locking.action.value || this.ruleItem.configuration.locking.action,
 					timeout: this.ruleItem.configuration.locking.timeout,
 				}
 				break

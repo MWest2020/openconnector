@@ -42,8 +42,8 @@ import { getTheme } from '../../services/getTheme.js'
 					<NcSelect
 						v-bind="authorizationTypeOptions"
 						v-model="authorizationTypeOptions.value" />
-
 					<div :class="`codeMirrorContainer ${getTheme()}`">
+						<span>Authorization Configuration</span>
 						<CodeMirror
 							v-model="authConfig"
 							:basic="true"
@@ -267,6 +267,50 @@ export default {
 }
 .codeMirrorContainer.dark > .vue-codemirror {
 	border: 1px dotted grey;
+}
+
+/* selection color */
+.codeMirrorContainer.light :deep(.cm-line)::selection,
+.codeMirrorContainer.light :deep(.cm-line) ::selection {
+	background-color: #d7eaff !important;
+    color: black;
+}
+.codeMirrorContainer.dark :deep(.cm-line)::selection,
+.codeMirrorContainer.dark :deep(.cm-line) ::selection {
+	background-color: #8fb3e6 !important;
+    color: black;
+}
+
+/* string */
+.codeMirrorContainer.light :deep(.cm-line .ͼe)::selection {
+    color: #2d770f;
+}
+.codeMirrorContainer.dark :deep(.cm-line .ͼe)::selection {
+    color: #104e0c;
+}
+
+/* boolean */
+.codeMirrorContainer.light :deep(.cm-line .ͼc)::selection {
+	color: #221199;
+}
+.codeMirrorContainer.dark :deep(.cm-line .ͼc)::selection {
+	color: #4026af;
+}
+
+/* null */
+.codeMirrorContainer.light :deep(.cm-line .ͼb)::selection {
+	color: #770088;
+}
+.codeMirrorContainer.dark :deep(.cm-line .ͼb)::selection {
+	color: #770088;
+}
+
+/* number */
+.codeMirrorContainer.light :deep(.cm-line .ͼd)::selection {
+	color: #8c5c2c;
+}
+.codeMirrorContainer.dark :deep(.cm-line .ͼd)::selection {
+	color: #623907;
 }
 
 .buttonContainer {
