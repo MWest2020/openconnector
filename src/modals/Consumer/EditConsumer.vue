@@ -26,9 +26,13 @@ import { getTheme } from '../../services/getTheme.js'
 				<div class="form-group editConsumerForm">
 					<NcTextField label="Name*" :value.sync="consumerItem.name" />
 
-					<NcTextArea label="Description" :value.sync="consumerItem.description" />
+					<NcTextArea
+						resize="vertical"
+						label="Description"
+						:value.sync="consumerItem.description" />
 
 					<NcTextArea
+						resize="vertical"
 						label="Domains"
 						:value.sync="consumerItem.domains"
 						helper-text="Enter domains separated by commas (e.g. example.com, example.org)." />
