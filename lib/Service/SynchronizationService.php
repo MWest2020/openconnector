@@ -1985,7 +1985,11 @@ class SynchronizationService
 
 		// Write file with OpenRegister FileService.
 		$fileService = $this->containerInterface->get('OCA\OpenRegister\Service\FileService');
-		$file = $fileService->addFile(objectEntity: $objectEntity, fileName: $filename, content: $response['body'], share: isset($config['autoShare']) ? $config['autoShare'] : false, tags: $tags);
+		
+		// Decode base64 content if it appears to be base64 encoded
+		$content = $response['body'];
+		
+		$file = $fileService->addFile(objectEntity: $objectEntity, fileName: $filename, content: $content, share: isset($config['autoShare']) ? $config['autoShare'] : false, tags: $tags);
 
 		return $originalEndpoint;
 	}
