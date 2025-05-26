@@ -311,11 +311,11 @@ class EndpointService
             $object = $mapper->find($serializedObject['id']);
         }
 
-        $uses = $object->getRelations();
-
-        if(isset($serializedObject) === true && !empty($serializedObject['@self']['relations'])) {
-            $uses = $serializedObject['@self']['relations'];
-        }
+        $uses = new Dot($object->jsonSerialize())->flatten();
+//
+//        if(isset($serializedObject) === true && !empty($serializedObject['@self']['relations'])) {
+//            $uses = $serializedObject['@self']['relations'];
+//        }
 
         $useUrls = [];
 
