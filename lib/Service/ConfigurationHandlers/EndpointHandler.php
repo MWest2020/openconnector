@@ -56,7 +56,7 @@ class EndpointHandler implements ConfigurationHandlerInterface
                     // For register/schema targets, split the ID and map both parts.
                     if (str_contains($endpointArray['targetId'], '/')) {
                         [$registerId, $schemaId] = explode('/', $endpointArray['targetId']);
-                        
+
                         // Map register ID to slug
                         if (isset($mappings['register']['idToSlug'][$registerId])) {
                             $registerSlug = $mappings['register']['idToSlug'][$registerId];
@@ -86,6 +86,20 @@ class EndpointHandler implements ConfigurationHandlerInterface
             $endpointArray['outputMapping'] = $mappings['mapping']['idToSlug'][$endpointArray['outputMapping']];
         }
 
+		$endpointArray['rules'] = array_filter(array_map(function(int|string $rule) use ($mappings) {
+			if(is_numeric($rule)) {
+				$rule = (int)$rule;
+			}
+			if(isset($mappings['rule']['idToSlug'][$rule]) === true) {
+
+				return $mappings['rule']['idToSlug'][$rule];
+			}
+			return null;
+		}, $endpointArray['rules']));
+
+
+
+
         return $endpointArray;
     }
 
@@ -109,7 +123,7 @@ class EndpointHandler implements ConfigurationHandlerInterface
                     // For register/schema targets, split the ID and map both parts.
                     if (str_contains($data['targetId'], '/')) {
                         [$registerSlug, $schemaSlug] = explode('/', $data['targetId']);
-                        
+
                         // Map register slug to ID
                         if (isset($mappings['register']['slugToId'][$registerSlug])) {
                             $registerId = $mappings['register']['slugToId'][$registerSlug];
@@ -144,7 +158,7 @@ class EndpointHandler implements ConfigurationHandlerInterface
             // Update existing endpoint.
             return $this->endpointMapper->updateFromArray($mappings['endpoint']['slugToId'][$data['slug']], $data);
         }
-        
+
         // Create new endpoint.
         return $this->endpointMapper->createFromArray($data);
     }
@@ -156,4 +170,4 @@ class EndpointHandler implements ConfigurationHandlerInterface
     {
         return 'endpoint';
     }
-} 
+}
