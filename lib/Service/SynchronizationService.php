@@ -239,8 +239,19 @@ class SynchronizationService
         ?string $source = null,
         ?array $data = null
     ): SynchronizationLog {
+        // Start overall timing measurement
+        $overallStartTime = microtime(true);
         $rateLimitException = null;
 
+        // Initialize timing data in result
+        $result = $log->getResult();
+        $result['timing'] = [
+            'stages' => [],
+            'total_ms' => 0
+        ];
+
+        // Stage 1: Configuration and validation
+        $stageStartTime = microtime(true);
         $sourceConfig = $this->callService->applyConfigDot($synchronization->getSourceConfig());
 
 		// If a source is provided, use it instead of the synchronization's source
@@ -255,6 +266,13 @@ class SynchronizationService
             throw new Exception('sourceId of synchronization cannot be empty. Canceling synchronization...');
         }
 
+        $result['timing']['stages']['configuration_validation'] = [
+            'duration_ms' => round((microtime(true) - $stageStartTime) * 1000, 2),
+            'description' => 'Configuration loading and source validation'
+        ];
+
+        // Stage 2: Fetching objects from source
+        $stageStartTime = microtime(true);
         try {
             $objectList = $this->getAllObjectsFromSource($synchronization, $isTest, $data);
         } catch (TooManyRequestsHttpException $e) {
@@ -262,7 +280,16 @@ class SynchronizationService
             $objectList = []; // Ensure it's defined
         }
 
-        $result = $log->getResult();
+        $fetchDuration = round((microtime(true) - $stageStartTime) * 1000, 2);
+        $result['timing']['stages']['fetch_objects'] = [
+            'duration_ms' => $fetchDuration,
+            'description' => 'Fetching objects from external source',
+            'objects_fetched' => count($objectList),
+            'rate_limited' => $rateLimitException !== null
+        ];
+
+        // Stage 3: Object list preparation
+        $stageStartTime = microtime(true);
         $result['objects']['found'] = count($objectList);
 
         if ($sourceConfig['resultsPosition'] === '_object') {
@@ -270,9 +297,20 @@ class SynchronizationService
             $result['objects']['found'] = count($objectList);
         }
 
-        $synchronizedTargetIds = [];
+        $result['timing']['stages']['object_preparation'] = [
+            'duration_ms' => round((microtime(true) - $stageStartTime) * 1000, 2),
+            'description' => 'Object list preparation and counting',
+            'final_object_count' => count($objectList)
+        ];
 
-        foreach ($objectList as $object) {
+        // Stage 4: Processing individual objects
+        $stageStartTime = microtime(true);
+        $synchronizedTargetIds = [];
+        $objectProcessingTimes = [];
+
+        foreach ($objectList as $index => $object) {
+            $objectStartTime = microtime(true);
+            
             $processResult = $this->processSynchronizationObject(
                 synchronization: $synchronization,
                 object: $object,
@@ -282,7 +320,8 @@ class SynchronizationService
                 log: $log
             );
 
-
+            $objectProcessingTime = round((microtime(true) - $objectStartTime) * 1000, 2);
+            $objectProcessingTimes[] = $objectProcessingTime;
 
             $result = $processResult['result'];
             $result['_embed']['contracts'] = array_map(function($contractId) {
@@ -295,12 +334,52 @@ class SynchronizationService
             }
         }
 
-        $result['objects']['deleted'] = $this->deleteInvalidObjects($synchronization, $synchronizedTargetIds);
+        $totalProcessingDuration = round((microtime(true) - $stageStartTime) * 1000, 2);
+        $result['timing']['stages']['process_objects'] = [
+            'duration_ms' => $totalProcessingDuration,
+            'description' => 'Processing and synchronizing individual objects',
+            'objects_processed' => count($objectList),
+            'average_per_object_ms' => count($objectList) > 0 ? round($totalProcessingDuration / count($objectList), 2) : 0,
+            'min_object_ms' => count($objectProcessingTimes) > 0 ? min($objectProcessingTimes) : 0,
+            'max_object_ms' => count($objectProcessingTimes) > 0 ? max($objectProcessingTimes) : 0,
+            'median_object_ms' => count($objectProcessingTimes) > 0 ? $this->calculateMedian($objectProcessingTimes) : 0
+        ];
 
+        // Stage 5: Cleanup - Delete invalid objects
+        $stageStartTime = microtime(true);
+        $deletedCount = $this->deleteInvalidObjects($synchronization, $synchronizedTargetIds);
+        $result['objects']['deleted'] = $deletedCount;
+
+        $result['timing']['stages']['cleanup_invalid'] = [
+            'duration_ms' => round((microtime(true) - $stageStartTime) * 1000, 2),
+            'description' => 'Deleting invalid/orphaned objects',
+            'objects_deleted' => $deletedCount
+        ];
+
+        // Stage 6: Follow-up synchronizations
+        $stageStartTime = microtime(true);
+        $followUpCount = 0;
         foreach ($synchronization->getFollowUps() as $followUp) {
             $followUpSynchronization = $this->synchronizationMapper->find($followUp);
             $this->synchronize(synchronization: $followUpSynchronization, isTest: $isTest, force: $force);
+            $followUpCount++;
         }
+
+        $result['timing']['stages']['follow_ups'] = [
+            'duration_ms' => round((microtime(true) - $stageStartTime) * 1000, 2),
+            'description' => 'Executing follow-up synchronizations',
+            'follow_ups_executed' => $followUpCount
+        ];
+
+        // Calculate total timing
+        $result['timing']['total_ms'] = round((microtime(true) - $overallStartTime) * 1000, 2);
+        
+        // Add performance summary
+        $result['timing']['summary'] = [
+            'slowest_stage' => $this->getSlowestStage($result['timing']['stages']),
+            'efficiency_ratio' => $this->calculateEfficiencyRatio($result['timing']['stages']),
+            'objects_per_second' => count($objectList) > 0 ? round(count($objectList) / ($result['timing']['total_ms'] / 1000), 2) : 0
+        ];
 
         $log->setResult($result);
 
@@ -2753,6 +2832,123 @@ class SynchronizationService
         }
 
         return $synchronizations[0];
+    }
+
+    /**
+     * Calculates the median value from an array of numbers.
+     *
+     * This method sorts the input array and returns the middle value for odd-length arrays
+     * or the average of the two middle values for even-length arrays.
+     *
+     * @param array $numbers Array of numeric values to calculate median from.
+     *
+     * @return float The median value, or 0 if the array is empty.
+     *
+     * @psalm-param array<float|int> $numbers
+     * @phpstan-param array<float|int> $numbers
+     */
+    private function calculateMedian(array $numbers): float
+    {
+        if (empty($numbers)) {
+            return 0.0;
+        }
+
+        // Sort the array to find the median
+        sort($numbers);
+        $count = count($numbers);
+        
+        // If odd number of elements, return the middle one
+        if ($count % 2 === 1) {
+            return (float) $numbers[intval($count / 2)];
+        }
+        
+        // If even number of elements, return average of two middle values
+        $middle1 = $numbers[intval($count / 2) - 1];
+        $middle2 = $numbers[intval($count / 2)];
+        return ($middle1 + $middle2) / 2.0;
+    }
+
+    /**
+     * Identifies the slowest stage from timing data.
+     *
+     * This method analyzes the timing stages and returns information about
+     * the stage that took the longest to execute.
+     *
+     * @param array $stages Array of timing stage data with duration_ms values.
+     *
+     * @return array Information about the slowest stage including name, duration, and description.
+     *
+     * @psalm-param array<string, array{duration_ms: float, description: string}> $stages
+     * @phpstan-param array<string, array{duration_ms: float, description: string}> $stages
+     * @psalm-return array{name: string, duration_ms: float, description: string}
+     * @phpstan-return array{name: string, duration_ms: float, description: string}
+     */
+    private function getSlowestStage(array $stages): array
+    {
+        if (empty($stages)) {
+            return [
+                'name' => 'none',
+                'duration_ms' => 0.0,
+                'description' => 'No stages recorded'
+            ];
+        }
+
+        $slowestStage = '';
+        $slowestDuration = 0.0;
+        $slowestDescription = '';
+
+        foreach ($stages as $stageName => $stageData) {
+            if ($stageData['duration_ms'] > $slowestDuration) {
+                $slowestDuration = $stageData['duration_ms'];
+                $slowestStage = $stageName;
+                $slowestDescription = $stageData['description'];
+            }
+        }
+
+        return [
+            'name' => $slowestStage,
+            'duration_ms' => $slowestDuration,
+            'description' => $slowestDescription
+        ];
+    }
+
+    /**
+     * Calculates the efficiency ratio of the synchronization process.
+     *
+     * This method determines how much time was spent on actual object processing
+     * versus overhead operations like fetching, configuration, and cleanup.
+     * A higher ratio indicates more efficient processing.
+     *
+     * @param array $stages Array of timing stage data with duration_ms values.
+     *
+     * @return float Efficiency ratio between 0 and 1, where 1 means 100% of time spent on processing.
+     *
+     * @psalm-param array<string, array{duration_ms: float}> $stages
+     * @phpstan-param array<string, array{duration_ms: float}> $stages
+     */
+    private function calculateEfficiencyRatio(array $stages): float
+    {
+        if (empty($stages)) {
+            return 0.0;
+        }
+
+        $totalDuration = 0.0;
+        $processingDuration = 0.0;
+
+        foreach ($stages as $stageName => $stageData) {
+            $totalDuration += $stageData['duration_ms'];
+            
+            // Consider 'process_objects' as the core processing stage
+            if ($stageName === 'process_objects') {
+                $processingDuration = $stageData['duration_ms'];
+            }
+        }
+
+        if ($totalDuration === 0.0) {
+            return 0.0;
+        }
+
+        return round($processingDuration / $totalDuration, 4);
     }
 
 }
