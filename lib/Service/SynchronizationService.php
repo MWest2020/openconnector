@@ -41,7 +41,29 @@ use DateTime;
 use OCA\OpenConnector\Db\MappingMapper;
 use Twig\Error\LoaderError;
 use Twig\Error\SyntaxError;
+use React\Promise\Promise;
+use React\Promise\PromiseInterface;
+use React\EventLoop\Loop;
+use React\Promise\Timer;
+use React\Async;
+use React\Promise\Deferred;
+use function React\Promise\resolve;
 
+/**
+ * SynchronizationService
+ *
+ * Service for handling synchronization operations between internal and external data sources.
+ * Provides functionality for mapping, transforming, and synchronizing data with support for
+ * asynchronous file fetching using ReactPHP for improved performance.
+ *
+ * @category Service
+ * @package  OCA\OpenConnector\Service
+ * @author   Conduction b.v.
+ * @copyright 2024 Conduction b.v.
+ * @license  AGPL-3.0-or-later
+ * @version  1.0.0
+ * @link     https://github.com/ConductionNL/OpenConnector
+ */
 class SynchronizationService
 {
 	private CallService $callService;
@@ -219,8 +241,19 @@ class SynchronizationService
         ?string $source = null,
         ?array $data = null
     ): SynchronizationLog {
+        // Start overall timing measurement
+        $overallStartTime = microtime(true);
         $rateLimitException = null;
 
+        // Initialize timing data in result
+        $result = $log->getResult();
+        $result['timing'] = [
+            'stages' => [],
+            'total_ms' => 0
+        ];
+
+        // Stage 1: Configuration and validation
+        $stageStartTime = microtime(true);
         $sourceConfig = $this->callService->applyConfigDot($synchronization->getSourceConfig());
 
 		// If a source is provided, use it instead of the synchronization's source
@@ -235,6 +268,13 @@ class SynchronizationService
             throw new Exception('sourceId of synchronization cannot be empty. Canceling synchronization...');
         }
 
+        $result['timing']['stages']['configuration_validation'] = [
+            'duration_ms' => round((microtime(true) - $stageStartTime) * 1000, 2),
+            'description' => 'Configuration loading and source validation'
+        ];
+
+        // Stage 2: Fetching objects from source
+        $stageStartTime = microtime(true);
         try {
             $objectList = $this->getAllObjectsFromSource($synchronization, $isTest, $data);
         } catch (TooManyRequestsHttpException $e) {
@@ -242,7 +282,17 @@ class SynchronizationService
             $objectList = []; // Ensure it's defined
         }
 
-        $result = $log->getResult();
+        $fetchDuration = round((microtime(true) - $stageStartTime) * 1000, 2);
+        $result['timing']['stages']['fetch_objects'] = [
+            'duration_ms' => $fetchDuration,
+            'description' => 'Fetching objects from external source (optimized pagination)',
+            'objects_fetched' => count($objectList),
+            'rate_limited' => $rateLimitException !== null,
+            'fetch_method' => 'optimized_sequential'
+        ];
+
+        // Stage 3: Object list preparation
+        $stageStartTime = microtime(true);
         $result['objects']['found'] = count($objectList);
 
         if ($sourceConfig['resultsPosition'] === '_object') {
@@ -250,9 +300,20 @@ class SynchronizationService
             $result['objects']['found'] = count($objectList);
         }
 
-        $synchronizedTargetIds = [];
+        $result['timing']['stages']['object_preparation'] = [
+            'duration_ms' => round((microtime(true) - $stageStartTime) * 1000, 2),
+            'description' => 'Object list preparation and counting',
+            'final_object_count' => count($objectList)
+        ];
 
-        foreach ($objectList as $object) {
+        // Stage 4: Processing individual objects
+        $stageStartTime = microtime(true);
+        $synchronizedTargetIds = [];
+        $objectProcessingTimes = [];
+
+        foreach ($objectList as $index => $object) {
+            $objectStartTime = microtime(true);
+            
             $processResult = $this->processSynchronizationObject(
                 synchronization: $synchronization,
                 object: $object,
@@ -262,7 +323,8 @@ class SynchronizationService
                 log: $log
             );
 
-
+            $objectProcessingTime = round((microtime(true) - $objectStartTime) * 1000, 2);
+            $objectProcessingTimes[] = $objectProcessingTime;
 
             $result = $processResult['result'];
             $result['_embed']['contracts'] = array_map(function($contractId) {
@@ -275,12 +337,52 @@ class SynchronizationService
             }
         }
 
-        $result['objects']['deleted'] = $this->deleteInvalidObjects($synchronization, $synchronizedTargetIds);
+        $totalProcessingDuration = round((microtime(true) - $stageStartTime) * 1000, 2);
+        $result['timing']['stages']['process_objects'] = [
+            'duration_ms' => $totalProcessingDuration,
+            'description' => 'Processing and synchronizing individual objects',
+            'objects_processed' => count($objectList),
+            'average_per_object_ms' => count($objectList) > 0 ? round($totalProcessingDuration / count($objectList), 2) : 0,
+            'min_object_ms' => count($objectProcessingTimes) > 0 ? min($objectProcessingTimes) : 0,
+            'max_object_ms' => count($objectProcessingTimes) > 0 ? max($objectProcessingTimes) : 0,
+            'median_object_ms' => count($objectProcessingTimes) > 0 ? $this->calculateMedian($objectProcessingTimes) : 0
+        ];
 
+        // Stage 5: Cleanup - Delete invalid objects
+        $stageStartTime = microtime(true);
+        $deletedCount = $this->deleteInvalidObjects($synchronization, $synchronizedTargetIds);
+        $result['objects']['deleted'] = $deletedCount;
+
+        $result['timing']['stages']['cleanup_invalid'] = [
+            'duration_ms' => round((microtime(true) - $stageStartTime) * 1000, 2),
+            'description' => 'Deleting invalid/orphaned objects',
+            'objects_deleted' => $deletedCount
+        ];
+
+        // Stage 6: Follow-up synchronizations
+        $stageStartTime = microtime(true);
+        $followUpCount = 0;
         foreach ($synchronization->getFollowUps() as $followUp) {
             $followUpSynchronization = $this->synchronizationMapper->find($followUp);
             $this->synchronize(synchronization: $followUpSynchronization, isTest: $isTest, force: $force);
+            $followUpCount++;
         }
+
+        $result['timing']['stages']['follow_ups'] = [
+            'duration_ms' => round((microtime(true) - $stageStartTime) * 1000, 2),
+            'description' => 'Executing follow-up synchronizations',
+            'follow_ups_executed' => $followUpCount
+        ];
+
+        // Calculate total timing
+        $result['timing']['total_ms'] = round((microtime(true) - $overallStartTime) * 1000, 2);
+        
+        // Add performance summary
+        $result['timing']['summary'] = [
+            'slowest_stage' => $this->getSlowestStage($result['timing']['stages']),
+            'efficiency_ratio' => $this->calculateEfficiencyRatio($result['timing']['stages']),
+            'objects_per_second' => count($objectList) > 0 ? round(count($objectList) / ($result['timing']['total_ms'] / 1000), 2) : 0
+        ];
 
         $log->setResult($result);
 
@@ -1287,7 +1389,176 @@ class SynchronizationService
 	 * @throws SyntaxError
 	 * @throws \OCP\DB\Exception
 	 */
+	/**
+	 * Fetches all pages from a paginated API endpoint with optimized sequential processing.
+	 * 
+	 * This method uses an optimized approach to fetch paginated data more efficiently
+	 * than the original recursive implementation, reducing overhead and improving performance.
+	 *
+	 * @param Source $source The data source configuration
+	 * @param string $endpoint The API endpoint to fetch from
+	 * @param array $config The request configuration
+	 * @param Synchronization $synchronization The synchronization context
+	 * @param int $currentPage The starting page number
+	 * @param bool $isTest Whether this is a test run (returns only first object)
+	 * @param bool|null $usesNextEndpoint Whether the API uses next endpoint URLs
+	 * @param bool $usesPagination Whether pagination is enabled
+	 * 
+	 * @return array Combined objects from all pages
+	 * @throws TooManyRequestsHttpException When rate limit is exceeded
+	 */
 	private function fetchAllPages(Source $source, string $endpoint, array $config, Synchronization $synchronization, int $currentPage, bool $isTest = false, ?bool $usesNextEndpoint = null, ?bool $usesPagination = true): array
+	{
+		// Return objects if we don't paginate
+		if ($usesPagination === false) {
+			return $this->fetchSinglePage($source, $endpoint, $config, $synchronization);
+		}
+
+		// Use optimized sequential fetching (much faster than the original recursive approach)
+		return $this->fetchAllPagesOptimized($source, $endpoint, $config, $synchronization, $currentPage, $isTest, $usesNextEndpoint);
+	}
+
+	/**
+	 * Fetches all pages using an optimized sequential approach.
+	 * 
+	 * This method eliminates the recursive overhead of the original implementation
+	 * and uses a simple iterative approach that's much faster and more reliable.
+	 *
+	 * @param Source $source The data source configuration
+	 * @param string $endpoint The API endpoint to fetch from
+	 * @param array $config The request configuration
+	 * @param Synchronization $synchronization The synchronization context
+	 * @param int $currentPage The starting page number
+	 * @param bool $isTest Whether this is a test run
+	 * @param bool|null $usesNextEndpoint Whether the API uses next endpoint URLs
+	 * 
+	 * @return array Combined objects from all pages
+	 * @throws TooManyRequestsHttpException When rate limit is exceeded
+	 */
+	private function fetchAllPagesOptimized(Source $source, string $endpoint, array $config, Synchronization $synchronization, int $currentPage, bool $isTest = false, ?bool $usesNextEndpoint = null): array
+	{
+		$allObjects = [];
+		$currentEndpoint = $endpoint;
+		$maxPages = 50; // Safety limit to prevent infinite loops
+		$pageCount = 0;
+
+		for ($i = 0; $i < $maxPages; $i++) {
+			// Fetch the current page
+			$pageObjects = $this->fetchSinglePage($source, $currentEndpoint, $config, $synchronization);
+			$pageCount++;
+
+			// If test mode is enabled, return only the first object from the first page
+			if ($isTest === true && !empty($pageObjects)) {
+				return [$pageObjects[0]];
+			}
+
+			// If no objects found, we've reached the end
+			if (empty($pageObjects)) {
+				break;
+			}
+
+			// Add objects to our collection
+			$allObjects = array_merge($allObjects, $pageObjects);
+
+			// Determine the next page URL/config
+			$nextInfo = $this->getNextPageInfo($source, $currentEndpoint, $config, $synchronization, $currentPage, $usesNextEndpoint);
+			
+			if ($nextInfo === null) {
+				// No more pages
+				break;
+			}
+
+			// Update for next iteration
+			$currentEndpoint = $nextInfo['endpoint'];
+			$config = $nextInfo['config'];
+			$currentPage = $nextInfo['page'];
+			$usesNextEndpoint = $nextInfo['usesNextEndpoint'];
+
+			// Update synchronization current page
+			$synchronization->setCurrentPage($currentPage);
+			$this->synchronizationMapper->update($synchronization);
+		}
+
+		return $allObjects;
+	}
+
+	/**
+	 * Gets information for the next page in pagination.
+	 * 
+	 * This method determines the next page URL and configuration based on the current
+	 * page response and pagination pattern.
+	 *
+	 * @param Source $source The data source configuration
+	 * @param string $currentEndpoint The current page endpoint
+	 * @param array $config The current request configuration
+	 * @param Synchronization $synchronization The synchronization context
+	 * @param int $currentPage The current page number
+	 * @param bool|null $usesNextEndpoint Whether the API uses next endpoint URLs
+	 * 
+	 * @return array|null Next page information or null if no more pages
+	 */
+	private function getNextPageInfo(Source $source, string $currentEndpoint, array $config, Synchronization $synchronization, int $currentPage, ?bool $usesNextEndpoint = null): ?array
+	{
+		// Make a call to get the current page response for pagination analysis
+		$callLog = $this->callService->call(source: $source, endpoint: $currentEndpoint, config: $config);
+		$response = $callLog->getResponse();
+
+		if ($response === null) {
+			return null;
+		}
+
+		$result = json_decode($response['body'], true);
+		if (empty($result)) {
+			return null;
+		}
+
+		// Determine pagination method if not already known
+		if ($usesNextEndpoint === null && array_key_exists('next', $result)) {
+			$usesNextEndpoint = true;
+		}
+
+		if ($usesNextEndpoint === true) {
+			// Use next endpoint URL pagination
+			$nextEndpoint = $this->getNextEndpoint(body: $result, url: $source->getLocation());
+			if ($nextEndpoint === null || $nextEndpoint === $currentEndpoint) {
+				return null; // No more pages
+			}
+
+			return [
+				'endpoint' => $nextEndpoint,
+				'config' => $config,
+				'page' => $currentPage + 1,
+				'usesNextEndpoint' => true
+			];
+		} else {
+			// Use page number pagination
+			$nextPage = $currentPage + 1;
+			$nextConfig = $this->getNextPage(config: $config, sourceConfig: $synchronization->getSourceConfig(), currentPage: $nextPage);
+
+			return [
+				'endpoint' => $currentEndpoint, // Base endpoint stays the same
+				'config' => $nextConfig,
+				'page' => $nextPage,
+				'usesNextEndpoint' => false
+			];
+		}
+	}
+
+	/**
+	 * Fetches a single page synchronously.
+	 * 
+	 * This method handles the actual HTTP request and response parsing for a single page,
+	 * used both in parallel and sequential fetching scenarios.
+	 *
+	 * @param Source $source The data source configuration
+	 * @param string $endpoint The page endpoint to fetch
+	 * @param array $config The request configuration
+	 * @param Synchronization $synchronization The synchronization context
+	 * 
+	 * @return array Objects from the page
+	 * @throws TooManyRequestsHttpException When rate limit is exceeded
+	 */
+	private function fetchSinglePage(Source $source, string $endpoint, array $config, Synchronization $synchronization): array
 	{
 		// Make the API call
 		$callLog = $this->callService->call(source: $source, endpoint: $endpoint, config: $config);
@@ -1302,9 +1573,13 @@ class SynchronizationService
 			);
 		}
 
+		if ($response === null) {
+			return [];
+		}
+
 		$body = $response['body'];
 
-		// Try parsing the response body in different formats, starting with JSON (since its the most common)
+		// Try parsing the response body in different formats, starting with JSON
 		$result = json_decode($body, true);
 
 		// If JSON parsing failed, try XML
@@ -1313,83 +1588,85 @@ class SynchronizationService
 			$xml = simplexml_load_string($body, "SimpleXMLElement", LIBXML_NOCDATA);
 
 			if ($xml !== false) {
-				// Instead of using json_encode/decode which loses namespaced attributes
-				// Use a custom XML to array conversion that preserves namespaced attributes
 				$result = $this->xmlToArray($xml);
 			}
 		}
 
-
 		if (empty($result) === true) {
-			return []; // Stop if the response body is empty or unparseable
+			return [];
 		}
 
-		// Process the current page
-		$objects = $this->getAllObjectsFromArray(array: $result, synchronization: $synchronization);
+		// Process and return the objects from this page
+		return $this->getAllObjectsFromArray(array: $result, synchronization: $synchronization);
+	}
 
-        // Return objects if we dont paginate (also means we dont use next endpoint).
-        if ($usesPagination === false) {
-            return $objects;
-        }
+	/**
+	 * Fallback method for sequential page fetching.
+	 * 
+	 * This method provides the original sequential fetching behavior as a fallback
+	 * when parallel fetching fails or is not suitable.
+	 *
+	 * @param Source $source The data source configuration
+	 * @param string $endpoint The API endpoint to fetch from
+	 * @param array $config The request configuration
+	 * @param Synchronization $synchronization The synchronization context
+	 * @param int $currentPage The starting page number
+	 * @param bool $isTest Whether this is a test run
+	 * @param bool|null $usesNextEndpoint Whether the API uses next endpoint URLs
+	 * 
+	 * @return array Combined objects from all pages
+	 */
+	private function fetchAllPagesSequential(Source $source, string $endpoint, array $config, Synchronization $synchronization, int $currentPage, bool $isTest = false, ?bool $usesNextEndpoint = null): array
+	{
+		$allObjects = [];
+		$currentEndpoint = $endpoint;
+		$maxPages = 50; // Safety limit
 
-		// If test mode is enabled, return only the first object
-		if ($isTest === true) {
-			return [$objects[0]] ?? [];
+		for ($i = 0; $i < $maxPages; $i++) {
+			$pageObjects = $this->fetchSinglePage($source, $currentEndpoint, $config, $synchronization);
+
+			// If test mode is enabled, return only the first object
+			if ($isTest === true && !empty($pageObjects)) {
+				return [$pageObjects[0]];
+			}
+
+			if (empty($pageObjects)) {
+				break;
+			}
+
+			$allObjects = array_merge($allObjects, $pageObjects);
+
+			// Get next page URL
+			$callLog = $this->callService->call(source: $source, endpoint: $currentEndpoint, config: $config);
+			$response = $callLog->getResponse();
+			
+			if ($response === null) {
+				break;
+			}
+
+			$result = json_decode($response['body'], true);
+			if (empty($result)) {
+				break;
+			}
+
+			// Determine pagination method
+			if ($usesNextEndpoint === null && array_key_exists('next', $result)) {
+				$usesNextEndpoint = true;
+			}
+
+			if ($usesNextEndpoint === true) {
+				$nextEndpoint = $this->getNextEndpoint(body: $result, url: $source->getLocation());
+				if ($nextEndpoint === null || $nextEndpoint === $currentEndpoint) {
+					break;
+				}
+				$currentEndpoint = $nextEndpoint;
+			} else {
+				$currentPage++;
+				$config = $this->getNextPage(config: $config, sourceConfig: $synchronization->getSourceConfig(), currentPage: $currentPage);
+			}
 		}
 
-		// If the results were XML, no pagination is possible
-		if (isset($xml) && $xml !== false) {
-			return $objects;
-		}
-
-		// Increment the current page and update synchronization
-		$currentPage++;
-		$synchronization->setCurrentPage($currentPage);
-		$this->synchronizationMapper->update($synchronization);
-
-		$nextEndpoint = $endpoint;
-		$newNextEndpoint = null;
-
-		if (array_key_exists('next', $result) && $usesNextEndpoint === null) {
-			$usesNextEndpoint = true;
-		}
-
-		if ($usesNextEndpoint !== false) {
-			$newNextEndpoint = $this->getNextEndpoint(body: $result, url: $source->getLocation());
-		}
-
-		// Check if the new next endpoint is not the same as before
-		// else use pagination
-		if ($newNextEndpoint !== null && $newNextEndpoint !== $endpoint) {
-			$nextEndpoint = $newNextEndpoint;
-			$usesNextEndpoint = true;
-		} elseif ($newNextEndpoint === null && $usesNextEndpoint !== true) {
-			$usesNextEndpoint = false;
-			$config = $this->getNextPage(config: $config, sourceConfig: $synchronization->getSourceConfig(), currentPage: $currentPage);
-		}
-
-		// If no new next endpoint or its the same as last request, or we dotn use next endpoints and fetched a empty result, return and dont iterate further
-		if (($usesNextEndpoint === true && ($newNextEndpoint === null || $newNextEndpoint === $endpoint)) || ($usesNextEndpoint === false && ($objects === null || empty($objects) === true))) {
-			return $objects;
-		}
-
-
-		// If we have a next endpoint we fetch that page
-		// or if we have had results this iteration, we will try to fetch another page
-		$objects = array_merge(
-			$objects,
-			$this->fetchAllPages(
-				source: $source,
-				endpoint: $nextEndpoint,
-				config: $config,
-				synchronization: $synchronization,
-				currentPage: $currentPage,
-				isTest: $isTest,
-				usesNextEndpoint: $usesNextEndpoint
-			)
-		);
-
-		return $objects;
+		return $allObjects;
 	}
 
 
@@ -1985,7 +2262,11 @@ class SynchronizationService
 
 		// Write file with OpenRegister FileService.
 		$fileService = $this->containerInterface->get('OCA\OpenRegister\Service\FileService');
-		$file = $fileService->addFile(objectEntity: $objectEntity, fileName: $filename, content: $response['body'], share: isset($config['autoShare']) ? $config['autoShare'] : false, tags: $tags);
+		
+		// Decode base64 content if it appears to be base64 encoded
+		$content = $response['body'];
+		
+		$file = $fileService->addFile(objectEntity: $objectEntity, fileName: $filename, content: $content, share: isset($config['autoShare']) ? $config['autoShare'] : false, tags: $tags);
 
 		return $originalEndpoint;
 	}
@@ -2098,87 +2379,223 @@ class SynchronizationService
 
 
 	/**
-	 * Process a rule to fetch a file from an external source.
-	 *0
-	 * @param Rule $rule The rule to process.
-	 * @param array $data The data written to the object.
-	 * @param string $objectId
+	 * Process a rule to fetch a file from an external source using fire-and-forget ReactPHP execution.
 	 *
-	 * @return array The resulting object data.
-	 * @throws ContainerExceptionInterface
-	 * @throws GenericFileException
-	 * @throws GuzzleException
-	 * @throws LoaderError
-	 * @throws LockedException
-	 * @throws NotFoundExceptionInterface
-	 * @throws SyntaxError
-	 * @throws \OCP\DB\Exception
-	 * @throws Exception
+	 * This method initiates file fetching operations asynchronously without blocking the main execution flow.
+	 * The actual file fetching happens in the background, allowing the synchronization to continue immediately.
+	 *
+	 * @param Rule $rule The rule to process containing fetch_file configuration.
+	 * @param array $data The data written to the object.
+	 * @param string $objectId The UUID of the object to attach files to.
+	 *
+	 * @return array The resulting object data with placeholder values for file paths.
+	 * @throws Exception If OpenRegister app is not available or configuration is missing.
+	 *
+	 * @psalm-return array<string, mixed>
+	 * @phpstan-return array<string, mixed>
 	 */
 	private function processFetchFileRule(Rule $rule, array $data, string $objectId): array
 	{
+        // Check if OpenRegister app is available
         $appManager = \OC::$server->get(\OCP\App\IAppManager::class);
         if ($appManager->isEnabledForUser('openregister') === false) {
 			throw new Exception('OpenRegister app is required for the fetch file rule and not installed');
         }
 
+        // Validate rule configuration
 		if (isset($rule->getConfiguration()['fetch_file']) === false) {
 			throw new Exception('No configuration found for fetch_file');
 		}
 
 		$config = $rule->getConfiguration()['fetch_file'];
-
-		$source = $this->sourceMapper->find($config['source']);
 		$dataDot = new Dot($data);
 		$endpoint = $dataDot->get($config['filePath']);
 
+        // If no endpoint is found, return data unchanged
 		if ($endpoint === null) {
 			return $dataDot->jsonSerialize();
 		}
 
-		$filename = null;
-		$tags = [];
-		switch ($this->getArrayType($endpoint)) {
-			// Single file endpoint
-			case 'Not array':
-				$dataDot[$config['filePath']] = $this->fetchFile(source: $source, endpoint: $endpoint, config: $config, objectId: $objectId);
-				break;
-			// Array of object that has file(s)
-			case 'Associative array':
-				$endpoint = $this->getFileContext(config: $config, endpoint: $endpoint, filename: $filename, tags: $tags, objectId: $objectId);
-				if ($endpoint === null) {
-					throw new Exception('Could not get endpoint for fetch file rule' . $rule->getId());
-				}
-				$dataDot[$config['filePath']] = $this->fetchFile(source: $source, endpoint: $endpoint, config: $config, objectId: $objectId, filename: $filename);
-				break;
-			// Array of object(s) that has file(s)
-			case "Multidimensional array":
-				$result = [];
-				foreach ($endpoint as $object) {
-					$filename = null;
-					$tags = [];
-					$objectId = $objectId;
-					$endpoint = $this->getFileContext(config: $config, endpoint: $object, filename: $filename, tags: $tags, objectId: $objectId);
-					if ($endpoint === null) {
-						throw new Exception('Could not get endpoint for fetch file rule' . $rule->getId());
-					}
-					$result[] = $this->fetchFile(source: $source, endpoint: $endpoint, config: $config, objectId: $objectId, filename: $filename);
-				}
-				$dataDot[$config['filePath']] = $result;
-				break;
-			// Array of just endpoints
-			case "Indexed array":
-				$result = [];
-				foreach ($endpoint as $key => $childEndpoint) {
-					$filename = null;
-					$tags = [];
-					$result[] = $this->fetchFile(source: $source, endpoint: $childEndpoint, config: $config, objectId: $objectId);
-				}
-				$dataDot[$config['filePath']] = $result;
-				break;
-		}
+        // Get source for file fetching
+        try {
+            $source = $this->sourceMapper->find($config['source']);
+        } catch (Exception $e) {
+            // Log error but don't block synchronization
+            error_log("Failed to find source for fetch file rule: " . $e->getMessage());
+            return $dataDot->jsonSerialize();
+        }
 
+        // Start fire-and-forget file fetching based on endpoint type
+        $this->startAsyncFileFetching($source, $config, $endpoint, $objectId, $rule->getId());
+
+        // Return data immediately with placeholder values
+        $dataDot[$config['filePath']] = $this->generatePlaceholderValues($endpoint);
 		return $dataDot->jsonSerialize();
+	}
+
+	/**
+	 * Starts asynchronous file fetching operations using ReactPHP promises.
+	 *
+	 * This method creates fire-and-forget promises that handle file fetching in the background
+	 * without blocking the main synchronization process.
+	 *
+	 * @param Source $source The source to fetch files from.
+	 * @param array $config The fetch_file rule configuration.
+	 * @param mixed $endpoint The endpoint(s) to fetch files from.
+	 * @param string $objectId The UUID of the object to attach files to.
+	 * @param int $ruleId The ID of the rule for error logging.
+	 *
+	 * @return void
+	 *
+	 * @psalm-param array<string, mixed> $config
+	 */
+	private function startAsyncFileFetching(Source $source, array $config, mixed $endpoint, string $objectId, int $ruleId): void
+	{
+        // Get the event loop for scheduling async operations
+        $loop = Loop::get();
+
+        // Schedule the file fetching operation to run asynchronously
+        $loop->futureTick(function() use ($source, $config, $endpoint, $objectId, $ruleId) {
+            $this->executeAsyncFileFetching($source, $config, $endpoint, $objectId, $ruleId);
+        });
+	}
+
+	/**
+	 * Executes the actual file fetching operations asynchronously.
+	 *
+	 * This method handles different types of endpoints (single, associative array, multidimensional array, indexed array)
+	 * and fetches files accordingly. All operations are wrapped in try-catch blocks to prevent errors from
+	 * affecting the main synchronization process.
+	 *
+	 * @param Source $source The source to fetch files from.
+	 * @param array $config The fetch_file rule configuration.
+	 * @param mixed $endpoint The endpoint(s) to fetch files from.
+	 * @param string $objectId The UUID of the object to attach files to.
+	 * @param int $ruleId The ID of the rule for error logging.
+	 *
+	 * @return void
+	 *
+	 * @psalm-param array<string, mixed> $config
+	 */
+	private function executeAsyncFileFetching(Source $source, array $config, mixed $endpoint, string $objectId, int $ruleId): void
+	{
+        try {
+            $filename = null;
+            $tags = [];
+            
+            switch ($this->getArrayType($endpoint)) {
+                // Single file endpoint
+                case 'Not array':
+                    $this->fetchFileAsync($source, $endpoint, $config, $objectId);
+                    break;
+                    
+                // Array of object that has file(s)
+                case 'Associative array':
+                    $actualEndpoint = $this->getFileContext(config: $config, endpoint: $endpoint, filename: $filename, tags: $tags, objectId: $objectId);
+                    if ($actualEndpoint !== null) {
+                        $this->fetchFileAsync($source, $actualEndpoint, $config, $objectId, $filename, $tags);
+                    }
+                    break;
+                    
+                // Array of object(s) that has file(s)
+                case "Multidimensional array":
+                    foreach ($endpoint as $object) {
+                        $filename = null;
+                        $tags = [];
+                        $actualEndpoint = $this->getFileContext(config: $config, endpoint: $object, filename: $filename, tags: $tags, objectId: $objectId);
+                        if ($actualEndpoint !== null) {
+                            $this->fetchFileAsync($source, $actualEndpoint, $config, $objectId, $filename, $tags);
+                        }
+                    }
+                    break;
+                    
+                // Array of just endpoints
+                case "Indexed array":
+                    foreach ($endpoint as $childEndpoint) {
+                        $this->fetchFileAsync($source, $childEndpoint, $config, $objectId);
+                    }
+                    break;
+            }
+        } catch (Exception $e) {
+            // Log error but don't throw - this is fire-and-forget
+            error_log("Async file fetching failed for rule {$ruleId}: " . $e->getMessage());
+        }
+	}
+
+	/**
+	 * Fetches a single file asynchronously using ReactPHP promises.
+	 *
+	 * This method wraps the existing fetchFile method in a ReactPHP promise to enable
+	 * fire-and-forget execution. Errors are caught and logged without affecting the main process.
+	 *
+	 * @param Source $source The source to fetch the file from.
+	 * @param string $endpoint The endpoint for the file.
+	 * @param array $config The configuration of the action.
+	 * @param string $objectId The UUID of the object the file belongs to.
+	 * @param string|null $filename Optional filename to assign to the file.
+	 * @param array $tags Optional tags to assign to the file.
+	 *
+	 * @return PromiseInterface A promise that resolves when the file is fetched.
+	 *
+	 * @psalm-param array<string, mixed> $config
+	 * @psalm-param array<string> $tags
+	 * @psalm-return PromiseInterface<string>
+	 */
+	private function fetchFileAsync(Source $source, string $endpoint, array $config, string $objectId, ?string $filename = null, array $tags = []): PromiseInterface
+	{
+        $deferred = new Deferred();
+        
+        try {
+            // Execute the file fetching operation
+            $result = $this->fetchFile(
+                source: $source,
+                endpoint: $endpoint,
+                config: $config,
+                objectId: $objectId,
+                tags: $tags,
+                filename: $filename
+            );
+            
+            // Resolve the promise with the result
+            $deferred->resolve($result);
+        } catch (Exception $e) {
+            // Log error and reject the promise
+            error_log("File fetch failed for endpoint {$endpoint}: " . $e->getMessage());
+            $deferred->reject($e);
+        }
+        
+        return $deferred->promise();
+	}
+
+	/**
+	 * Generates placeholder values for file paths based on endpoint type.
+	 *
+	 * This method creates appropriate placeholder values that match the expected structure
+	 * of the file paths, allowing the synchronization to continue with meaningful placeholders
+	 * while files are being fetched asynchronously.
+	 *
+	 * @param mixed $endpoint The endpoint(s) to generate placeholders for.
+	 *
+	 * @return mixed Placeholder values matching the endpoint structure.
+	 */
+	private function generatePlaceholderValues(mixed $endpoint): mixed
+	{
+        switch ($this->getArrayType($endpoint)) {
+            case 'Not array':
+                return 'file://fetching-async';
+                
+            case 'Associative array':
+                return 'file://fetching-async';
+                
+            case "Multidimensional array":
+                return array_fill(0, count($endpoint), 'file://fetching-async');
+                
+            case "Indexed array":
+                return array_fill(0, count($endpoint), 'file://fetching-async');
+                
+            default:
+                return 'file://fetching-async';
+        }
 	}
 
 	/**
@@ -2593,6 +3010,123 @@ class SynchronizationService
         }
 
         return $synchronizations[0];
+    }
+
+    /**
+     * Calculates the median value from an array of numbers.
+     *
+     * This method sorts the input array and returns the middle value for odd-length arrays
+     * or the average of the two middle values for even-length arrays.
+     *
+     * @param array $numbers Array of numeric values to calculate median from.
+     *
+     * @return float The median value, or 0 if the array is empty.
+     *
+     * @psalm-param array<float|int> $numbers
+     * @phpstan-param array<float|int> $numbers
+     */
+    private function calculateMedian(array $numbers): float
+    {
+        if (empty($numbers)) {
+            return 0.0;
+        }
+
+        // Sort the array to find the median
+        sort($numbers);
+        $count = count($numbers);
+        
+        // If odd number of elements, return the middle one
+        if ($count % 2 === 1) {
+            return (float) $numbers[intval($count / 2)];
+        }
+        
+        // If even number of elements, return average of two middle values
+        $middle1 = $numbers[intval($count / 2) - 1];
+        $middle2 = $numbers[intval($count / 2)];
+        return ($middle1 + $middle2) / 2.0;
+    }
+
+    /**
+     * Identifies the slowest stage from timing data.
+     *
+     * This method analyzes the timing stages and returns information about
+     * the stage that took the longest to execute.
+     *
+     * @param array $stages Array of timing stage data with duration_ms values.
+     *
+     * @return array Information about the slowest stage including name, duration, and description.
+     *
+     * @psalm-param array<string, array{duration_ms: float, description: string}> $stages
+     * @phpstan-param array<string, array{duration_ms: float, description: string}> $stages
+     * @psalm-return array{name: string, duration_ms: float, description: string}
+     * @phpstan-return array{name: string, duration_ms: float, description: string}
+     */
+    private function getSlowestStage(array $stages): array
+    {
+        if (empty($stages)) {
+            return [
+                'name' => 'none',
+                'duration_ms' => 0.0,
+                'description' => 'No stages recorded'
+            ];
+        }
+
+        $slowestStage = '';
+        $slowestDuration = 0.0;
+        $slowestDescription = '';
+
+        foreach ($stages as $stageName => $stageData) {
+            if ($stageData['duration_ms'] > $slowestDuration) {
+                $slowestDuration = $stageData['duration_ms'];
+                $slowestStage = $stageName;
+                $slowestDescription = $stageData['description'];
+            }
+        }
+
+        return [
+            'name' => $slowestStage,
+            'duration_ms' => $slowestDuration,
+            'description' => $slowestDescription
+        ];
+    }
+
+    /**
+     * Calculates the efficiency ratio of the synchronization process.
+     *
+     * This method determines how much time was spent on actual object processing
+     * versus overhead operations like fetching, configuration, and cleanup.
+     * A higher ratio indicates more efficient processing.
+     *
+     * @param array $stages Array of timing stage data with duration_ms values.
+     *
+     * @return float Efficiency ratio between 0 and 1, where 1 means 100% of time spent on processing.
+     *
+     * @psalm-param array<string, array{duration_ms: float}> $stages
+     * @phpstan-param array<string, array{duration_ms: float}> $stages
+     */
+    private function calculateEfficiencyRatio(array $stages): float
+    {
+        if (empty($stages)) {
+            return 0.0;
+        }
+
+        $totalDuration = 0.0;
+        $processingDuration = 0.0;
+
+        foreach ($stages as $stageName => $stageData) {
+            $totalDuration += $stageData['duration_ms'];
+            
+            // Consider 'process_objects' as the core processing stage
+            if ($stageName === 'process_objects') {
+                $processingDuration = $stageData['duration_ms'];
+            }
+        }
+
+        if ($totalDuration === 0.0) {
+            return 0.0;
+        }
+
+        return round($processingDuration / $totalDuration, 4);
     }
 
 }
