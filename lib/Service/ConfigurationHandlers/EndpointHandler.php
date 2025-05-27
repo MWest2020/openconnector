@@ -153,7 +153,16 @@ class EndpointHandler implements ConfigurationHandlerInterface
             $data['outputMapping'] = $mappings['mapping']['slugToId'][$data['outputMapping']];
         }
 
-        // Check if endpoint with this slug already exists.
+		$data['rules'] = array_filter(array_map(function(int|string $rule) use ($mappings) {
+			if(isset($mappings['rule']['slugToId'][$rule]) === true) {
+
+				return $mappings['rule']['slugToId'][$rule];
+			}
+			return null;
+		}, $data['rules']));
+
+
+		// Check if endpoint with this slug already exists.
         if (isset($data['slug']) && isset($mappings['endpoint']['slugToId'][$data['slug']])) {
             // Update existing endpoint.
             return $this->endpointMapper->updateFromArray($mappings['endpoint']['slugToId'][$data['slug']], $data);
