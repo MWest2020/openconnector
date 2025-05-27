@@ -912,6 +912,7 @@ class EndpointService
      */
     private function processRules(Endpoint $endpoint, IRequest $request, array $data, string $timing, ?string $objectId = null): array|Response
     {
+
         $rules = $endpoint->getRules();
         if (empty($rules) === true) {
             return $data;
@@ -931,6 +932,7 @@ class EndpointService
 
             // Process each rule in order
             foreach ($ruleEntities as $rule) {
+
                 // Skip if rule action doesn't match request method
                 if (strtolower($rule->getAction()) !== strtolower($request->getMethod())) {
                     continue;

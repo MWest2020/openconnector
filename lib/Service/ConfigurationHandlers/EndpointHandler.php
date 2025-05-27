@@ -32,7 +32,7 @@ class EndpointHandler implements ConfigurationHandlerInterface
     /**
      * {@inheritDoc}
      */
-    public function export(Entity $entity, array $mappings): array
+    public function export(Entity $entity, array $mappings, array &$mappingIds = []): array
     {
         if (!$entity instanceof Endpoint) {
             throw new \InvalidArgumentException('Entity must be an instance of Endpoint');
