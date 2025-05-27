@@ -26,7 +26,7 @@ interface ConfigurationHandlerInterface
      * @param array<string,array{idToSlug:array<string,string>,slugToId:array<string,string>}> $mappings The global mappings for ID/slug conversion
      * @return array The OpenAPI entity specification
      */
-    public function export(Entity $entity, array $mappings): array;
+    public function export(Entity $entity, array $mappings, array &$mappingIds = []): array;
 
     /**
      * Import an entity from OpenAPI format
@@ -43,4 +43,4 @@ interface ConfigurationHandlerInterface
      * @return string The entity type
      */
     public function getEntityType(): string;
-} 
+}
