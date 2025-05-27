@@ -311,7 +311,7 @@ class EndpointService
             $object = $mapper->find($serializedObject['id']);
         }
 
-        $uses = new Dot($object->jsonSerialize())->flatten();
+        $uses = (new Dot($object->jsonSerialize()))->flatten();
 //
 //        if(isset($serializedObject) === true && !empty($serializedObject['@self']['relations'])) {
 //            $uses = $serializedObject['@self']['relations'];
