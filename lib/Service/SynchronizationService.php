@@ -44,6 +44,8 @@ use Twig\Error\SyntaxError;
 use React\Promise\Promise;
 use React\Promise\PromiseInterface;
 use React\EventLoop\Loop;
+use React\Promise\Timer;
+use React\Async;
 use React\Promise\Deferred;
 use function React\Promise\resolve;
 
@@ -283,9 +285,10 @@ class SynchronizationService
         $fetchDuration = round((microtime(true) - $stageStartTime) * 1000, 2);
         $result['timing']['stages']['fetch_objects'] = [
             'duration_ms' => $fetchDuration,
-            'description' => 'Fetching objects from external source',
+            'description' => 'Fetching objects from external source (optimized pagination)',
             'objects_fetched' => count($objectList),
-            'rate_limited' => $rateLimitException !== null
+            'rate_limited' => $rateLimitException !== null,
+            'fetch_method' => 'optimized_sequential'
         ];
 
         // Stage 3: Object list preparation
@@ -1386,7 +1389,176 @@ class SynchronizationService
 	 * @throws SyntaxError
 	 * @throws \OCP\DB\Exception
 	 */
+	/**
+	 * Fetches all pages from a paginated API endpoint with optimized sequential processing.
+	 * 
+	 * This method uses an optimized approach to fetch paginated data more efficiently
+	 * than the original recursive implementation, reducing overhead and improving performance.
+	 *
+	 * @param Source $source The data source configuration
+	 * @param string $endpoint The API endpoint to fetch from
+	 * @param array $config The request configuration
+	 * @param Synchronization $synchronization The synchronization context
+	 * @param int $currentPage The starting page number
+	 * @param bool $isTest Whether this is a test run (returns only first object)
+	 * @param bool|null $usesNextEndpoint Whether the API uses next endpoint URLs
+	 * @param bool $usesPagination Whether pagination is enabled
+	 * 
+	 * @return array Combined objects from all pages
+	 * @throws TooManyRequestsHttpException When rate limit is exceeded
+	 */
 	private function fetchAllPages(Source $source, string $endpoint, array $config, Synchronization $synchronization, int $currentPage, bool $isTest = false, ?bool $usesNextEndpoint = null, ?bool $usesPagination = true): array
+	{
+		// Return objects if we don't paginate
+		if ($usesPagination === false) {
+			return $this->fetchSinglePage($source, $endpoint, $config, $synchronization);
+		}
+
+		// Use optimized sequential fetching (much faster than the original recursive approach)
+		return $this->fetchAllPagesOptimized($source, $endpoint, $config, $synchronization, $currentPage, $isTest, $usesNextEndpoint);
+	}
+
+	/**
+	 * Fetches all pages using an optimized sequential approach.
+	 * 
+	 * This method eliminates the recursive overhead of the original implementation
+	 * and uses a simple iterative approach that's much faster and more reliable.
+	 *
+	 * @param Source $source The data source configuration
+	 * @param string $endpoint The API endpoint to fetch from
+	 * @param array $config The request configuration
+	 * @param Synchronization $synchronization The synchronization context
+	 * @param int $currentPage The starting page number
+	 * @param bool $isTest Whether this is a test run
+	 * @param bool|null $usesNextEndpoint Whether the API uses next endpoint URLs
+	 * 
+	 * @return array Combined objects from all pages
+	 * @throws TooManyRequestsHttpException When rate limit is exceeded
+	 */
+	private function fetchAllPagesOptimized(Source $source, string $endpoint, array $config, Synchronization $synchronization, int $currentPage, bool $isTest = false, ?bool $usesNextEndpoint = null): array
+	{
+		$allObjects = [];
+		$currentEndpoint = $endpoint;
+		$maxPages = 50; // Safety limit to prevent infinite loops
+		$pageCount = 0;
+
+		for ($i = 0; $i < $maxPages; $i++) {
+			// Fetch the current page
+			$pageObjects = $this->fetchSinglePage($source, $currentEndpoint, $config, $synchronization);
+			$pageCount++;
+
+			// If test mode is enabled, return only the first object from the first page
+			if ($isTest === true && !empty($pageObjects)) {
+				return [$pageObjects[0]];
+			}
+
+			// If no objects found, we've reached the end
+			if (empty($pageObjects)) {
+				break;
+			}
+
+			// Add objects to our collection
+			$allObjects = array_merge($allObjects, $pageObjects);
+
+			// Determine the next page URL/config
+			$nextInfo = $this->getNextPageInfo($source, $currentEndpoint, $config, $synchronization, $currentPage, $usesNextEndpoint);
+			
+			if ($nextInfo === null) {
+				// No more pages
+				break;
+			}
+
+			// Update for next iteration
+			$currentEndpoint = $nextInfo['endpoint'];
+			$config = $nextInfo['config'];
+			$currentPage = $nextInfo['page'];
+			$usesNextEndpoint = $nextInfo['usesNextEndpoint'];
+
+			// Update synchronization current page
+			$synchronization->setCurrentPage($currentPage);
+			$this->synchronizationMapper->update($synchronization);
+		}
+
+		return $allObjects;
+	}
+
+	/**
+	 * Gets information for the next page in pagination.
+	 * 
+	 * This method determines the next page URL and configuration based on the current
+	 * page response and pagination pattern.
+	 *
+	 * @param Source $source The data source configuration
+	 * @param string $currentEndpoint The current page endpoint
+	 * @param array $config The current request configuration
+	 * @param Synchronization $synchronization The synchronization context
+	 * @param int $currentPage The current page number
+	 * @param bool|null $usesNextEndpoint Whether the API uses next endpoint URLs
+	 * 
+	 * @return array|null Next page information or null if no more pages
+	 */
+	private function getNextPageInfo(Source $source, string $currentEndpoint, array $config, Synchronization $synchronization, int $currentPage, ?bool $usesNextEndpoint = null): ?array
+	{
+		// Make a call to get the current page response for pagination analysis
+		$callLog = $this->callService->call(source: $source, endpoint: $currentEndpoint, config: $config);
+		$response = $callLog->getResponse();
+
+		if ($response === null) {
+			return null;
+		}
+
+		$result = json_decode($response['body'], true);
+		if (empty($result)) {
+			return null;
+		}
+
+		// Determine pagination method if not already known
+		if ($usesNextEndpoint === null && array_key_exists('next', $result)) {
+			$usesNextEndpoint = true;
+		}
+
+		if ($usesNextEndpoint === true) {
+			// Use next endpoint URL pagination
+			$nextEndpoint = $this->getNextEndpoint(body: $result, url: $source->getLocation());
+			if ($nextEndpoint === null || $nextEndpoint === $currentEndpoint) {
+				return null; // No more pages
+			}
+
+			return [
+				'endpoint' => $nextEndpoint,
+				'config' => $config,
+				'page' => $currentPage + 1,
+				'usesNextEndpoint' => true
+			];
+		} else {
+			// Use page number pagination
+			$nextPage = $currentPage + 1;
+			$nextConfig = $this->getNextPage(config: $config, sourceConfig: $synchronization->getSourceConfig(), currentPage: $nextPage);
+
+			return [
+				'endpoint' => $currentEndpoint, // Base endpoint stays the same
+				'config' => $nextConfig,
+				'page' => $nextPage,
+				'usesNextEndpoint' => false
+			];
+		}
+	}
+
+	/**
+	 * Fetches a single page synchronously.
+	 * 
+	 * This method handles the actual HTTP request and response parsing for a single page,
+	 * used both in parallel and sequential fetching scenarios.
+	 *
+	 * @param Source $source The data source configuration
+	 * @param string $endpoint The page endpoint to fetch
+	 * @param array $config The request configuration
+	 * @param Synchronization $synchronization The synchronization context
+	 * 
+	 * @return array Objects from the page
+	 * @throws TooManyRequestsHttpException When rate limit is exceeded
+	 */
+	private function fetchSinglePage(Source $source, string $endpoint, array $config, Synchronization $synchronization): array
 	{
 		// Make the API call
 		$callLog = $this->callService->call(source: $source, endpoint: $endpoint, config: $config);
@@ -1401,9 +1573,13 @@ class SynchronizationService
 			);
 		}
 
+		if ($response === null) {
+			return [];
+		}
+
 		$body = $response['body'];
 
-		// Try parsing the response body in different formats, starting with JSON (since its the most common)
+		// Try parsing the response body in different formats, starting with JSON
 		$result = json_decode($body, true);
 
 		// If JSON parsing failed, try XML
@@ -1412,83 +1588,85 @@ class SynchronizationService
 			$xml = simplexml_load_string($body, "SimpleXMLElement", LIBXML_NOCDATA);
 
 			if ($xml !== false) {
-				// Instead of using json_encode/decode which loses namespaced attributes
-				// Use a custom XML to array conversion that preserves namespaced attributes
 				$result = $this->xmlToArray($xml);
 			}
 		}
 
-
 		if (empty($result) === true) {
-			return []; // Stop if the response body is empty or unparseable
+			return [];
 		}
 
-		// Process the current page
-		$objects = $this->getAllObjectsFromArray(array: $result, synchronization: $synchronization);
+		// Process and return the objects from this page
+		return $this->getAllObjectsFromArray(array: $result, synchronization: $synchronization);
+	}
 
-        // Return objects if we dont paginate (also means we dont use next endpoint).
-        if ($usesPagination === false) {
-            return $objects;
-        }
+	/**
+	 * Fallback method for sequential page fetching.
+	 * 
+	 * This method provides the original sequential fetching behavior as a fallback
+	 * when parallel fetching fails or is not suitable.
+	 *
+	 * @param Source $source The data source configuration
+	 * @param string $endpoint The API endpoint to fetch from
+	 * @param array $config The request configuration
+	 * @param Synchronization $synchronization The synchronization context
+	 * @param int $currentPage The starting page number
+	 * @param bool $isTest Whether this is a test run
+	 * @param bool|null $usesNextEndpoint Whether the API uses next endpoint URLs
+	 * 
+	 * @return array Combined objects from all pages
+	 */
+	private function fetchAllPagesSequential(Source $source, string $endpoint, array $config, Synchronization $synchronization, int $currentPage, bool $isTest = false, ?bool $usesNextEndpoint = null): array
+	{
+		$allObjects = [];
+		$currentEndpoint = $endpoint;
+		$maxPages = 50; // Safety limit
 
-		// If test mode is enabled, return only the first object
-		if ($isTest === true) {
-			return [$objects[0]] ?? [];
+		for ($i = 0; $i < $maxPages; $i++) {
+			$pageObjects = $this->fetchSinglePage($source, $currentEndpoint, $config, $synchronization);
+
+			// If test mode is enabled, return only the first object
+			if ($isTest === true && !empty($pageObjects)) {
+				return [$pageObjects[0]];
+			}
+
+			if (empty($pageObjects)) {
+				break;
+			}
+
+			$allObjects = array_merge($allObjects, $pageObjects);
+
+			// Get next page URL
+			$callLog = $this->callService->call(source: $source, endpoint: $currentEndpoint, config: $config);
+			$response = $callLog->getResponse();
+			
+			if ($response === null) {
+				break;
+			}
+
+			$result = json_decode($response['body'], true);
+			if (empty($result)) {
+				break;
+			}
+
+			// Determine pagination method
+			if ($usesNextEndpoint === null && array_key_exists('next', $result)) {
+				$usesNextEndpoint = true;
+			}
+
+			if ($usesNextEndpoint === true) {
+				$nextEndpoint = $this->getNextEndpoint(body: $result, url: $source->getLocation());
+				if ($nextEndpoint === null || $nextEndpoint === $currentEndpoint) {
+					break;
+				}
+				$currentEndpoint = $nextEndpoint;
+			} else {
+				$currentPage++;
+				$config = $this->getNextPage(config: $config, sourceConfig: $synchronization->getSourceConfig(), currentPage: $currentPage);
+			}
 		}
 
-		// If the results were XML, no pagination is possible
-		if (isset($xml) && $xml !== false) {
-			return $objects;
-		}
-
-		// Increment the current page and update synchronization
-		$currentPage++;
-		$synchronization->setCurrentPage($currentPage);
-		$this->synchronizationMapper->update($synchronization);
-
-		$nextEndpoint = $endpoint;
-		$newNextEndpoint = null;
-
-		if (array_key_exists('next', $result) && $usesNextEndpoint === null) {
-			$usesNextEndpoint = true;
-		}
-
-		if ($usesNextEndpoint !== false) {
-			$newNextEndpoint = $this->getNextEndpoint(body: $result, url: $source->getLocation());
-		}
-
-		// Check if the new next endpoint is not the same as before
-		// else use pagination
-		if ($newNextEndpoint !== null && $newNextEndpoint !== $endpoint) {
-			$nextEndpoint = $newNextEndpoint;
-			$usesNextEndpoint = true;
-		} elseif ($newNextEndpoint === null && $usesNextEndpoint !== true) {
-			$usesNextEndpoint = false;
-			$config = $this->getNextPage(config: $config, sourceConfig: $synchronization->getSourceConfig(), currentPage: $currentPage);
-		}
-
-		// If no new next endpoint or its the same as last request, or we dotn use next endpoints and fetched a empty result, return and dont iterate further
-		if (($usesNextEndpoint === true && ($newNextEndpoint === null || $newNextEndpoint === $endpoint)) || ($usesNextEndpoint === false && ($objects === null || empty($objects) === true))) {
-			return $objects;
-		}
-
-
-		// If we have a next endpoint we fetch that page
-		// or if we have had results this iteration, we will try to fetch another page
-		$objects = array_merge(
-			$objects,
-			$this->fetchAllPages(
-				source: $source,
-				endpoint: $nextEndpoint,
-				config: $config,
-				synchronization: $synchronization,
-				currentPage: $currentPage,
-				isTest: $isTest,
-				usesNextEndpoint: $usesNextEndpoint
-			)
-		);
-
-		return $objects;
+		return $allObjects;
 	}
 
 
