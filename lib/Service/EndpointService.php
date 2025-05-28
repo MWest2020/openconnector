@@ -27,6 +27,7 @@ use GuzzleHttp\Exception\ClientException;
 use GuzzleHttp\Exception\GuzzleException;
 use GuzzleHttp\Exception\RequestException;
 use GuzzleHttp\Exception\ServerException;
+use OCA\OpenRegister\Exception\ValidationException;
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCA\OpenRegister\Db\ObjectEntity;
 use OCP\AppFramework\Db\Entity;
@@ -617,7 +618,7 @@ class EndpointService
         $schema = $target[1];
 
 
-        $mapper = $this->objectService->getMapper(schema: $schema, register: $register);
+        $mapper = $this->objectService->getMapper(schema: (int)$schema, register: (int)$register);
 
         $parameters = $request->getParams();
 
@@ -687,6 +688,7 @@ class EndpointService
             }
 
         } catch (Exception $exception) {
+
             if (in_array(get_class($exception), ['OCA\OpenRegister\Exception\ValidationException', 'OCA\OpenRegister\Exception\CustomValidationException']) === true) {
                 return $mapper->getValidateHandler()->handleValidationException(exception: $exception);
             }
@@ -1433,7 +1435,7 @@ class EndpointService
      * @throws \OCP\Files\InvalidPathException
      * @throws \OCP\Files\NotFoundException
      */
-    private function processFilePartRule(Rule $rule, array $data, Endpoint $endpoint, ?string $objectId = null): array
+    private function processFilePartRule(Rule $rule, array $data, Endpoint $endpoint, ?string $objectId = null): array|JSONResponse
     {
         if ($objectId === null) {
             throw new Exception('Filepart rules can only be applied after the object has been created');
@@ -1465,7 +1467,10 @@ class EndpointService
         $openRegister->setSchema($superSchemaId);
 
         $object   = $openRegister->find(id: $objectId);
-        $location = $object->getFolder();
+//        $location = $object->getFolder();
+
+		$fileService = $this->containerInterface->get('OCA\OpenRegister\Service\FileService');
+		$location = $fileService->getObjectFolder($object)->getPath();
 
 
         $dataDot = new Dot($data);
@@ -1474,21 +1479,38 @@ class EndpointService
 
         $fileParts = $this->storageService->createUpload($location, $filename, $size, $objectId);
 
-        $fileParts = array_map(function ($filePart) use ($mapping, $registerId, $schemaId) {
+		$fileParts = array_map(function ($filePart) use ($mapping, $registerId, $schemaId) {
 
-            if ($mapping !== null) {
-                $formatted = $this->mappingService->executeMapping(mapping: $mapping, input: $filePart);
-            } else {
-                $formatted = $filePart;
-            }
+			if ($mapping !== null) {
+				$formatted = $this->mappingService->executeMapping(mapping: $mapping, input: $filePart);
+			} else {
+				$formatted = $filePart;
+			}
 
-            return $this->objectService->getOpenRegisters()->saveObject(
-                register: $registerId,
-                schema: $schemaId,
-                object: $formatted
-            )->jsonSerialize();
+			try {
+				return $this->objectService->getOpenRegisters()->saveObject(
+					register: $registerId,
+					schema: $schemaId,
+					object: $formatted,
+					uuid: $formatted['id']
+				)->jsonSerialize();
+			} catch (ValidationException $exception) {
+				return $this->objectService->getOpenRegisters()->handleValidationException($exception);
+			}
 
-        }, $fileParts);
+
+		}, $fileParts);
+
+		$errors = array_filter($fileParts, function($part) {
+			if($part instanceof JSONResponse) {
+				return true;
+			}
+		});
+
+		if(count($errors) > 0) {
+			return array_shift($errors);
+		}
+
 
 
         $dataDot[$filePartLocation] = $fileParts;
@@ -1500,7 +1522,7 @@ class EndpointService
         $saveObject = clone $dataDot;
         $saveObject[$filePartLocation] = $filepartIds;
 
-        $openRegister->saveObject($registerId, $schemaId, $saveObject->jsonSerialize());
+        $openRegister->saveObject(register: $registerId, schema: $schemaId, object: $saveObject->jsonSerialize());
 
         return $dataDot->jsonSerialize();
     }
@@ -1536,6 +1558,8 @@ class EndpointService
             $mappedData = $this->mappingService->executeMapping(mapping: $mapping, input: $mappedData);
         }
 
+		var_dump($mappedData);
+
         $mappedData['successful'] = $this->storageService->writePart(partId: $mappedData['order'], partUuid: $mappedData['id'], data: $mappedData['data']);
 
         unset($data['data']);
@@ -1543,6 +1567,8 @@ class EndpointService
         if (isset($config['mappingOutId']) === true) {
             $mappedData = $this->mappingService->executeMapping(mapping: $this->mappingService->getMapping(mappingId: $config['mappingOutId']), input: $mappedData);
         }
+
+		var_dump($mappedData);
 
         $object = $this->objectService->getOpenRegisters()->getMapper('objectEntity')->find($objectId);
         $object->setObject($mappedData);
