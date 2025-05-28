@@ -311,7 +311,7 @@ class EndpointService
             $object = $mapper->find($serializedObject['id']);
         }
 
-        $uses = new Dot($object->jsonSerialize())->flatten();
+        $uses = (new Dot($object->jsonSerialize()))->flatten();
 //
 //        if(isset($serializedObject) === true && !empty($serializedObject['@self']['relations'])) {
 //            $uses = $serializedObject['@self']['relations'];
@@ -969,9 +969,9 @@ class EndpointService
 
                 // Update data with rule result
                 $data = $result;
-            }
+			}
 
-            return $data;
+			return $data;
         } catch (Exception $e) {
             $this->logger->error('Error processing rules: ' . $e->getMessage());
             return new JSONResponse(['error' => 'Rule processing failed: ' . $e->getMessage()], 500);
