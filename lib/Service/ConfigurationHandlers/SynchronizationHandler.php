@@ -40,6 +40,11 @@ class SynchronizationHandler implements ConfigurationHandlerInterface
 
         $syncArray = $entity->jsonSerialize();
         unset($syncArray['id'], $syncArray['uuid']);
+        
+        // Ensure slug is set
+        if (empty($syncArray['slug'])) {
+            $syncArray['slug'] = $entity->getSlug();
+        }
 
         // Handle sourceId based on sourceType.
         if (isset($syncArray['sourceId']) && isset($syncArray['sourceType'])) {

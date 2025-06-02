@@ -40,6 +40,11 @@ class MappingHandler implements ConfigurationHandlerInterface
 
         $mappingArray = $entity->jsonSerialize();
         unset($mappingArray['id'], $mappingArray['uuid']);
+        
+        // Ensure slug is set
+        if (empty($mappingArray['slug'])) {
+            $mappingArray['slug'] = $entity->getSlug();
+        }
 
         // Replace IDs with slugs where applicable.
         if (isset($mappingArray['source_id']) && isset($mappings['source']['idToSlug'][$mappingArray['source_id']])) {
