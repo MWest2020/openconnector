@@ -2332,7 +2332,7 @@ class SynchronizationService
 	 * the relevant endpoint using dot notation. It also extracts filename and tag information
 	 * if available.
 	 *
-	 * @param array  $config   The configuration array, which may include 'subObjectFilepath' and 'tags'.
+	 * @param array  $config   The configuration array, which may include 'subObjectFilepath', 'tags', 'useLabelsAsTags', and 'allowedLabels'.
 	 * @param mixed  $endpoint The data containing the endpoint, which can be a string or an array.
 	 * @param string|null &$filename A reference to the filename (if available) that will be updated.
 	 * @param array|null  &$tags     A reference to an array of tags (if available) that will be updated.
@@ -2352,10 +2352,55 @@ class SynchronizationService
 		}
 
 		if (is_array($endpoint) === true) {
-			if (isset($endpoint['label']) === true && isset($config['tags']) === true &&
-				in_array(needle: $endpoint['label'], haystack: $config['tags']) === true) {
-				$tags = [$endpoint['label']];
+			// Handle labels/tags with support for multiple property names
+			$extractedTags = [];
+			
+			// Check for various tag/label property names and extract values
+			$tagProperties = ['label', 'labels', 'tag', 'tags'];
+			foreach ($tagProperties as $property) {
+				if (isset($endpoint[$property]) === true && !empty($endpoint[$property])) {
+					$value = $endpoint[$property];
+					
+					// Handle both single values and arrays
+					if (is_array($value)) {
+						$extractedTags = array_merge($extractedTags, array_filter($value, function($item) {
+							return !empty($item) && is_string($item);
+						}));
+					} elseif (is_string($value) && !empty($value)) {
+						$extractedTags[] = $value;
+					}
+				}
 			}
+			
+			// Remove duplicates and apply tag filtering logic
+			$extractedTags = array_unique($extractedTags);
+
+			// Check if we have meaningful tag configuration
+			$hasUseLabelsAsTags = isset($config['useLabelsAsTags']) && $config['useLabelsAsTags'] === true;
+			$hasAllowedLabels = isset($config['allowedLabels']) && is_array($config['allowedLabels']) && !empty($config['allowedLabels']);
+			$hasLegacyTags = isset($config['tags']) && is_array($config['tags']) && !empty($config['tags']);
+			$hasMeaningfulTagConfig = $hasUseLabelsAsTags || $hasAllowedLabels || $hasLegacyTags;
+			
+			foreach ($extractedTags as $tagValue) {
+				// If useLabelsAsTags is explicitly enabled, always use the tag
+				if ($hasUseLabelsAsTags) {
+					$tags[] = $tagValue;
+				}
+				// If config has specific allowed labels, check if this tag is allowed
+				elseif ($hasAllowedLabels && in_array($tagValue, $config['allowedLabels'], true)) {
+					$tags[] = $tagValue;
+				}
+				// Legacy behavior - if config has non-empty tags array and tag is in it
+				elseif ($hasLegacyTags && in_array($tagValue, $config['tags'], true)) {
+					$tags[] = $tagValue;
+				}
+				// If no meaningful tag configuration is provided, use all tags (default behavior)
+				elseif (!$hasMeaningfulTagConfig) {
+					$tags[] = $tagValue;
+				}
+			}
+			
+			// Extract filename if available
 			if (isset($endpoint['filename']) === true && empty($endpoint['filename']) === false) {
 				$filename = $endpoint['filename'];
 			}
@@ -2569,9 +2614,6 @@ class SynchronizationService
 	private function fetchFileSafely(Source $source, string $endpoint, array $config, string $objectId, ?string $filename = null, array $tags = []): void
 	{
         try {
-            // Log the file fetch attempt for debugging
-            error_log("File fetch starting - Endpoint: {$endpoint}, ObjectId: {$objectId}, Filename: " . ($filename ?? 'auto-detect'));
-            
             // Execute the file fetching operation
             $result = $this->fetchFile(
                 source: $source,
@@ -2581,9 +2623,6 @@ class SynchronizationService
                 tags: $tags,
                 filename: $filename
             );
-            
-            // Log successful completion
-            error_log("File fetch completed successfully - Endpoint: {$endpoint}, ObjectId: {$objectId}");
         } catch (Exception $e) {
             // Log error with detailed information but don't throw
             error_log("File fetch failed for endpoint {$endpoint}, objectId {$objectId}: " . $e->getMessage());
