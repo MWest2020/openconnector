@@ -265,99 +265,25 @@ export const useContractStore = defineStore('contract', () => {
 	}
 
 	/**
-	 * Activate a contract
+	 * Enforce a contract (equivalent to executing/running it)
 	 * 
-	 * @param {string} id - The ID of the contract to activate
+	 * @param {string} id - The ID of the contract to enforce
 	 * @return {Promise<{ response: Response }>}
 	 */
-	const activateContract = async (id: string): Promise<{ response: Response }> => {
+	const enforceContract = async (id: string): Promise<{ response: Response }> => {
 		if (!id) {
 			throw new Error('Contract ID is required')
 		}
 
-		console.info('Activating contract...')
+		console.info('Enforcing contract...')
 
-		const endpoint = `${apiEndpoint}/${id}/activate`
+		const endpoint = `${apiEndpoint}/${id}/enforce`
 
 		const response = await fetch(endpoint, {
 			method: 'POST',
 		})
 
 		return { response }
-	}
-
-	/**
-	 * Deactivate a contract
-	 * 
-	 * @param {string} id - The ID of the contract to deactivate
-	 * @return {Promise<{ response: Response }>}
-	 */
-	const deactivateContract = async (id: string): Promise<{ response: Response }> => {
-		if (!id) {
-			throw new Error('Contract ID is required')
-		}
-
-		console.info('Deactivating contract...')
-
-		const endpoint = `${apiEndpoint}/${id}/deactivate`
-
-		const response = await fetch(endpoint, {
-			method: 'POST',
-		})
-
-		return { response }
-	}
-
-	/**
-	 * Execute a contract immediately
-	 * 
-	 * @param {string} id - The ID of the contract to execute
-	 * @return {Promise<{ response: Response }>}
-	 */
-	const executeContract = async (id: string): Promise<{ response: Response }> => {
-		if (!id) {
-			throw new Error('Contract ID is required')
-		}
-
-		console.info('Executing contract...')
-
-		const endpoint = `${apiEndpoint}/${id}/execute`
-
-		const response = await fetch(endpoint, {
-			method: 'POST',
-		})
-
-		return { response }
-	}
-
-	/**
-	 * Activate multiple contracts
-	 * 
-	 * @param {string[]} ids - Array of contract IDs to activate
-	 * @return {Promise<void>}
-	 */
-	const activateMultiple = async (ids: string[]): Promise<void> => {
-		if (!ids || ids.length === 0) return
-
-		console.info('Activating multiple contracts...')
-
-		// Activate contracts one by one (can be optimized with bulk API later)
-		await Promise.all(ids.map(id => activateContract(id)))
-	}
-
-	/**
-	 * Deactivate multiple contracts
-	 * 
-	 * @param {string[]} ids - Array of contract IDs to deactivate
-	 * @return {Promise<void>}
-	 */
-	const deactivateMultiple = async (ids: string[]): Promise<void> => {
-		if (!ids || ids.length === 0) return
-
-		console.info('Deactivating multiple contracts...')
-
-		// Deactivate contracts one by one (can be optimized with bulk API later)
-		await Promise.all(ids.map(id => deactivateContract(id)))
 	}
 
 	/**
@@ -394,6 +320,36 @@ export const useContractStore = defineStore('contract', () => {
 		contractsPerformance.value = data
 
 		return { response, data }
+	}
+
+	/**
+	 * Export filtered contracts
+	 * 
+	 * @return {Promise<{ response: Response }>}
+	 */
+	const exportFiltered = async (): Promise<{ response: Response }> => {
+		console.info('Exporting filtered contracts...')
+
+		const endpoint = `${apiEndpoint}/export`
+
+		const response = await fetch(endpoint, {
+			method: 'GET',
+		})
+
+		// Handle file download
+		if (response.ok) {
+			const blob = await response.blob()
+			const url = window.URL.createObjectURL(blob)
+			const a = document.createElement('a')
+			a.href = url
+			a.download = 'contracts.csv'
+			document.body.appendChild(a)
+			a.click()
+			window.URL.revokeObjectURL(url)
+			document.body.removeChild(a)
+		}
+
+		return { response }
 	}
 
 	/**
@@ -461,13 +417,10 @@ export const useContractStore = defineStore('contract', () => {
 		fetchContract,
 		deleteContract,
 		deleteMultiple,
-		activateContract,
-		deactivateContract,
-		executeContract,
-		activateMultiple,
-		deactivateMultiple,
+		enforceContract,
 		fetchStatistics,
 		fetchPerformance,
+		exportFiltered,
 		saveContract,
 	}
 }) 

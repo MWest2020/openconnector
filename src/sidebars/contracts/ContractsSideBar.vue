@@ -25,21 +25,21 @@ import { contractStore, synchronizationStore } from '../../store/store.js'
 					@input="applyFilters" />
 			</div>
 
-			<!-- Status Filter -->
+			<!-- Sync Status Filter -->
 			<div class="filter-group">
-				<label>{{ t('openconnector', 'Status') }}</label>
+				<label>{{ t('openconnector', 'Sync Status') }}</label>
 				<NcSelect
-					v-model="filters.status"
-					:options="statusOptions"
-					:placeholder="t('openconnector', 'All statuses')"
-					:input-label="t('openconnector', 'Status')"
+					v-model="filters.syncStatus"
+					:options="syncStatusOptions"
+					:placeholder="t('openconnector', 'All sync statuses')"
+					:input-label="t('openconnector', 'Sync Status')"
 					:clearable="true"
 					@input="applyFilters" />
 			</div>
 
 			<!-- Date Range Filter -->
 			<div class="filter-group">
-				<label>{{ t('openconnector', 'Last Executed') }}</label>
+				<label>{{ t('openconnector', 'Last Synced') }}</label>
 				<div class="date-range">
 					<NcDateTimePickerNative
 						id="contracts-date-from"
@@ -56,27 +56,6 @@ import { contractStore, synchronizationStore } from '../../store/store.js'
 				</div>
 			</div>
 
-			<!-- Success Rate Filter -->
-			<div class="filter-group">
-				<label>{{ t('openconnector', 'Success Rate') }}</label>
-				<div class="range-inputs">
-					<NcTextField
-						v-model="filters.successRateMin"
-						type="number"
-						:placeholder="t('openconnector', 'Min %')"
-						min="0"
-						max="100"
-						@input="debouncedApplyFilters" />
-					<NcTextField
-						v-model="filters.successRateMax"
-						type="number"
-						:placeholder="t('openconnector', 'Max %')"
-						min="0"
-						max="100"
-						@input="debouncedApplyFilters" />
-				</div>
-			</div>
-
 			<!-- Clear Filters -->
 			<NcButton v-if="hasActiveFilters" @click="clearFilters">
 				{{ t('openconnector', 'Clear Filters') }}
@@ -90,17 +69,11 @@ import { contractStore, synchronizationStore } from '../../store/store.js'
 				{{ t('openconnector', '{count} contracts selected', { count: selectedCount }) }}
 			</p>
 			<div class="bulk-actions">
-				<NcButton type="primary" @click="bulkActivate">
+				<NcButton type="error" @click="bulkDelete">
 					<template #icon>
-						<Play :size="20" />
+						<Delete :size="20" />
 					</template>
-					{{ t('openconnector', 'Activate Selected') }}
-				</NcButton>
-				<NcButton type="error" @click="bulkDeactivate">
-					<template #icon>
-						<Pause :size="20" />
-					</template>
-					{{ t('openconnector', 'Deactivate Selected') }}
+					{{ t('openconnector', 'Delete Selected') }}
 				</NcButton>
 			</div>
 		</div>
@@ -115,35 +88,6 @@ import { contractStore, synchronizationStore } from '../../store/store.js'
 				<div class="stat-item">
 					<span class="stat-label">{{ t('openconnector', 'Total Contracts') }}</span>
 					<span class="stat-value">{{ filteredCount }}</span>
-				</div>
-				<div class="stat-item">
-					<span class="stat-label">{{ t('openconnector', 'Active') }}</span>
-					<span class="stat-value success">{{ statistics.activeCount || 0 }}</span>
-				</div>
-				<div class="stat-item">
-					<span class="stat-label">{{ t('openconnector', 'Inactive') }}</span>
-					<span class="stat-value warning">{{ statistics.inactiveCount || 0 }}</span>
-				</div>
-				<div class="stat-item">
-					<span class="stat-label">{{ t('openconnector', 'Errors') }}</span>
-					<span class="stat-value error">{{ statistics.errorCount || 0 }}</span>
-				</div>
-			</div>
-
-			<!-- Performance Chart -->
-			<div v-if="statistics.performanceData" class="chart-container">
-				<h5>{{ t('openconnector', 'Performance Trends') }}</h5>
-				<div class="performance-chart">
-					<div v-for="(data, period) in statistics.performanceData" 
-						:key="period" 
-						class="performance-bar">
-						<div class="period-label">{{ formatPeriod(period) }}</div>
-						<div class="performance-progress">
-							<div class="performance-fill" 
-								:style="{ width: getPerformancePercentage(data.successRate) + '%' }"></div>
-						</div>
-						<div class="performance-rate">{{ data.successRate }}%</div>
-					</div>
 				</div>
 			</div>
 		</div>
@@ -172,6 +116,7 @@ import {
 import Play from 'vue-material-design-icons/Play.vue'
 import Pause from 'vue-material-design-icons/Pause.vue'
 import Download from 'vue-material-design-icons/Download.vue'
+import Delete from 'vue-material-design-icons/Delete.vue'
 
 export default {
 	name: 'ContractsSideBar',
@@ -184,16 +129,15 @@ export default {
 		Play,
 		Pause,
 		Download,
+		Delete,
 	},
 	data() {
 		return {
 			filters: {
 				synchronization: null,
-				status: null,
+				syncStatus: null,
 				dateFrom: null,
 				dateTo: null,
-				successRateMin: '',
-				successRateMax: '',
 			},
 			selectedCount: 0,
 			filteredCount: 0,
@@ -214,14 +158,14 @@ export default {
 			}))
 		},
 		/**
-		 * Get status filter options
-		 * @return {Array} Array of status options
+		 * Get sync status filter options
+		 * @return {Array} Array of sync status options
 		 */
-		statusOptions() {
+		syncStatusOptions() {
 			return [
-				{ id: 'active', label: this.t('openconnector', 'Active') },
-				{ id: 'inactive', label: this.t('openconnector', 'Inactive') },
-				{ id: 'error', label: this.t('openconnector', 'Error') },
+				{ id: 'synced', label: this.t('openconnector', 'Synced') },
+				{ id: 'stale', label: this.t('openconnector', 'Stale') },
+				{ id: 'unsynced', label: this.t('openconnector', 'Unsynced') },
 			]
 		},
 		/**
@@ -233,9 +177,8 @@ export default {
 		},
 	},
 	async mounted() {
-		// Load initial statistics and performance data
+		// Load initial statistics
 		await this.loadStatistics()
-		await this.loadPerformance()
 
 		// Listen for events from main view
 		this.$root.$on('contracts-selection-count', this.updateSelectionCount)
@@ -257,34 +200,14 @@ export default {
 		async loadStatistics() {
 			this.statisticsLoading = true
 			try {
-				await contractStore.fetchStatistics()
-				this.statistics = contractStore.contractsStatistics
+				// For contracts, we only need basic count statistics
+				// The filteredCount will be updated from the main view
+				this.statistics = {}
 			} catch (error) {
 				console.error('Error loading statistics:', error)
-				// Set default empty statistics to prevent errors
-				this.statistics = {
-					activeCount: 0,
-					inactiveCount: 0,
-					errorCount: 0,
-				}
+				this.statistics = {}
 			} finally {
 				this.statisticsLoading = false
-			}
-		},
-		/**
-		 * Load performance data
-		 * @return {Promise<void>}
-		 */
-		async loadPerformance() {
-			try {
-				await contractStore.fetchPerformance()
-				// Merge performance data into statistics
-				this.statistics = {
-					...this.statistics,
-					performanceData: contractStore.contractsPerformance,
-				}
-			} catch (error) {
-				console.error('Error loading performance data:', error)
 			}
 		},
 		/**
@@ -322,11 +245,9 @@ export default {
 		clearFilters() {
 			this.filters = {
 				synchronization: null,
-				status: null,
+				syncStatus: null,
 				dateFrom: null,
 				dateTo: null,
-				successRateMin: '',
-				successRateMax: '',
 			}
 			this.applyFilters()
 		},
@@ -347,18 +268,11 @@ export default {
 			this.filteredCount = count
 		},
 		/**
-		 * Trigger bulk activate action
+		 * Trigger bulk delete action
 		 * @return {void}
 		 */
-		bulkActivate() {
-			this.$root.$emit('contracts-bulk-activate')
-		},
-		/**
-		 * Trigger bulk deactivate action
-		 * @return {void}
-		 */
-		bulkDeactivate() {
-			this.$root.$emit('contracts-bulk-deactivate')
+		bulkDelete() {
+			this.$root.$emit('contracts-bulk-delete')
 		},
 		/**
 		 * Trigger export filtered action
@@ -366,23 +280,6 @@ export default {
 		 */
 		exportFiltered() {
 			this.$root.$emit('contracts-export-filtered')
-		},
-		/**
-		 * Format period for display
-		 * @param {string} period - Period identifier
-		 * @return {string} Formatted period
-		 */
-		formatPeriod(period) {
-			// Convert period like 'last_7_days' to 'Last 7 Days'
-			return period.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
-		},
-		/**
-		 * Get percentage for performance display
-		 * @param {number} successRate - Success rate percentage
-		 * @return {number} Percentage
-		 */
-		getPerformancePercentage(successRate) {
-			return Math.min(100, Math.max(0, successRate || 0))
 		},
 	},
 }
@@ -451,15 +348,6 @@ export default {
 }
 
 .date-range > * {
-	flex: 1;
-}
-
-.range-inputs {
-	display: flex;
-	gap: 10px;
-}
-
-.range-inputs > * {
 	flex: 1;
 }
 

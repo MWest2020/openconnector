@@ -85,9 +85,9 @@ import { logStore, contractStore, synchronizationStore, navigationStore } from '
 							class="item-row"
 							:class="{ 
 								selected: selectedItems.includes(item.id),
-								'log-error': item.level === 'error',
-								'log-warning': item.level === 'warning',
-								'log-success': item.level === 'success' || item.level === 'info'
+								'log-error': item.getLevel && item.getLevel() === 'error',
+								'log-warning': item.getLevel && item.getLevel() === 'warning',
+								'log-success': item.getLevel && (item.getLevel() === 'success' || item.getLevel() === 'info')
 							}">
 							<td class="checkbox-column">
 								<NcCheckboxRadioSwitch
@@ -95,19 +95,19 @@ import { logStore, contractStore, synchronizationStore, navigationStore } from '
 									@update:checked="(checked) => toggleItemSelection(item.id, checked)" />
 							</td>
 							<td class="timestamp-column">
-								<NcDateTime :timestamp="new Date(item.timestamp)" :ignore-seconds="false" />
+								<NcDateTime :timestamp="new Date(item.created)" :ignore-seconds="false" />
 							</td>
 							<td>
-								<span :class="'badge-' + getLevelType(item.level)">
-									{{ getLevelLabel(item.level) }}
+								<span :class="'badge-' + getLevelType(item.getLevel ? item.getLevel() : 'unknown')">
+									{{ getLevelLabel(item.getLevel ? item.getLevel() : 'unknown') }}
 								</span>
 							</td>
-							<td>{{ getContractName(item.contractId) }}</td>
+							<td>{{ getContractName(null) }}</td>
 							<td>{{ getSynchronizationName(item.synchronizationId) }}</td>
 							<td class="message-column">
 								<div class="message-content">
 									<span class="message-text">{{ item.message }}</span>
-									<NcButton v-if="item.details" 
+									<NcButton v-if="item.result && item.result.length > 0" 
 										type="tertiary" 
 										@click="toggleDetails(item.id)"
 										:aria-expanded="expandedItems.includes(item.id)">
@@ -118,12 +118,13 @@ import { logStore, contractStore, synchronizationStore, navigationStore } from '
 										{{ expandedItems.includes(item.id) ? t('openconnector', 'Less') : t('openconnector', 'More') }}
 									</NcButton>
 								</div>
-								<div v-if="expandedItems.includes(item.id) && item.details" class="details-content">
-									<pre>{{ formatDetails(item.details) }}</pre>
+								<div v-if="expandedItems.includes(item.id) && item.result" class="details-content">
+									<pre>{{ formatDetails(item.result) }}</pre>
 								</div>
 							</td>
 							<td>
-								<span v-if="item.duration">{{ formatDuration(item.duration) }}</span>
+								<span v-if="item.getFormattedDuration">{{ item.getFormattedDuration() }}</span>
+								<span v-else-if="item.executionTime">{{ formatDuration(item.executionTime) }}</span>
 								<span v-else>-</span>
 							</td>
 							<td class="actions-column">
@@ -134,11 +135,11 @@ import { logStore, contractStore, synchronizationStore, navigationStore } from '
 										</template>
 										{{ t('openconnector', 'View Full Log') }}
 									</NcActionButton>
-									<NcActionButton v-if="item.contractId" @click="viewContract(item)">
+									<NcActionButton v-if="item.synchronizationId" @click="viewSynchronization(item)">
 										<template #icon>
 											<FileDocumentOutline :size="20" />
 										</template>
-										{{ t('openconnector', 'View Contract') }}
+										{{ t('openconnector', 'View Synchronization') }}
 									</NcActionButton>
 									<NcActionButton @click="deleteLog(item)">
 										<template #icon>
@@ -530,15 +531,15 @@ export default {
 			navigationStore.setDialog('viewLogDetails')
 		},
 		/**
-		 * View contract associated with log
+		 * View synchronization associated with log
 		 * @param {object} log - Log entry
 		 * @return {void}
 		 */
-		viewContract(log) {
-			// Navigate to contracts view with contract filter
-			navigationStore.setSelected('contracts')
-			// Filter by specific contract
-			this.$root.$emit('contracts-filter-by-id', log.contractId)
+		viewSynchronization(log) {
+			// Navigate to synchronization view with synchronization filter
+			navigationStore.setSelected('synchronizations')
+			// Filter by specific synchronization
+			this.$root.$emit('synchronizations-filter-by-id', log.synchronizationId)
 		},
 		/**
 		 * Delete individual log

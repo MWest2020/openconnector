@@ -355,7 +355,7 @@ export const useLogStore = defineStore('log', () => {
 			method: 'DELETE',
 		})
 
-		if (response.ok && logItem.value?.id === id) {
+		if (response.ok && logItem.value?.id === parseInt(id)) {
 			setLogItem(null)
 		}
 

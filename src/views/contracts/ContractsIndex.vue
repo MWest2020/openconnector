@@ -22,21 +22,12 @@ import { contractStore, synchronizationStore, navigationStore } from '../../stor
 				<div class="actions">
 					<NcButton
 						v-if="selectedItems.length > 0"
-						type="primary"
-						@click="bulkActivate">
-						<template #icon>
-							<Play :size="20" />
-						</template>
-						{{ t('openconnector', 'Activate Selected') }}
-					</NcButton>
-					<NcButton
-						v-if="selectedItems.length > 0"
 						type="error"
-						@click="bulkDeactivate">
+						@click="bulkDelete">
 						<template #icon>
-							<Pause :size="20" />
+							<Delete :size="20" />
 						</template>
-						{{ t('openconnector', 'Deactivate Selected') }}
+						{{ t('openconnector', 'Delete Selected') }}
 					</NcButton>
 					<NcButton @click="refreshItems">
 						<template #icon>
@@ -71,12 +62,11 @@ import { contractStore, synchronizationStore, navigationStore } from '../../stor
 									:indeterminate="someSelected"
 									@update:checked="toggleSelectAll" />
 							</th>
-							<th>{{ t('openconnector', 'Name') }}</th>
+							<th>{{ t('openconnector', 'Contract') }}</th>
 							<th>{{ t('openconnector', 'Synchronization') }}</th>
-							<th>{{ t('openconnector', 'Status') }}</th>
-							<th>{{ t('openconnector', 'Last Executed') }}</th>
-							<th>{{ t('openconnector', 'Next Execution') }}</th>
-							<th>{{ t('openconnector', 'Success Rate') }}</th>
+							<th>{{ t('openconnector', 'Sync Status') }}</th>
+							<th>{{ t('openconnector', 'Last Synced') }}</th>
+							<th>{{ t('openconnector', 'Last Action') }}</th>
 							<th>{{ t('openconnector', 'Actions') }}</th>
 						</tr>
 					</thead>
@@ -93,51 +83,43 @@ import { contractStore, synchronizationStore, navigationStore } from '../../stor
 							<td class="title-column">
 								<div class="title-content">
 									<strong>{{ getContractName(item) }}</strong>
-									<span v-if="item.description" class="description">{{ item.description }}</span>
+									<span v-if="item.uuid" class="description">{{ item.uuid }}</span>
 								</div>
 							</td>
 							<td>{{ getSynchronizationName(item.synchronizationId) }}</td>
 							<td>
-								<span :class="getStatusType(item.getStatus ? item.getStatus() : 'unknown')">
-									{{ getStatusLabel(item.getStatus ? item.getStatus() : 'unknown') }}
+								<span :class="getSyncStatusType(item.getSyncStatus ? item.getSyncStatus() : 'unsynced')">
+									{{ getSyncStatusLabel(item.getSyncStatus ? item.getSyncStatus() : 'unsynced') }}
 								</span>
 							</td>
 							<td>
-								<NcDateTime v-if="item.lastExecuted" :timestamp="new Date(item.lastExecuted)" :ignore-seconds="true" />
+								<NcDateTime v-if="item.getLastSyncDate && item.getLastSyncDate()" 
+									:timestamp="new Date(item.getLastSyncDate())" 
+									:ignore-seconds="true" />
 								<span v-else>{{ t('openconnector', 'Never') }}</span>
 							</td>
 							<td>
-								<NcDateTime v-if="item.nextExecution" :timestamp="new Date(item.nextExecution)" :ignore-seconds="true" />
-								<span v-else>{{ t('openconnector', 'Not scheduled') }}</span>
-							</td>
-							<td>
-								<div class="success-rate">
-									<span>{{ calculateSuccessRate(item) }}%</span>
-									<div class="rate-bar">
-										<div class="rate-fill" :style="{ width: calculateSuccessRate(item) + '%' }"></div>
-									</div>
-								</div>
+								<span class="action-badge">{{ getLastActionLabel(item.getLastAction ? item.getLastAction() : 'none') }}</span>
 							</td>
 							<td class="actions-column">
 								<NcActions>
-									<NcActionButton @click="toggleContractStatus(item)">
-										<template #icon>
-											<Play v-if="item.getStatus && item.getStatus() === 'inactive'" :size="20" />
-											<Pause v-else :size="20" />
-										</template>
-										{{ (item.getStatus && item.getStatus() === 'inactive') ? t('openconnector', 'Activate') : t('openconnector', 'Deactivate') }}
-									</NcActionButton>
-									<NcActionButton @click="executeContract(item)">
+									<NcActionButton @click="enforceContract(item)">
 										<template #icon>
 											<PlayCircle :size="20" />
 										</template>
-										{{ t('openconnector', 'Execute Now') }}
+										{{ t('openconnector', 'Enforce Contract') }}
 									</NcActionButton>
 									<NcActionButton @click="viewLogs(item)">
 										<template #icon>
 											<TextBoxOutline :size="20" />
 										</template>
 										{{ t('openconnector', 'View Logs') }}
+									</NcActionButton>
+									<NcActionButton @click="deleteContract(item)">
+										<template #icon>
+											<Delete :size="20" />
+										</template>
+										{{ t('openconnector', 'Delete') }}
 									</NcActionButton>
 								</NcActions>
 							</td>
@@ -193,6 +175,7 @@ import Pause from 'vue-material-design-icons/Pause.vue'
 import Refresh from 'vue-material-design-icons/Refresh.vue'
 import PlayCircle from 'vue-material-design-icons/PlayCircle.vue'
 import TextBoxOutline from 'vue-material-design-icons/TextBoxOutline.vue'
+import Delete from 'vue-material-design-icons/Delete.vue'
 
 export default {
 	name: 'ContractsIndex',
@@ -211,6 +194,7 @@ export default {
 		Refresh,
 		PlayCircle,
 		TextBoxOutline,
+		Delete,
 	},
 	data() {
 		return {
@@ -278,14 +262,12 @@ export default {
 
 		// Listen for filter changes from sidebar
 		this.$root.$on('contracts-filters-changed', this.handleFiltersChanged)
-		this.$root.$on('contracts-bulk-activate', this.bulkActivate)
-		this.$root.$on('contracts-bulk-deactivate', this.bulkDeactivate)
+		this.$root.$on('contracts-bulk-delete', this.bulkDelete)
 		this.$root.$on('contracts-export-filtered', this.exportFiltered)
 	},
 	beforeDestroy() {
 		this.$root.$off('contracts-filters-changed')
-		this.$root.$off('contracts-bulk-activate')
-		this.$root.$off('contracts-bulk-deactivate')
+		this.$root.$off('contracts-bulk-delete')
 		this.$root.$off('contracts-export-filtered')
 	},
 	methods: {
@@ -346,15 +328,17 @@ export default {
 			return synchronization?.name || `Synchronization ${synchronizationId}`
 		},
 		/**
-		 * Get status badge type
-		 * @param {string} status - Contract status
-		 * @return {string} Badge type
+		 * Get sync status type
+		 * @param {string} status - Sync status
+		 * @return {string} Sync status type
 		 */
-		getStatusType(status) {
+		getSyncStatusType(status) {
 			switch (status) {
-				case 'active':
+				case 'synced':
 					return 'success'
-				case 'inactive':
+				case 'stale':
+					return 'warning'
+				case 'unsynced':
 					return 'secondary'
 				case 'error':
 					return 'error'
@@ -363,16 +347,18 @@ export default {
 			}
 		},
 		/**
-		 * Get status label
-		 * @param {string} status - Contract status
-		 * @return {string} Status label
+		 * Get sync status label
+		 * @param {string} status - Sync status
+		 * @return {string} Sync status label
 		 */
-		getStatusLabel(status) {
+		getSyncStatusLabel(status) {
 			switch (status) {
-				case 'active':
-					return t('openconnector', 'Active')
-				case 'inactive':
-					return t('openconnector', 'Inactive')
+				case 'synced':
+					return t('openconnector', 'Synced')
+				case 'stale':
+					return t('openconnector', 'Stale')
+				case 'unsynced':
+					return t('openconnector', 'Unsynced')
 				case 'error':
 					return t('openconnector', 'Error')
 				default:
@@ -380,15 +366,26 @@ export default {
 			}
 		},
 		/**
-		 * Calculate success rate for a contract
-		 * @param {object} contract - The contract object
-		 * @return {number} Success rate percentage
+		 * Get last action label
+		 * @param {string} action - Last action
+		 * @return {string} Last action label
 		 */
-		calculateSuccessRate(contract) {
-			if (!contract.totalExecutions || contract.totalExecutions === 0) {
-				return 0
+		getLastActionLabel(action) {
+			switch (action) {
+				case 'create':
+				case 'created':
+					return t('openconnector', 'Created')
+				case 'update':
+				case 'updated':
+					return t('openconnector', 'Updated')
+				case 'delete':
+				case 'deleted':
+					return t('openconnector', 'Deleted')
+				case 'insert':
+					return t('openconnector', 'Inserted')
+				default:
+					return t('openconnector', 'None')
 			}
-			return Math.round((contract.successfulExecutions / contract.totalExecutions) * 100)
 		},
 		/**
 		 * Toggle selection for all items on current page
@@ -430,68 +427,47 @@ export default {
 			}
 		},
 		/**
-		 * Bulk activate selected contracts
+		 * Bulk delete selected contracts
 		 * @return {Promise<void>}
 		 */
-		async bulkActivate() {
+		async bulkDelete() {
 			if (this.selectedItems.length === 0) return
 
 			try {
-				await contractStore.activateMultiple(this.selectedItems)
+				await contractStore.deleteMultiple(this.selectedItems)
 				this.selectedItems = []
 				// Refresh the list
 				await this.loadItems()
 			} catch (error) {
-				console.error('Error activating contracts:', error)
+				console.error('Error deleting contracts:', error)
 			}
 		},
 		/**
-		 * Bulk deactivate selected contracts
+		 * Enforce contract (equivalent to executing/running it)
+		 * @param {object} contract - Contract to enforce
 		 * @return {Promise<void>}
 		 */
-		async bulkDeactivate() {
-			if (this.selectedItems.length === 0) return
-
+		async enforceContract(contract) {
 			try {
-				await contractStore.deactivateMultiple(this.selectedItems)
-				this.selectedItems = []
+				await contractStore.enforceContract(contract.id)
 				// Refresh the list
 				await this.loadItems()
 			} catch (error) {
-				console.error('Error deactivating contracts:', error)
+				console.error('Error enforcing contract:', error)
 			}
 		},
 		/**
-		 * Toggle contract status
-		 * @param {object} contract - Contract to toggle
+		 * Delete contract
+		 * @param {object} contract - Contract to delete
 		 * @return {Promise<void>}
 		 */
-		async toggleContractStatus(contract) {
+		async deleteContract(contract) {
 			try {
-				const currentStatus = contract.getStatus ? contract.getStatus() : 'inactive'
-				if (currentStatus === 'active') {
-					await contractStore.deactivateContract(contract.id)
-				} else {
-					await contractStore.activateContract(contract.id)
-				}
+				await contractStore.deleteContract(contract.id)
 				// Refresh the list
 				await this.loadItems()
 			} catch (error) {
-				console.error('Error toggling contract status:', error)
-			}
-		},
-		/**
-		 * Execute contract immediately
-		 * @param {object} contract - Contract to execute
-		 * @return {Promise<void>}
-		 */
-		async executeContract(contract) {
-			try {
-				await contractStore.executeContract(contract.id)
-				// Refresh the list
-				await this.loadItems()
-			} catch (error) {
-				console.error('Error executing contract:', error)
+				console.error('Error deleting contract:', error)
 			}
 		},
 		/**
@@ -525,6 +501,17 @@ export default {
 		async refreshItems() {
 			await this.loadItems()
 			this.selectedItems = []
+		},
+		/**
+		 * Export filtered contracts
+		 * @return {Promise<void>}
+		 */
+		async exportFiltered() {
+			try {
+				await contractStore.exportFiltered()
+			} catch (error) {
+				console.error('Error exporting contracts:', error)
+			}
 		},
 		/**
 		 * Update counts for sidebar
@@ -726,6 +713,16 @@ export default {
 	padding: 4px 8px;
 	background: var(--color-error);
 	color: white;
+	border-radius: 12px;
+	font-size: 0.75rem;
+	font-weight: 500;
+}
+
+.action-badge {
+	display: inline-block;
+	padding: 4px 8px;
+	background: var(--color-background-dark);
+	color: var(--color-text-maxcontrast);
 	border-radius: 12px;
 	font-size: 0.75rem;
 	font-weight: 500;

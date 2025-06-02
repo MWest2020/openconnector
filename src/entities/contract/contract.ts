@@ -77,45 +77,89 @@ export class Contract extends ReadonlyBaseClass implements TContract {
 	}
 
 	/**
-	 * Generate a human-readable contract name
+	 * Generate a human-readable contract display name
 	 *
-	 * @return {string} Generated contract name
+	 * @return {string} Generated contract display name
 	 */
 	public getDisplayName(): string {
-		if (this.originId && this.targetId) {
-			return `Contract: ${this.originId} → ${this.targetId}`
-		} else if (this.originId) {
-			return `Contract: ${this.originId} → (pending)`
-		} else if (this.id) {
-			return `Contract ${this.id}`
-		}
-		return 'New Contract'
+		return `Contract: ${this.id}`
 	}
 
 	/**
-	 * Calculate contract status based on sync dates and data
+	 * Get the contract sync status (for display purposes only)
+	 * Note: Contracts cannot be "activated" or "deactivated" - they exist or don't exist
 	 *
-	 * @return {string} Contract status (active, inactive, error)
+	 * @return {string} Sync status indicator
 	 */
-	public getStatus(): string {
-		// If we have recent sync activity, consider it active
+	public getSyncStatus(): string {
+		// Check if contract has recent sync activity
+		const hasRecentSourceSync = this.sourceLastSynced
+			&& new Date(this.sourceLastSynced).getTime() > (Date.now() - 24 * 60 * 60 * 1000) // 24 hours
+		const hasRecentTargetSync = this.targetLastSynced
+			&& new Date(this.targetLastSynced).getTime() > (Date.now() - 24 * 60 * 60 * 1000) // 24 hours
+
+		if (hasRecentSourceSync || hasRecentTargetSync) {
+			return 'synced'
+		}
+
 		if (this.sourceLastSynced || this.targetLastSynced) {
-			const sourceTimestamp = this.sourceLastSynced ? new Date(this.sourceLastSynced).getTime() : 0
-			const targetTimestamp = this.targetLastSynced ? new Date(this.targetLastSynced).getTime() : 0
-			const lastSync = new Date(Math.max(sourceTimestamp, targetTimestamp))
-			const daysSinceSync = (Date.now() - lastSync.getTime()) / (1000 * 60 * 60 * 24)
-			
-			if (daysSinceSync < 7) {
-				return 'active'
-			}
+			return 'stale'
 		}
-		
-		// If we have both origin and target, it's at least inactive
-		if (this.originId && this.targetId) {
-			return 'inactive'
-		}
-		
-		// If missing critical data, consider it an error
-		return 'error'
+
+		return 'unsynced'
 	}
-} 
+
+	/**
+	 * Get the most recent sync date from either source or target
+	 *
+	 * @return {string|null} Most recent sync date
+	 */
+	public getLastSyncDate(): string | null {
+		const sourceTimestamp = this.sourceLastSynced ? new Date(this.sourceLastSynced).getTime() : 0
+		const targetTimestamp = this.targetLastSynced ? new Date(this.targetLastSynced).getTime() : 0
+
+		if (sourceTimestamp === 0 && targetTimestamp === 0) {
+			return null
+		}
+
+		const mostRecent = Math.max(sourceTimestamp, targetTimestamp)
+		return new Date(mostRecent).toISOString()
+	}
+
+	/**
+	 * Check if hashes match between source and target
+	 *
+	 * @return {boolean} Whether hashes are synchronized
+	 */
+	public isHashSynchronized(): boolean {
+		return !!(this.originHash && this.targetHash && this.originHash === this.targetHash)
+	}
+
+	/**
+	 * Get the synchronization progress indicator
+	 *
+	 * @return {string} Progress status
+	 */
+	public getSyncProgress(): string {
+		if (!this.originId) {
+			return 'no-source'
+		}
+		if (!this.targetId) {
+			return 'no-target'
+		}
+		if (this.isHashSynchronized()) {
+			return 'synchronized'
+		}
+		return 'out-of-sync'
+	}
+
+	/**
+	 * Get a short description of the last action
+	 *
+	 * @return {string} Last action description
+	 */
+	public getLastAction(): string {
+		return this.targetLastAction || 'none'
+	}
+
+}

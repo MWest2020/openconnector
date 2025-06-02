@@ -129,18 +129,19 @@ class SynchronizationService
 	 * Synchronizes internal data to external sources based on synchronization rules.
 	 *
 	 * @param Synchronization $synchronization The synchronization configuration.
-	 * @param bool 		      $isTest Whether this is a test run (does not persist data if true).
 	 * @param \OCA\OpenRegister\Db\ObjectEntity|array $object The object to be synchronized, also referenced so its updated in parent objects.
-     * @param SynchronizationLog $log
+     * @param SynchronizationLog $log The log object to record synchronization details and results.
+	 * @param bool 		      $isTest Whether this is a test run (does not persist data if true).
+	 * @param bool|null       $force Whether to force the synchronization regardless of changes.
 	 * @param string|null $mutationType If dealing with single object synchronization, the type of the mutation that will be handled, 'create', 'update' or 'delete'. Used for syncs to extern sources.
 	 *
 	 * @return SynchronizationContract|array|null Returns a synchronization contract, an array for test cases, or null if conditions are not met.
 	 */
 	private function synchronizeInternToExtern(
 		Synchronization $synchronization,
-		?bool $isTest = false,
 		\OCA\OpenRegister\Db\ObjectEntity|array &$object,
 		SynchronizationLog $log,
+		?bool $isTest = false,
 		?bool $force = false,
 		?string $mutationType = null
 	): SynchronizationContract|array|null
@@ -471,7 +472,6 @@ class SynchronizationService
             $log = $this->synchronizationLogMapper->createFromArray($log);
             return $this->synchronizeInternToExtern(
                 synchronization: $synchronization,
-                isTest: $isTest,
                 object: $object,
                 log: $log,
                 force: $force,
@@ -2242,6 +2242,11 @@ class SynchronizationService
 		);
 		$response = $result->getResponse();
 
+		// Check if response is valid
+		if ($response === null) {
+			throw new Exception("Failed to fetch file from endpoint: {$originalEndpoint}. No response received.");
+		}
+
 		if (isset($config['write']) === true && $config['write'] === false) {
             return base64_encode($response['body']);
         }
@@ -2252,21 +2257,40 @@ class SynchronizationService
         }
 
 		if ($filename === null) {
-            throw new Exception('Could not write file: no filename could be determined');
+            throw new Exception("Could not write file from endpoint {$originalEndpoint}: no filename could be determined");
         }
 
-		$objectService = $this->containerInterface->get('OCA\OpenRegister\Service\ObjectService');
-		$objectEntity = $objectService->findByUuid(uuid: $objectId);
+		// Validate objectId format (should be a UUID)
+		if (empty($objectId) || !preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $objectId)) {
+			throw new Exception("Invalid object ID format: {$objectId}. Expected a valid UUID.");
+		}
+
+		try {
+			$objectService = $this->containerInterface->get('OCA\OpenRegister\Service\ObjectService');
+			$objectEntity = $objectService->findByUuid(uuid: $objectId);
+		} catch (Exception $e) {
+			throw new Exception("Failed to find object with UUID {$objectId}: " . $e->getMessage());
+		}
 
         $tags[] = "object:$objectId";
 
-		// Write file with OpenRegister FileService.
-		$fileService = $this->containerInterface->get('OCA\OpenRegister\Service\FileService');
-		
-		// Decode base64 content if it appears to be base64 encoded
-		$content = $response['body'];
-		
-		$file = $fileService->addFile(objectEntity: $objectEntity, fileName: $filename, content: $content, share: isset($config['autoShare']) ? $config['autoShare'] : false, tags: $tags);
+		try {
+			// Write file with OpenRegister FileService.
+			$fileService = $this->containerInterface->get('OCA\OpenRegister\Service\FileService');
+			
+			// Decode base64 content if it appears to be base64 encoded
+			$content = $response['body'];
+			
+			$file = $fileService->addFile(
+				objectEntity: $objectEntity, 
+				fileName: $filename, 
+				content: $content, 
+				share: isset($config['autoShare']) ? $config['autoShare'] : false, 
+				tags: $tags
+			);
+		} catch (Exception $e) {
+			throw new Exception("Failed to save file {$filename} for object {$objectId}: " . $e->getMessage());
+		}
 
 		return $originalEndpoint;
 	}
@@ -2451,13 +2475,9 @@ class SynchronizationService
 	 */
 	private function startAsyncFileFetching(Source $source, array $config, mixed $endpoint, string $objectId, int $ruleId): void
 	{
-        // Get the event loop for scheduling async operations
-        $loop = Loop::get();
-
-        // Schedule the file fetching operation to run asynchronously
-        $loop->futureTick(function() use ($source, $config, $endpoint, $objectId, $ruleId) {
-            $this->executeAsyncFileFetching($source, $config, $endpoint, $objectId, $ruleId);
-        });
+        // Execute file fetching immediately but with error isolation
+        // This provides "fire-and-forget" behavior without complex ReactPHP setup
+        $this->executeAsyncFileFetching($source, $config, $endpoint, $objectId, $ruleId);
 	}
 
 	/**
@@ -2486,14 +2506,17 @@ class SynchronizationService
             switch ($this->getArrayType($endpoint)) {
                 // Single file endpoint
                 case 'Not array':
-                    $this->fetchFileAsync($source, $endpoint, $config, $objectId);
+                    $this->fetchFileSafely($source, $endpoint, $config, $objectId);
                     break;
                     
                 // Array of object that has file(s)
                 case 'Associative array':
-                    $actualEndpoint = $this->getFileContext(config: $config, endpoint: $endpoint, filename: $filename, tags: $tags, objectId: $objectId);
+                    $contextObjectId = null; // Separate variable to avoid overwriting the original
+                    $actualEndpoint = $this->getFileContext(config: $config, endpoint: $endpoint, filename: $filename, tags: $tags, objectId: $contextObjectId);
+                    // Use context object ID if specified, otherwise fall back to the original object ID
+                    $targetObjectId = $contextObjectId ?? $objectId;
                     if ($actualEndpoint !== null) {
-                        $this->fetchFileAsync($source, $actualEndpoint, $config, $objectId, $filename, $tags);
+                        $this->fetchFileSafely($source, $actualEndpoint, $config, $targetObjectId, $filename, $tags);
                     }
                     break;
                     
@@ -2502,9 +2525,12 @@ class SynchronizationService
                     foreach ($endpoint as $object) {
                         $filename = null;
                         $tags = [];
-                        $actualEndpoint = $this->getFileContext(config: $config, endpoint: $object, filename: $filename, tags: $tags, objectId: $objectId);
+                        $contextObjectId = null; // Separate variable to avoid overwriting the original
+                        $actualEndpoint = $this->getFileContext(config: $config, endpoint: $object, filename: $filename, tags: $tags, objectId: $contextObjectId);
+                        // Use context object ID if specified, otherwise fall back to the original object ID
+                        $targetObjectId = $contextObjectId ?? $objectId;
                         if ($actualEndpoint !== null) {
-                            $this->fetchFileAsync($source, $actualEndpoint, $config, $objectId, $filename, $tags);
+                            $this->fetchFileSafely($source, $actualEndpoint, $config, $targetObjectId, $filename, $tags);
                         }
                     }
                     break;
@@ -2512,7 +2538,7 @@ class SynchronizationService
                 // Array of just endpoints
                 case "Indexed array":
                     foreach ($endpoint as $childEndpoint) {
-                        $this->fetchFileAsync($source, $childEndpoint, $config, $objectId);
+                        $this->fetchFileSafely($source, $childEndpoint, $config, $objectId);
                     }
                     break;
             }
@@ -2523,9 +2549,9 @@ class SynchronizationService
 	}
 
 	/**
-	 * Fetches a single file asynchronously using ReactPHP promises.
+	 * Fetches a single file with comprehensive error handling.
 	 *
-	 * This method wraps the existing fetchFile method in a ReactPHP promise to enable
+	 * This method wraps the existing fetchFile method with error isolation to enable
 	 * fire-and-forget execution. Errors are caught and logged without affecting the main process.
 	 *
 	 * @param Source $source The source to fetch the file from.
@@ -2535,17 +2561,17 @@ class SynchronizationService
 	 * @param string|null $filename Optional filename to assign to the file.
 	 * @param array $tags Optional tags to assign to the file.
 	 *
-	 * @return PromiseInterface A promise that resolves when the file is fetched.
+	 * @return void
 	 *
 	 * @psalm-param array<string, mixed> $config
 	 * @psalm-param array<string> $tags
-	 * @psalm-return PromiseInterface<string>
 	 */
-	private function fetchFileAsync(Source $source, string $endpoint, array $config, string $objectId, ?string $filename = null, array $tags = []): PromiseInterface
+	private function fetchFileSafely(Source $source, string $endpoint, array $config, string $objectId, ?string $filename = null, array $tags = []): void
 	{
-        $deferred = new Deferred();
-        
         try {
+            // Log the file fetch attempt for debugging
+            error_log("File fetch starting - Endpoint: {$endpoint}, ObjectId: {$objectId}, Filename: " . ($filename ?? 'auto-detect'));
+            
             // Execute the file fetching operation
             $result = $this->fetchFile(
                 source: $source,
@@ -2556,15 +2582,17 @@ class SynchronizationService
                 filename: $filename
             );
             
-            // Resolve the promise with the result
-            $deferred->resolve($result);
+            // Log successful completion
+            error_log("File fetch completed successfully - Endpoint: {$endpoint}, ObjectId: {$objectId}");
         } catch (Exception $e) {
-            // Log error and reject the promise
-            error_log("File fetch failed for endpoint {$endpoint}: " . $e->getMessage());
-            $deferred->reject($e);
+            // Log error with detailed information but don't throw
+            error_log("File fetch failed for endpoint {$endpoint}, objectId {$objectId}: " . $e->getMessage());
+            
+            // Only log stack trace for debugging if it's not a known issue
+            if (strpos($e->getMessage(), 'file versioning') === false && strpos($e->getMessage(), 'files_versions') === false) {
+                error_log("Stack trace: " . $e->getTraceAsString());
+            }
         }
-        
-        return $deferred->promise();
 	}
 
 	/**
