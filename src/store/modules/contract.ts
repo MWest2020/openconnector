@@ -1,0 +1,473 @@
+import { ref, computed } from 'vue'
+import { defineStore } from 'pinia'
+import { Contract, TContract } from '../../entities/index.js'
+
+const apiEndpoint = '/index.php/apps/openconnector/api/synchronization-contracts'
+
+/**
+ * Contract store for managing synchronization contracts
+ *
+ * @description
+ * This store manages the state and operations for synchronization contracts,
+ * including fetching, creating, updating, and deleting contracts.
+ */
+export const useContractStore = defineStore('contract', () => {
+	// ################################
+	// ||           State            ||
+	// ################################
+
+	/** @type {import('vue').Ref<Contract|null>} Current contract item */
+	const contractItem = ref<Contract>(null)
+	
+	/** @type {import('vue').Ref<Contract[]>} List of contracts */
+	const contractsList = ref<Contract[]>([])
+	
+	/** @type {import('vue').Ref<boolean>} Loading state for contracts */
+	const contractsLoading = ref<boolean>(false)
+	
+	/** @type {import('vue').Ref<object>} Pagination information */
+	const contractsPagination = ref<object>({
+		page: 1,
+		pages: 1,
+		results: 0,
+		total: 0
+	})
+	
+	/** @type {import('vue').Ref<object>} Current filters */
+	const contractsFilters = ref<object>({})
+	
+	/** @type {import('vue').Ref<object>} Statistics data */
+	const contractsStatistics = ref<object>({})
+	
+	/** @type {import('vue').Ref<object>} Performance data */
+	const contractsPerformance = ref<object>({})
+
+	// ################################
+	// ||    Setters and Getters     ||
+	// ################################
+
+	/**
+	 * Set the active contract item
+	 * 
+	 * @param {Contract|TContract|null} item - The contract item to set
+	 * @return {void}
+	 */
+	const setContractItem = (item: Contract | TContract | null): void => {
+		contractItem.value = item && new Contract(item)
+		console.info('Active contract item set to ' + (item ? item.id : 'null'))
+	}
+
+	/**
+	 * Get the active contract item
+	 *
+	 * @description
+	 * Returns the currently active contract item. Note that the return value is non-reactive.
+	 *
+	 * For reactive usage, either:
+	 * 1. Reference the `contractItem` state directly:
+	 * ```js
+	 * const contractItem = useContractStore().contractItem // reactive state
+	 * ```
+	 * 2. Or wrap in a `computed` property:
+	 * ```js
+	 * const contractItem = computed(() => useContractStore().getContractItem())
+	 * ```
+	 *
+	 * @return {Contract | null} The active contract item
+	 */
+	const getContractItem = (): Contract | null => contractItem.value as Contract | null
+
+	/**
+	 * Set the contract list
+	 * 
+	 * @param {Contract[]|TContract[]} list - The contract list to set
+	 * @return {void}
+	 */
+	const setContractsList = (list: Contract[] | TContract[]): void => {
+		contractsList.value = list.map((item) => new Contract(item))
+		console.info('Contract list set to ' + list.length + ' items')
+	}
+
+	/**
+	 * Get the contract list
+	 *
+	 * @description
+	 * Returns the currently active contract list. Note that the return value is non-reactive.
+	 *
+	 * For reactive usage, either:
+	 * 1. Reference the `contractsList` state directly:
+	 * ```js
+	 * const contractsList = useContractStore().contractsList // reactive state
+	 * ```
+	 * 2. Or wrap in a `computed` property:
+	 * ```js
+	 * const contractsList = computed(() => useContractStore().getContractsList())
+	 * ```
+	 *
+	 * @return {Contract[]} The contract list
+	 */
+	const getContractsList = (): Contract[] => contractsList.value as Contract[]
+
+	/**
+	 * Set contracts filters
+	 * 
+	 * @param {object} filters - The filters to set
+	 * @return {void}
+	 */
+	const setContractsFilters = (filters: object): void => {
+		contractsFilters.value = filters
+		console.info('Contracts filters set', filters)
+	}
+
+	/**
+	 * Set contracts loading state
+	 * 
+	 * @param {boolean} loading - The loading state
+	 * @return {void}
+	 */
+	const setContractsLoading = (loading: boolean): void => {
+		contractsLoading.value = loading
+	}
+
+	/**
+	 * Set contracts pagination
+	 * 
+	 * @param {object} pagination - The pagination object
+	 * @return {void}
+	 */
+	const setContractsPagination = (pagination: object): void => {
+		contractsPagination.value = pagination
+	}
+
+	// ################################
+	// ||          Actions           ||
+	// ################################
+
+	/**
+	 * Fetch contracts from the API
+	 * 
+	 * @param {object} options - Request options
+	 * @param {number} options.page - Page number
+	 * @param {object} options.filters - Filters to apply
+	 * @return {Promise<{ response: Response, data: TContract[], entities: Contract[] }>}
+	 */
+	const fetchContracts = async (options: { page?: number, filters?: object } = {}): Promise<{ response: Response, data: TContract[], entities: Contract[] }> => {
+		setContractsLoading(true)
+		
+		try {
+			const queryParams = new URLSearchParams()
+
+			// Add page parameter
+			if (options.page) {
+				queryParams.append('page', options.page.toString())
+			}
+
+			// Add filters
+			if (options.filters) {
+				Object.entries(options.filters).forEach(([key, value]) => {
+					if (value !== null && value !== '') {
+						queryParams.append(key, value.toString())
+					}
+				})
+			}
+
+			// Build the endpoint with query params
+			let endpoint = apiEndpoint
+			if (queryParams.toString()) {
+				endpoint += '?' + queryParams.toString()
+			}
+
+			const response = await fetch(endpoint, {
+				method: 'GET',
+			})
+
+			const responseData = await response.json()
+			const data = (responseData.results || responseData) as TContract[]
+			const entities = data.map(contractItem => new Contract(contractItem))
+
+			setContractsList(data)
+			
+			// Set pagination if available
+			if (responseData.pagination) {
+				setContractsPagination(responseData.pagination)
+			}
+
+			return { response, data, entities }
+		} finally {
+			setContractsLoading(false)
+		}
+	}
+
+	/**
+	 * Fetch a single contract
+	 * 
+	 * @param {string} id - The ID of the contract to fetch
+	 * @return {Promise<{ response: Response, data: TContract, entity: Contract }>}
+	 */
+	const fetchContract = async (id: string): Promise<{ response: Response, data: TContract, entity: Contract }> => {
+		if (!id) {
+			throw new Error('Contract ID is required')
+		}
+
+		const endpoint = `${apiEndpoint}/${id}`
+
+		const response = await fetch(endpoint, {
+			method: 'GET',
+		})
+
+		const data = await response.json() as TContract
+		const entity = new Contract(data)
+
+		setContractItem(data)
+
+		return { response, data, entity }
+	}
+
+	/**
+	 * Delete a contract
+	 * 
+	 * @param {string} id - The ID of the contract to delete
+	 * @return {Promise<{ response: Response }>}
+	 */
+	const deleteContract = async (id: string): Promise<{ response: Response }> => {
+		if (!id) {
+			throw new Error('Contract ID is required')
+		}
+
+		console.info('Deleting contract...')
+
+		const endpoint = `${apiEndpoint}/${id}`
+
+		const response = await fetch(endpoint, {
+			method: 'DELETE',
+		})
+
+		if (response.ok && contractItem.value?.id === id) {
+			setContractItem(null)
+		}
+
+		return { response }
+	}
+
+	/**
+	 * Delete multiple contracts
+	 * 
+	 * @param {string[]} ids - Array of contract IDs to delete
+	 * @return {Promise<void>}
+	 */
+	const deleteMultiple = async (ids: string[]): Promise<void> => {
+		if (!ids || ids.length === 0) return
+
+		console.info('Deleting multiple contracts...')
+
+		// Delete contracts one by one (can be optimized with bulk API later)
+		await Promise.all(ids.map(id => deleteContract(id)))
+	}
+
+	/**
+	 * Activate a contract
+	 * 
+	 * @param {string} id - The ID of the contract to activate
+	 * @return {Promise<{ response: Response }>}
+	 */
+	const activateContract = async (id: string): Promise<{ response: Response }> => {
+		if (!id) {
+			throw new Error('Contract ID is required')
+		}
+
+		console.info('Activating contract...')
+
+		const endpoint = `${apiEndpoint}/${id}/activate`
+
+		const response = await fetch(endpoint, {
+			method: 'POST',
+		})
+
+		return { response }
+	}
+
+	/**
+	 * Deactivate a contract
+	 * 
+	 * @param {string} id - The ID of the contract to deactivate
+	 * @return {Promise<{ response: Response }>}
+	 */
+	const deactivateContract = async (id: string): Promise<{ response: Response }> => {
+		if (!id) {
+			throw new Error('Contract ID is required')
+		}
+
+		console.info('Deactivating contract...')
+
+		const endpoint = `${apiEndpoint}/${id}/deactivate`
+
+		const response = await fetch(endpoint, {
+			method: 'POST',
+		})
+
+		return { response }
+	}
+
+	/**
+	 * Execute a contract immediately
+	 * 
+	 * @param {string} id - The ID of the contract to execute
+	 * @return {Promise<{ response: Response }>}
+	 */
+	const executeContract = async (id: string): Promise<{ response: Response }> => {
+		if (!id) {
+			throw new Error('Contract ID is required')
+		}
+
+		console.info('Executing contract...')
+
+		const endpoint = `${apiEndpoint}/${id}/execute`
+
+		const response = await fetch(endpoint, {
+			method: 'POST',
+		})
+
+		return { response }
+	}
+
+	/**
+	 * Activate multiple contracts
+	 * 
+	 * @param {string[]} ids - Array of contract IDs to activate
+	 * @return {Promise<void>}
+	 */
+	const activateMultiple = async (ids: string[]): Promise<void> => {
+		if (!ids || ids.length === 0) return
+
+		console.info('Activating multiple contracts...')
+
+		// Activate contracts one by one (can be optimized with bulk API later)
+		await Promise.all(ids.map(id => activateContract(id)))
+	}
+
+	/**
+	 * Deactivate multiple contracts
+	 * 
+	 * @param {string[]} ids - Array of contract IDs to deactivate
+	 * @return {Promise<void>}
+	 */
+	const deactivateMultiple = async (ids: string[]): Promise<void> => {
+		if (!ids || ids.length === 0) return
+
+		console.info('Deactivating multiple contracts...')
+
+		// Deactivate contracts one by one (can be optimized with bulk API later)
+		await Promise.all(ids.map(id => deactivateContract(id)))
+	}
+
+	/**
+	 * Fetch contract statistics
+	 * 
+	 * @return {Promise<{ response: Response, data: object }>}
+	 */
+	const fetchStatistics = async (): Promise<{ response: Response, data: object }> => {
+		const endpoint = `${apiEndpoint}/statistics`
+
+		const response = await fetch(endpoint, {
+			method: 'GET',
+		})
+
+		const data = await response.json()
+		contractsStatistics.value = data
+
+		return { response, data }
+	}
+
+	/**
+	 * Fetch contract performance data
+	 * 
+	 * @return {Promise<{ response: Response, data: object }>}
+	 */
+	const fetchPerformance = async (): Promise<{ response: Response, data: object }> => {
+		const endpoint = `${apiEndpoint}/performance`
+
+		const response = await fetch(endpoint, {
+			method: 'GET',
+		})
+
+		const data = await response.json()
+		contractsPerformance.value = data
+
+		return { response, data }
+	}
+
+	/**
+	 * Save a contract
+	 * 
+	 * @param {Contract} contractItem - The contract item to save
+	 * @return {Promise<{ response: Response, data: TContract, entity: Contract }>}
+	 */
+	const saveContract = async (contractItem: Contract): Promise<{ response: Response, data: TContract, entity: Contract }> => {
+		if (!contractItem) {
+			throw new Error('Contract item is required')
+		}
+		if (!(contractItem instanceof Contract)) {
+			throw new Error('contractItem is not an instance of Contract')
+		}
+
+		console.info('Saving contract...')
+
+		const isNewContract = !contractItem.id
+		const endpoint = isNewContract
+			? apiEndpoint
+			: `${apiEndpoint}/${contractItem.id}`
+		const method = isNewContract ? 'POST' : 'PUT'
+
+		const response = await fetch(
+			endpoint,
+			{
+				method,
+				headers: {
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify(contractItem.toJSON()),
+			},
+		)
+
+		const data = await response.json() as TContract
+		const entity = new Contract(data)
+
+		setContractItem(data)
+
+		return { response, data, entity }
+	}
+
+	return {
+		// state
+		contractItem,
+		contractsList,
+		contractsLoading,
+		contractsPagination,
+		contractsFilters,
+		contractsStatistics,
+		contractsPerformance,
+
+		// setters and getters
+		setContractItem,
+		getContractItem,
+		setContractsList,
+		getContractsList,
+		setContractsFilters,
+		setContractsLoading,
+		setContractsPagination,
+
+		// actions
+		fetchContracts,
+		fetchContract,
+		deleteContract,
+		deleteMultiple,
+		activateContract,
+		deactivateContract,
+		executeContract,
+		activateMultiple,
+		deactivateMultiple,
+		fetchStatistics,
+		fetchPerformance,
+		saveContract,
+	}
+}) 
