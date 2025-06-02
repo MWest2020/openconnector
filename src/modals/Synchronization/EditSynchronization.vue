@@ -79,10 +79,14 @@ import { Synchronization } from '../../entities/index.js'
 					label="Name"
 					required />
 
-				<NcTextArea :value.sync="synchronizationItem.description"
+				<NcTextArea
+					resize="vertical"
+					:value.sync="synchronizationItem.description"
 					label="Description" />
 
-				<NcTextArea :value.sync="synchronizationItem.conditions"
+				<NcTextArea
+					resize="vertical"
+					:value.sync="synchronizationItem.conditions"
 					label="Conditions (json logic)" />
 
 				<NcSelect v-bind="ruleOptions"

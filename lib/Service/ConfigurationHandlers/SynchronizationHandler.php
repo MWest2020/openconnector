@@ -32,7 +32,7 @@ class SynchronizationHandler implements ConfigurationHandlerInterface
     /**
      * {@inheritDoc}
      */
-    public function export(Entity $entity, array $mappings): array
+    public function export(Entity $entity, array $mappings, array &$mappingIds = []): array
     {
         if (!$entity instanceof Synchronization) {
             throw new \InvalidArgumentException('Entity must be an instance of Synchronization');
@@ -61,7 +61,7 @@ class SynchronizationHandler implements ConfigurationHandlerInterface
                     // For register/schema sources, split the ID and map both parts.
                     if (str_contains($syncArray['sourceId'], '/')) {
                         [$registerId, $schemaId] = explode('/', $syncArray['sourceId']);
-                        
+
                         // Map register ID to slug
                         if (isset($mappings['register']['idToSlug'][$registerId])) {
                             $registerSlug = $mappings['register']['idToSlug'][$registerId];
@@ -98,7 +98,7 @@ class SynchronizationHandler implements ConfigurationHandlerInterface
                     // For register/schema targets, split the ID and map both parts.
                     if (str_contains($syncArray['targetId'], '/')) {
                         [$registerId, $schemaId] = explode('/', $syncArray['targetId']);
-                        
+
                         // Map register ID to slug
                         if (isset($mappings['register']['idToSlug'][$registerId])) {
                             $registerSlug = $mappings['register']['idToSlug'][$registerId];
@@ -173,7 +173,7 @@ class SynchronizationHandler implements ConfigurationHandlerInterface
                     // For register/schema sources, split the ID and map both parts.
                     if (str_contains($data['sourceId'], '/')) {
                         [$registerSlug, $schemaSlug] = explode('/', $data['sourceId']);
-                        
+
                         // Map register slug to ID
                         if (isset($mappings['register']['slugToId'][$registerSlug])) {
                             $registerId = $mappings['register']['slugToId'][$registerSlug];
@@ -210,7 +210,7 @@ class SynchronizationHandler implements ConfigurationHandlerInterface
                     // For register/schema targets, split the ID and map both parts.
                     if (str_contains($data['targetId'], '/')) {
                         [$registerSlug, $schemaSlug] = explode('/', $data['targetId']);
-                        
+
                         // Map register slug to ID
                         if (isset($mappings['register']['slugToId'][$registerSlug])) {
                             $registerId = $mappings['register']['slugToId'][$registerSlug];
@@ -267,7 +267,7 @@ class SynchronizationHandler implements ConfigurationHandlerInterface
             // Update existing synchronization.
             return $this->synchronizationMapper->updateFromArray($mappings['synchronization']['slugToId'][$data['slug']], $data);
         }
-        
+
         // Create new synchronization.
         return $this->synchronizationMapper->createFromArray($data);
     }
@@ -279,4 +279,4 @@ class SynchronizationHandler implements ConfigurationHandlerInterface
     {
         return 'synchronization';
     }
-} 
+}

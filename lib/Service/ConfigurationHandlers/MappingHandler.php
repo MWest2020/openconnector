@@ -32,7 +32,7 @@ class MappingHandler implements ConfigurationHandlerInterface
     /**
      * {@inheritDoc}
      */
-    public function export(Entity $entity, array $mappings): array
+    public function export(Entity $entity, array $mappings, array &$mappingIds = []): array
     {
         if (!$entity instanceof Mapping) {
             throw new \InvalidArgumentException('Entity must be an instance of Mapping');
@@ -75,7 +75,7 @@ class MappingHandler implements ConfigurationHandlerInterface
             // Update existing mapping.
             return $this->mappingMapper->updateFromArray($mappings['mapping']['slugToId'][$data['slug']], $data);
         }
-        
+
         // Create new mapping.
         return $this->mappingMapper->createFromArray($data);
     }
@@ -87,4 +87,4 @@ class MappingHandler implements ConfigurationHandlerInterface
     {
         return 'mapping';
     }
-} 
+}

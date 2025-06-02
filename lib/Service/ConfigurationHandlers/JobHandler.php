@@ -32,7 +32,7 @@ class JobHandler implements ConfigurationHandlerInterface
     /**
      * {@inheritDoc}
      */
-    public function export(Entity $entity, array $mappings): array
+    public function export(Entity $entity, array $mappings, array &$mappingIds = []): array
     {
         if (!$entity instanceof Job) {
             throw new \InvalidArgumentException('Entity must be an instance of Job');
@@ -95,7 +95,7 @@ class JobHandler implements ConfigurationHandlerInterface
             // Update existing job.
             return $this->jobMapper->updateFromArray($mappings['job']['slugToId'][$data['slug']], $data);
         }
-        
+
         // Create new job.
         return $this->jobMapper->createFromArray($data);
     }
@@ -107,4 +107,4 @@ class JobHandler implements ConfigurationHandlerInterface
     {
         return 'job';
     }
-} 
+}

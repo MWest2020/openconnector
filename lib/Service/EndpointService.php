@@ -27,6 +27,7 @@ use GuzzleHttp\Exception\ClientException;
 use GuzzleHttp\Exception\GuzzleException;
 use GuzzleHttp\Exception\RequestException;
 use GuzzleHttp\Exception\ServerException;
+use OCA\OpenRegister\Exception\ValidationException;
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCA\OpenRegister\Db\ObjectEntity;
 use OCP\AppFramework\Db\Entity;
@@ -311,11 +312,11 @@ class EndpointService
             $object = $mapper->find($serializedObject['id']);
         }
 
-        $uses = $object->getRelations();
-
-        if(isset($serializedObject) === true && !empty($serializedObject['@self']['relations'])) {
-            $uses = $serializedObject['@self']['relations'];
-        }
+        $uses = (new Dot($object->jsonSerialize()))->flatten();
+//
+//        if(isset($serializedObject) === true && !empty($serializedObject['@self']['relations'])) {
+//            $uses = $serializedObject['@self']['relations'];
+//        }
 
         $useUrls = [];
 
@@ -617,7 +618,7 @@ class EndpointService
         $schema = $target[1];
 
 
-        $mapper = $this->objectService->getMapper(schema: $schema, register: $register);
+        $mapper = $this->objectService->getMapper(schema: (int)$schema, register: (int)$register);
 
         $parameters = $request->getParams();
 
@@ -687,6 +688,7 @@ class EndpointService
             }
 
         } catch (Exception $exception) {
+
             if (in_array(get_class($exception), ['OCA\OpenRegister\Exception\ValidationException', 'OCA\OpenRegister\Exception\CustomValidationException']) === true) {
                 return $mapper->getValidateHandler()->handleValidationException(exception: $exception);
             }
@@ -912,6 +914,7 @@ class EndpointService
      */
     private function processRules(Endpoint $endpoint, IRequest $request, array $data, string $timing, ?string $objectId = null): array|Response
     {
+
         $rules = $endpoint->getRules();
         if (empty($rules) === true) {
             return $data;
@@ -931,6 +934,7 @@ class EndpointService
 
             // Process each rule in order
             foreach ($ruleEntities as $rule) {
+
                 // Skip if rule action doesn't match request method
                 if (strtolower($rule->getAction()) !== strtolower($request->getMethod())) {
                     continue;
@@ -955,7 +959,7 @@ class EndpointService
                     'extend_input' => $this->processExtendInputRule(rule: $rule, data: $data),
                     'audit_trail' => $this->processAuditTrailRule(rule: $rule, endpoint: $endpoint, data: $data, objectId: $objectId),
                     'write_file' => $this->processWriteFileRule(rule: $rule, data: $data, objectId: $objectId),
-                    'lock' => $this->processLockingRule(rule: $rule, data: $data, objectId: $objectId),
+                    'locking' => $this->processLockingRule(rule: $rule, data: $data, objectId: $objectId),
                     'custom' => $this->processCustomRule(rule: $rule, data: $data),
                     default => throw new Exception('Unsupported rule type: ' . $rule->getType()),
                 };
@@ -967,9 +971,9 @@ class EndpointService
 
                 // Update data with rule result
                 $data = $result;
-            }
+			}
 
-            return $data;
+			return $data;
         } catch (Exception $e) {
             $this->logger->error('Error processing rules: ' . $e->getMessage());
             return new JSONResponse(['error' => 'Rule processing failed: ' . $e->getMessage()], 500);
@@ -1189,7 +1193,7 @@ class EndpointService
         $pathParameters = $this->getPathParameters(endpointArray: $endpoint->getEndpointArray(), path: $data['path']);
 
         if(isset($pathParameters['audittrail-id']) === true) {
-            $auditrule = $this->objectService->getOpenRegisters()->getPaginatedAuditTrail($objectId, requestParams: ['uuid' => $pathParameters['audittrail-id']]);
+            $auditrule = $this->objectService->getOpenRegisters()->getLogs($objectId, filters: ['uuid' => $pathParameters['audittrail-id']]);
 
             if(count($auditrule) === 1) {
                 $data['body'] = $auditrule[0];
@@ -1199,9 +1203,9 @@ class EndpointService
             return new JSONResponse(data: ['error' => 'Not found', 'reason' => 'The resource you are looking for does not exist'], statusCode: HTTP::STATUS_NOT_FOUND);
 
         }
-        $audittrail = $this->objectService->getOpenRegisters()->getPaginatedAuditTrail($objectId);
+        $audittrail = $this->objectService->getOpenRegisters()->getLogs($objectId);
 
-        $data['body'] = $audittrail['results'];
+        $data['body'] = $audittrail;
 
 
         return $data;
@@ -1299,11 +1303,12 @@ class EndpointService
                 try {
                     // Write file with OpenRegister ObjectService.
                     $objectService = $this->containerInterface->get('OCA\OpenRegister\Service\ObjectService');
-                    $file = $objectService->addFile(object: $objectId, fileName: $fileName, base64Content: $content);
+                    $fileService = $this->containerInterface->get('OCA\OpenRegister\Service\FileService');
+                    $file = $fileService->addFile(objectEntity: $objectService->find($objectId), fileName: $fileName, content: base64_decode($content));
 
                     $tags = array_merge($config['tags'] ?? [], ["object:$objectId"]);
                     if ($file instanceof \OCP\Files\File === true) {
-                        $this->attachTagsToFile(fileId: $file->getId(), tags: $tags);
+//                        $this->attachTagsToFile(fileId: $file->getId(), tags: $tags);
                     }
 
                     $result[$key] = $file->getPath();
@@ -1319,11 +1324,12 @@ class EndpointService
             try {
                 // Write file with OpenRegister ObjectService.
                 $objectService = $this->containerInterface->get('OCA\OpenRegister\Service\ObjectService');
-                $file = $objectService->addFile(object: $objectId, fileName: $fileName, base64Content: $content);
+				$fileService = $this->containerInterface->get('OCA\OpenRegister\Service\FileService');
+                $file = $fileService->addFile(objectEntity: $objectService->find($objectId), fileName: $fileName, content: base64_decode($content));
 
                 $tags = array_merge($config['tags'] ?? [], ["object:$objectId"]);
                 if ($file instanceof File === true) {
-                    $this->attachTagsToFile(fileId: $file->getId(), tags: $tags);
+//                    $this->attachTagsToFile(fileId: $file->getId(), tags: $tags);
                 }
                 $dataDot[$config['filePath']] = $file->getPath();
             } catch (Exception $exception) {
@@ -1429,7 +1435,7 @@ class EndpointService
      * @throws \OCP\Files\InvalidPathException
      * @throws \OCP\Files\NotFoundException
      */
-    private function processFilePartRule(Rule $rule, array $data, Endpoint $endpoint, ?string $objectId = null): array
+    private function processFilePartRule(Rule $rule, array $data, Endpoint $endpoint, ?string $objectId = null): array|JSONResponse
     {
         if ($objectId === null) {
             throw new Exception('Filepart rules can only be applied after the object has been created');
@@ -1461,7 +1467,10 @@ class EndpointService
         $openRegister->setSchema($superSchemaId);
 
         $object   = $openRegister->find(id: $objectId);
-        $location = $object->getFolder();
+//        $location = $object->getFolder();
+
+		$fileService = $this->containerInterface->get('OCA\OpenRegister\Service\FileService');
+		$location = $fileService->getObjectFolder($object)->getPath();
 
 
         $dataDot = new Dot($data);
@@ -1470,21 +1479,38 @@ class EndpointService
 
         $fileParts = $this->storageService->createUpload($location, $filename, $size, $objectId);
 
-        $fileParts = array_map(function ($filePart) use ($mapping, $registerId, $schemaId) {
+		$fileParts = array_map(function ($filePart) use ($mapping, $registerId, $schemaId) {
 
-            if ($mapping !== null) {
-                $formatted = $this->mappingService->executeMapping(mapping: $mapping, input: $filePart);
-            } else {
-                $formatted = $filePart;
-            }
+			if ($mapping !== null) {
+				$formatted = $this->mappingService->executeMapping(mapping: $mapping, input: $filePart);
+			} else {
+				$formatted = $filePart;
+			}
 
-            return $this->objectService->getOpenRegisters()->saveObject(
-                register: $registerId,
-                schema: $schemaId,
-                object: $formatted
-            )->jsonSerialize();
+			try {
+				return $this->objectService->getOpenRegisters()->saveObject(
+					register: $registerId,
+					schema: $schemaId,
+					object: $formatted,
+					uuid: $formatted['id']
+				)->jsonSerialize();
+			} catch (ValidationException $exception) {
+				return $this->objectService->getOpenRegisters()->handleValidationException($exception);
+			}
 
-        }, $fileParts);
+
+		}, $fileParts);
+
+		$errors = array_filter($fileParts, function($part) {
+			if($part instanceof JSONResponse) {
+				return true;
+			}
+		});
+
+		if(count($errors) > 0) {
+			return array_shift($errors);
+		}
+
 
 
         $dataDot[$filePartLocation] = $fileParts;
@@ -1496,7 +1522,7 @@ class EndpointService
         $saveObject = clone $dataDot;
         $saveObject[$filePartLocation] = $filepartIds;
 
-        $openRegister->saveObject($registerId, $schemaId, $saveObject->jsonSerialize());
+        $openRegister->saveObject(register: $registerId, schema: $schemaId, object: $saveObject->jsonSerialize());
 
         return $dataDot->jsonSerialize();
     }
@@ -1532,6 +1558,8 @@ class EndpointService
             $mappedData = $this->mappingService->executeMapping(mapping: $mapping, input: $mappedData);
         }
 
+		var_dump($mappedData);
+
         $mappedData['successful'] = $this->storageService->writePart(partId: $mappedData['order'], partUuid: $mappedData['id'], data: $mappedData['data']);
 
         unset($data['data']);
@@ -1539,6 +1567,8 @@ class EndpointService
         if (isset($config['mappingOutId']) === true) {
             $mappedData = $this->mappingService->executeMapping(mapping: $this->mappingService->getMapping(mappingId: $config['mappingOutId']), input: $mappedData);
         }
+
+		var_dump($mappedData);
 
         $object = $this->objectService->getOpenRegisters()->getMapper('objectEntity')->find($objectId);
         $object->setObject($mappedData);
@@ -1599,16 +1629,18 @@ class EndpointService
         }
 
         if (isset($filename) === false && count($object->getFiles()) === 1) {
-            $filename = $object->getFiles()[0]['filename'];
+            $filename = $object->getFiles()[0]['title'];
         } else if (isset($filename) === false) {
             throw new Exception('File could not be determined');
         }
 
 
+		$fileService = $this->containerInterface->get('OCA\OpenRegister\Service\FileService');
+
         if(isset($data['parameters']['version']) === true) {
-            $file = $this->objectService->getOpenRegisters()->getFile(object: $object, filePath: $filename, version: $data['parameters']['version']);
+            $file = $fileService->getFile(object: $object, filePath: $filename, version: $data['parameters']['version']);
         } else {
-            $file = $this->objectService->getOpenRegisters()->getFile(object: $object, filePath: $filename);
+            $file = $fileService->getFile(object: $object, filePath: $filename);
         }
 
         $response = new DataDownloadResponse(data: $file->getContent(), filename: $file->getName(), contentType: $file->getType());

@@ -334,7 +334,7 @@ class ConfigurationService
                 'synchronizations' => $this->organizeEntitiesByComponent($exportedSynchronizations),
             ],
         ];
-        
+
         return $components;
     }
 
@@ -425,9 +425,9 @@ class ConfigurationService
      * @param Rule $rule The rule to export
      * @return array The OpenAPI rule specification
      */
-    private function exportRule(Rule $rule): array
+    private function exportRule(Rule $rule, array &$mappingIds = []): array
     {
-        return $this->handlers['rule']->export($rule, $this->mappings);
+        return $this->handlers['rule']->export($rule, $this->mappings, $mappingIds);
     }
 
     /**
@@ -526,7 +526,7 @@ class ConfigurationService
             $endpoints = $this->endpointMapper->getByTarget(registerId: $registerId);
             foreach ($endpoints as $endpoint) {
                 $endpointIds[] = $endpoint->getId();
-                
+
                 // Collect related IDs
                 if ($endpoint->getInputMapping() !== null) {
                     $mappingIds[] = $endpoint->getInputMapping();
@@ -561,7 +561,7 @@ class ConfigurationService
             );
             foreach ($synchronizations as $synchronization) {
                 $synchronizationIds[] = $synchronization->getId();
-                
+
                 // Collect related IDs
                 if ($synchronization->getSourceTargetMapping() !== null) {
                     $mappingIds[] = $synchronization->getSourceTargetMapping();
@@ -627,15 +627,6 @@ class ConfigurationService
             }
         }
 
-        // Batch fetch and export related entities
-        if (!empty($mappingIds)) {
-            $mappings = $this->mappingMapper->findAll(ids: ['id' => $mappingIds]);
-            $indexedMappings = [];
-            foreach ($mappings as $mapping) {
-                $indexedMappings[$mapping->getSlug()] = $this->exportMapping($mapping);
-            }
-            $components['components']['mappings'] = $indexedMappings;
-        }
 
         if (!empty($sourceIds)) {
             $sources = $this->sourceMapper->findAll(ids: ['id' => $sourceIds]);
@@ -650,10 +641,22 @@ class ConfigurationService
             $rules = $this->ruleMapper->findAll(ids: ['id' => $ruleIds]);
             $indexedRules = [];
             foreach ($rules as $rule) {
-                $indexedRules[$rule->getSlug()] = $this->exportRule($rule);
+                $indexedRules[$rule->getSlug()] = $this->exportRule($rule, $mappingIds, $mappingIds);
             }
             $components['components']['rules'] = $indexedRules;
         }
+
+
+		// Batch fetch and export related entities
+		if (!empty($mappingIds)) {
+			$mappings = $this->mappingMapper->findAll(ids: ['id' => $mappingIds]);
+			$indexedMappings = [];
+			foreach ($mappings as $mapping) {
+				$indexedMappings[$mapping->getSlug()] = $this->exportMapping($mapping);
+			}
+			$components['components']['mappings'] = $indexedMappings;
+		}
+
         // Get and export related jobs
         if (!empty($endpointIds) || !empty($synchronizationIds) || !empty($sourceIds)) {
             $jobs = $this->jobMapper->findByArgumentIds(
@@ -765,4 +768,4 @@ class ConfigurationService
 
         return $result;
     }
-} 
+}
