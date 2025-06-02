@@ -1,2 +1,3 @@
 /* eslint-disable import/export */
-export * from './Contract.js' 
+export * from './contract.ts'
+export * from './contract.types.ts' 

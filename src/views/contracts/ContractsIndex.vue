@@ -98,8 +98,8 @@ import { contractStore, synchronizationStore, navigationStore } from '../../stor
 							</td>
 							<td>{{ getSynchronizationName(item.synchronizationId) }}</td>
 							<td>
-								<span :class="getStatusType(item.status)">
-									{{ getStatusLabel(item.status) }}
+								<span :class="getStatusType(item.getStatus ? item.getStatus() : 'unknown')">
+									{{ getStatusLabel(item.getStatus ? item.getStatus() : 'unknown') }}
 								</span>
 							</td>
 							<td>
@@ -122,10 +122,10 @@ import { contractStore, synchronizationStore, navigationStore } from '../../stor
 								<NcActions>
 									<NcActionButton @click="toggleContractStatus(item)">
 										<template #icon>
-											<Play v-if="item.status === 'inactive'" :size="20" />
+											<Play v-if="item.getStatus && item.getStatus() === 'inactive'" :size="20" />
 											<Pause v-else :size="20" />
 										</template>
-										{{ item.status === 'inactive' ? t('openconnector', 'Activate') : t('openconnector', 'Deactivate') }}
+										{{ (item.getStatus && item.getStatus() === 'inactive') ? t('openconnector', 'Activate') : t('openconnector', 'Deactivate') }}
 									</NcActionButton>
 									<NcActionButton @click="executeContract(item)">
 										<template #icon>
@@ -332,7 +332,7 @@ export default {
 		 * @return {string} The contract name
 		 */
 		getContractName(contract) {
-			return contract.name || contract.title || `Contract ${contract.id}`
+			return contract.getDisplayName ? contract.getDisplayName() : `Contract ${contract.id}`
 		},
 		/**
 		 * Get synchronization name by ID
@@ -468,7 +468,8 @@ export default {
 		 */
 		async toggleContractStatus(contract) {
 			try {
-				if (contract.status === 'active') {
+				const currentStatus = contract.getStatus ? contract.getStatus() : 'inactive'
+				if (currentStatus === 'active') {
 					await contractStore.deactivateContract(contract.id)
 				} else {
 					await contractStore.activateContract(contract.id)

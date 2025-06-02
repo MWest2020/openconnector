@@ -54,7 +54,7 @@ export const useContractStore = defineStore('contract', () => {
 	 */
 	const setContractItem = (item: Contract | TContract | null): void => {
 		contractItem.value = item && new Contract(item)
-		console.info('Active contract item set to ' + (item ? item.id : 'null'))
+		console.info('Active contract item set to ' + (item ? (item as any).id : 'null'))
 	}
 
 	/**
@@ -242,7 +242,7 @@ export const useContractStore = defineStore('contract', () => {
 			method: 'DELETE',
 		})
 
-		if (response.ok && contractItem.value?.id === id) {
+		if (response.ok && (contractItem.value as any)?.id === id) {
 			setContractItem(null)
 		}
 
@@ -412,10 +412,10 @@ export const useContractStore = defineStore('contract', () => {
 
 		console.info('Saving contract...')
 
-		const isNewContract = !contractItem.id
+		const isNewContract = !(contractItem as any).id
 		const endpoint = isNewContract
 			? apiEndpoint
-			: `${apiEndpoint}/${contractItem.id}`
+			: `${apiEndpoint}/${(contractItem as any).id}`
 		const method = isNewContract ? 'POST' : 'PUT'
 
 		const response = await fetch(
@@ -425,7 +425,7 @@ export const useContractStore = defineStore('contract', () => {
 				headers: {
 					'Content-Type': 'application/json',
 				},
-				body: JSON.stringify(contractItem.toJSON()),
+				body: JSON.stringify(contractItem.cloneRaw()),
 			},
 		)
 
