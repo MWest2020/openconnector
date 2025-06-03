@@ -2273,17 +2273,21 @@ class SynchronizationService
 		}
 
 		try {
-			// Write file with OpenRegister FileService.
+			// Use OpenRegister FileService with the new saveFile method
 			$fileService = $this->containerInterface->get('OCA\OpenRegister\Service\FileService');
 			
 			// Decode base64 content if it appears to be base64 encoded
 			$content = $response['body'];
 			
-			$file = $fileService->addFile(
+			// Determine if we should share the file - only if there are user-defined tags
+			$shouldShare = !empty($tags) && isset($config['autoShare']) ? $config['autoShare'] : false;
+			
+			// Use the new saveFile method which handles both creation and updates
+			$file = $fileService->saveFile(
 				objectEntity: $objectEntity, 
 				fileName: $filename, 
 				content: $content, 
-				share: isset($config['autoShare']) ? $config['autoShare'] : false, 
+				share: $shouldShare, 
 				tags: $tags
 			);
 		} catch (Exception $e) {
@@ -2563,26 +2567,14 @@ class SynchronizationService
                     }
                     break;
                     
-                // Array of object(s) that has file(s)
+                // Array of object(s) that has file(s) - use cleanup logic
                 case "Multidimensional array":
-                    foreach ($endpoint as $object) {
-                        $filename = null;
-                        $tags = [];
-                        $contextObjectId = null; // Separate variable to avoid overwriting the original
-                        $actualEndpoint = $this->getFileContext(config: $config, endpoint: $object, filename: $filename, tags: $tags, objectId: $contextObjectId);
-                        // Use context object ID if specified, otherwise fall back to the original object ID
-                        $targetObjectId = $contextObjectId ?? $objectId;
-                        if ($actualEndpoint !== null) {
-                            $this->fetchFileSafely($source, $actualEndpoint, $config, $targetObjectId, $filename, $tags);
-                        }
-                    }
+                    $this->processMultipleFilesWithCleanup($source, $config, $endpoint, $objectId);
                     break;
                     
-                // Array of just endpoints
+                // Array of just endpoints - use cleanup logic
                 case "Indexed array":
-                    foreach ($endpoint as $childEndpoint) {
-                        $this->fetchFileSafely($source, $childEndpoint, $config, $objectId);
-                    }
+                    $this->processMultipleFilesWithCleanup($source, $config, $endpoint, $objectId);
                     break;
             }
         } catch (Exception $e) {
@@ -2690,66 +2682,84 @@ class SynchronizationService
             return $dataDot->jsonSerialize();
         }
 
-        // Check if associative array
-        if (is_array($files) === true && isset($files[0]) === true & array_keys($files[0]) !== range(0, count($files[0]) - 1)) {
+        // Get the object entity and file service
+        $objectService = $this->containerInterface->get('OCA\OpenRegister\Service\ObjectService');
+        $objectEntity = $objectService->findByUuid(uuid: $objectId);
+        $fileService = $this->containerInterface->get('OCA\OpenRegister\Service\FileService');
+
+        // Check if associative array (multiple files with metadata)
+        if (is_array($files) === true && isset($files[0]) === true && array_keys($files[0]) !== range(0, count($files[0]) - 1)) {
             $result = [];
 			foreach ($files as $key => $value) {
-
-                // Check for tags
+                $content = '';
+                $fileName = '';
                 $tags = [];
+
+                // Extract file data
                 if (is_array($value) === true) {
                     $content = $value['content'];
+                    $fileName = $value['filename'] ?? "file_$key";
+                    
+                    // Handle tags from config and value labels
                     if (isset($value['label']) === true && isset($config['tags']) === true &&
                         in_array(needle: $value['label'], haystack: $config['tags']) === true) {
                         $tags = [$value['label']];
                     }
-                    if (isset($value['filename']) === true) {
-                        $fileName = $value['filename'];
-                    }
                 } else {
                     $content = $value;
+                    $fileName = "file_$key";
                 }
 
-                $openRegisters = $this->objectService->getOpenRegisters();
-                $openRegisters->setRegister($registerId);
-                $openRegisters->setSchema($schemaId);
+                // Merge with configured tags
+                $allTags = array_unique(array_merge($config['tags'] ?? [], $tags));
+                
+                // Determine if we should share the file - only if there are user-defined tags
+                $shouldShare = !empty($allTags);
 
                 try {
-
-                    $objectService = $this->containerInterface->get('OCA\OpenRegister\Service\ObjectService');
-                    $objectEntity = $objectService->findByUuid(uuid: $objectId);
-
-                    // Write file with OpenRegister ObjectService.
-                    $fileService = $this->containerInterface->get('OCA\OpenRegister\Service\FileService');
-                    $file = $fileService->addFile(objectEntity: $objectEntity, fileName: $fileName, content: $content, share: false, tags: $tags);
+                    // Use the new saveFile method
+                    $file = $fileService->saveFile(
+                        objectEntity: $objectEntity, 
+                        fileName: $fileName, 
+                        content: $content, 
+                        share: $shouldShare, 
+                        tags: $allTags
+                    );
 
                     $result[$key] = $file->getPath();
                 } catch (Exception $exception) {
+                    error_log("Failed to save file $fileName: " . $exception->getMessage());
+                    $result[$key] = null;
                 }
             }
-            $result[$key] = $file->getPath();
             $dataDot[$config['filePath']] = $result;
         } else {
+            // Single file case
             $content = $files;
-            $fileName = $dataDot[$config['fileNamePath']];
-            $openRegisters = $this->objectService->getOpenRegisters();
-            $openRegisters->setRegister($registerId);
-            $openRegisters->setSchema($schemaId);
+            $fileName = $dataDot[$config['fileNamePath']] ?? 'default_file';
+            
+            // Get configured tags
+            $tags = $config['tags'] ?? [];
+            
+            // Determine if we should share the file - only if there are user-defined tags
+            $shouldShare = !empty($tags);
 
             try {
-
-                $objectService = $this->containerInterface->get('OCA\OpenRegister\Service\ObjectService');
-                $objectEntity = $objectService->findByUuid(uuid: $objectId);
-
-                // Write file with OpenRegister FileService.
-                $fileService = $this->containerInterface->get('OCA\OpenRegister\Service\FileService');
-                $file = $fileService->addFile(object: $objectId, fileName: $fileName, content: $content, share: false, tags: $tags);
+                // Use the new saveFile method
+                $file = $fileService->saveFile(
+                    objectEntity: $objectEntity, 
+                    fileName: $fileName, 
+                    content: $content, 
+                    share: $shouldShare, 
+                    tags: $tags
+                );
 
                 $dataDot[$config['filePath']] = $file->getPath();
             } catch (Exception $exception) {
+                error_log("Failed to save file $fileName: " . $exception->getMessage());
+                $dataDot[$config['filePath']] = null;
             }
         }
-
 
         return $dataDot->jsonSerialize();
     }
@@ -3191,5 +3201,142 @@ class SynchronizationService
 
         return round($processingDuration / $totalDuration, 4);
     }
+
+	/**
+	 * Cleans up files that are currently attached to an object but not present in the new file set.
+	 *
+	 * This method compares the currently attached files to an object with the new set of files
+	 * being processed and removes any files that are no longer needed.
+	 *
+	 * @param string $objectId The UUID of the object to clean up files for.
+	 * @param array $newFileNames Array of filenames that should remain attached to the object.
+	 *
+	 * @return int The number of files that were deleted.
+	 * @throws ContainerExceptionInterface
+	 * @throws NotFoundExceptionInterface
+	 * @throws Exception
+	 */
+	private function cleanupOrphanedFiles(string $objectId, array $newFileNames): int
+	{
+		$deletedCount = 0;
+
+		try {
+			// Get the object entity
+			$objectService = $this->containerInterface->get('OCA\OpenRegister\Service\ObjectService');
+			$objectEntity = $objectService->findByUuid(uuid: $objectId);
+
+			// Get the file service
+			$fileService = $this->containerInterface->get('OCA\OpenRegister\Service\FileService');
+
+			// Get all currently attached files for this object
+			$currentFiles = $fileService->getFiles($objectEntity);
+
+			// Check each current file to see if it should be kept
+			foreach ($currentFiles as $file) {
+				$fileName = $file->getName();
+				
+				// If this file is not in the new set, delete it
+				if (!in_array($fileName, $newFileNames, true)) {
+					try {
+						$file->delete();
+						$deletedCount++;
+						error_log("Deleted orphaned file: {$fileName} for object: {$objectId}");
+					} catch (Exception $e) {
+						error_log("Failed to delete orphaned file {$fileName}: " . $e->getMessage());
+					}
+				}
+			}
+		} catch (Exception $e) {
+			error_log("Error during file cleanup for object {$objectId}: " . $e->getMessage());
+		}
+
+		return $deletedCount;
+	}
+
+	/**
+	 * Processes file fetching for multiple files and handles cleanup of orphaned files.
+	 *
+	 * This method fetches multiple files for an object and ensures that any files
+	 * currently attached to the object but not in the new set are removed.
+	 *
+	 * @param Source $source The source to fetch files from.
+	 * @param array $config The fetch_file rule configuration.
+	 * @param array $endpoints Array of endpoints/file data to process.
+	 * @param string $objectId The UUID of the object to attach files to.
+	 *
+	 * @return void
+	 */
+	private function processMultipleFilesWithCleanup(Source $source, array $config, array $endpoints, string $objectId): void
+	{
+		$newFileNames = [];
+
+		// Process all files first and collect their filenames
+		foreach ($endpoints as $endpoint) {
+			$filename = null;
+			$tags = [];
+			$contextObjectId = null;
+			$actualEndpoint = null;
+
+			// Handle different endpoint types
+			if (is_array($endpoint)) {
+				// This is an object with file metadata (multidimensional array case)
+				$actualEndpoint = $this->getFileContext(
+					config: $config, 
+					endpoint: $endpoint, 
+					filename: $filename, 
+					tags: $tags, 
+					objectId: $contextObjectId
+				);
+			} else {
+				// This is a simple endpoint string (indexed array case)
+				$actualEndpoint = $endpoint;
+			}
+
+			// Use context object ID if specified, otherwise fall back to the original object ID
+			$targetObjectId = $contextObjectId ?? $objectId;
+
+			if ($actualEndpoint !== null) {
+				try {
+					// Fetch the file
+					$this->fetchFile(
+						source: $source,
+						endpoint: $actualEndpoint,
+						config: $config,
+						objectId: $targetObjectId,
+						tags: $tags,
+						filename: $filename
+					);
+
+					// Determine filename for tracking - use provided filename or extract from endpoint
+					$trackingFilename = $filename;
+					if ($trackingFilename === null) {
+						// Try to extract filename from endpoint URL
+						$pathParts = explode('/', $actualEndpoint);
+						$trackingFilename = end($pathParts);
+						
+						// If still no clear filename, generate a fallback
+						if (empty($trackingFilename) || strpos($trackingFilename, '?') !== false) {
+							$trackingFilename = 'file_' . md5($actualEndpoint);
+						}
+					}
+
+					// Add to our tracking array if we have a valid filename
+					if (!empty($trackingFilename)) {
+						$newFileNames[] = $trackingFilename;
+					}
+				} catch (Exception $e) {
+					error_log("Failed to fetch file from endpoint {$actualEndpoint}: " . $e->getMessage());
+				}
+			}
+		}
+
+		// Clean up any files that weren't in the new set
+		if (!empty($newFileNames)) {
+			$deletedCount = $this->cleanupOrphanedFiles($objectId, $newFileNames);
+			if ($deletedCount > 0) {
+				error_log("Cleaned up {$deletedCount} orphaned files for object {$objectId}");
+			}
+		}
+	}
 
 }
