@@ -425,7 +425,7 @@ class EndpointService
      *
      * @return array The modified array with UUIDs replaced by URLs.
      */
-    private function replaceUuidsInArray(array $data, array $uuidToUrlMap, ?bool $isRelatedObject = false): array {
+    private function replaceUuidsInArray(array $data, array $uuidToUrlMap, ?bool $isRelatedObject = false, array $extend = []): array {
         foreach ($data as $key => $value) {
 
             // Don't check @self
@@ -532,11 +532,13 @@ class EndpointService
     ): Entity|array
     {
         if (isset($pathParams['id']) === true && $pathParams['id'] === end($pathParams)) {
+			
             $result = $this->replaceInternalReferences(mapper: $mapper, serializedObject: $this->objectService->getOpenRegisters()->renderEntity(
                 entity: $mapper->find($pathParams['id'], extend: $parameters['extend'] ?? $parameters['_extend'] ?? null)->jsonSerialize(),
                 extend: $parameters['_extend'] ?? $parameters['extend'] ?? null),
-				extend: $parameters['extend'] ?? $parameters['_extend'] ?? null
+				extend: $parameters['extend'] ?? $parameters['_extend'] ?? []
             );
+
 			return $result;
 
         } else if (isset($pathParams['id']) === true) {
@@ -595,7 +597,7 @@ class EndpointService
         $result = $mapper->findAllPaginated(requestParams: $parameters);
 
         $result['results'] = array_map(function ($object) use ($mapper) {
-            return $this->replaceInternalReferences(mapper: $mapper, serializedObject: $this->objectService->getOpenRegisters()->renderEntity(entity: $object->jsonSerialize()), extend: $parameters['extend'] ?? $parameters['_extend'] ?? null);
+            return $this->replaceInternalReferences(mapper: $mapper, serializedObject: $this->objectService->getOpenRegisters()->renderEntity(entity: $object->jsonSerialize()), extend: $parameters['extend'] ?? $parameters['_extend'] ?? []);
         }, $result['results']);
 
         $returnArray = [
