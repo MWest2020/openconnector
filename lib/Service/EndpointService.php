@@ -299,11 +299,10 @@ class EndpointService
     private function replaceInternalReferences(
         QBMapper|\OCA\OpenRegister\Service\ObjectService $mapper,
         ?ObjectEntity $object = null,
-        array $serializedObject = []
+        array $serializedObject = [],
+		array $extend = []
     ): array
     {
-
-
         if ($serializedObject === [] && $object !== null) {
             $serializedObject = $object->jsonSerialize();
         } else if ($serializedObject === null) {
@@ -381,10 +380,42 @@ class EndpointService
         $uuidToUrlMap[$object->getUri(). '/download'] = $this->generateEndpointUrl(id: $object->getUuid(), schemaMapper: $schemaMapper). '/download';
 
         // Replace UUIDs in serializedObject recursively
-        $serializedObject = $this->replaceUuidsInArray($serializedObject, $uuidToUrlMap);
+        $serializedObject = $this->replaceUuidsInArray($serializedObject, $uuidToUrlMap, extend: $this->reduceExtendKeys($extend));
 
         return $serializedObject;
     }
+
+	/**
+	 * Create a reduced list of extend keys and extends for checking purposes
+	 *
+	 * @param array $extend The original extend array
+	 * @return array The reduced extend array
+	 */
+	private function reduceExtendKeys(array $extend): array
+	{
+		$reducedKeys = [];
+
+		foreach($extend as $key => $value) {
+			if(str_contains(haystack: $value, needle: '.') === false) {
+				$reducedKeys[] = $key;
+				continue;
+			}
+
+
+			[$prefix, $newKey] = explode('.', $value, 2);
+
+			if(($newPrefix = array_search(needle: $prefix, haystack: $extend)) !== false) {
+				$reducedKeys[] = $newPrefix .'.'. $newKey;
+				continue;
+			}
+			$reducedKeys[] = $value;
+		}
+
+		$reducedExtend = array_combine($reducedKeys, $reducedKeys);
+
+		$serialized = (new Dot($reducedExtend, parse: true))->jsonSerialize();
+		return $serialized;
+	} //end reduceExtendKeys()
 
     /**
      * Recursively replaces UUIDs in an array with their corresponding URLs.
@@ -399,7 +430,7 @@ class EndpointService
      *
      * @return array The modified array with UUIDs replaced by URLs.
      */
-    private function replaceUuidsInArray(array $data, array $uuidToUrlMap, ?bool $isRelatedObject = false): array {
+    private function replaceUuidsInArray(array $data, array $uuidToUrlMap, ?bool $isRelatedObject = false, array $extend = []): array {
         foreach ($data as $key => $value) {
 
             // Don't check @self
@@ -408,13 +439,13 @@ class EndpointService
             }
 
             // If in array of multiple objects and has id
-            if (is_array($value) === true && isset($value['id']) === true && isset($uuidToUrlMap[$value['id']]) === true) {
+            if (is_array($value) === true && isset($value['id']) === true && isset($uuidToUrlMap[$value['id']]) === true && key_exists(key: $key, array: $extend) === false) {
                 $data[$key] = $uuidToUrlMap[$value['id']];
                 continue;
             }
 
             // If related object and has id
-            if ($isRelatedObject === true && $key === 'id' && isset($uuidToUrlMap[$value]) === true) {
+            if ($isRelatedObject === true && $key === 'id' && isset($uuidToUrlMap[$value]) === true && key_exists(key: $key, array: $extend) === false) {
                 $data[$key] = $uuidToUrlMap[$value];
                 continue;
             }
@@ -424,12 +455,22 @@ class EndpointService
                 continue;
             }
 
+			if (is_array($value) === true && array_is_list($value) === true) {
+				$extend[$key] = array_fill(0, count($value), $extend[$key]);
+			}
+
+
             if (is_array($value) === true && empty($value) === false) {
-                $data[$key] = $this->replaceUuidsInArray(data: $value, uuidToUrlMap: $uuidToUrlMap, isRelatedObject: true);
+                $data[$key] = $this->replaceUuidsInArray(
+					data: $value, uuidToUrlMap: $uuidToUrlMap,
+					isRelatedObject: true,
+					extend: isset($extend[$key]) === true && is_array($extend[$key]) === true ? $extend[$key] : $extend
+				);
             } elseif (is_string($value) === true && isset($uuidToUrlMap[$value]) === true) {
                 $data[$key] = $uuidToUrlMap[$value];
             }
         }
+
         return $data;
     }
 
@@ -500,11 +541,17 @@ class EndpointService
     ): Entity|array
     {
         if (isset($pathParams['id']) === true && $pathParams['id'] === end($pathParams)) {
-            return $this->replaceInternalReferences(mapper: $mapper, serializedObject: $this->objectService->getOpenRegisters()->renderEntity(
-                entity: $mapper->find($pathParams['id'], extend: $parameters['extend'] ?? $parameters['_extend'] ?? null)->jsonSerialize(),
-                extend: $parameters['_extend'] ?? $parameters['extend'] ?? null),
+			$serializedObject = $this->objectService->getOpenRegisters()->renderEntity(
+				entity: $mapper->find($pathParams['id'], extend: $parameters['extend'] ?? $parameters['_extend'] ?? null)->jsonSerialize(),
+				extend: $parameters['_extend'] ?? $parameters['extend'] ?? null
+			);
+            $result = $this->replaceInternalReferences(
+				mapper: $mapper,
+				serializedObject: $serializedObject,
+				extend: $parameters['extend'] ?? $parameters['_extend'] ?? []
             );
 
+			return $result;
 
         } else if (isset($pathParams['id']) === true) {
 
@@ -562,7 +609,7 @@ class EndpointService
         $result = $mapper->findAllPaginated(requestParams: $parameters);
 
         $result['results'] = array_map(function ($object) use ($mapper) {
-            return $this->replaceInternalReferences(mapper: $mapper, serializedObject: $this->objectService->getOpenRegisters()->renderEntity(entity: $object->jsonSerialize()));
+            return $this->replaceInternalReferences(mapper: $mapper, serializedObject: $this->objectService->getOpenRegisters()->renderEntity(entity: $object->jsonSerialize()), extend: $parameters['extend'] ?? $parameters['_extend'] ?? []);
         }, $result['results']);
 
         $returnArray = [
@@ -622,17 +669,17 @@ class EndpointService
 
         $parameters = $request->getParams();
 
-
         if ($endpoint->getInputMapping() !== null) {
             $inputMapping = $this->mappingService->getMapping($endpoint->getInputMapping());
             $parameters = $this->mappingService->executeMapping(mapping: $inputMapping, input: $parameters);
         }
-        $pathParams = $this->getPathParameters($endpoint->getEndpointArray(), $path);
 
-        if (isset($pathParams['id']) === true) {
-            $parameters['id'] = $pathParams['id'];
-        }
-        foreach ($this::UNSET_PARAMETERS as $parameter) {
+		$pathParams = $this->getPathParameters($endpoint->getEndpointArray(), $path);
+
+		if (isset($pathParams['id']) === true) {
+			$parameters['id'] = $pathParams['id'];
+		}
+		foreach ($this::UNSET_PARAMETERS as $parameter) {
             unset($parameters[$parameter]);
         }
 
@@ -973,6 +1020,8 @@ class EndpointService
                 $data = $result;
 			}
 
+			unset($data['body']['_extendedInput']);
+
 			return $data;
         } catch (Exception $e) {
             $this->logger->error('Error processing rules: ' . $e->getMessage());
@@ -1169,7 +1218,7 @@ class EndpointService
 
         }
 
-        $data['extendedParameters'] = $extendedParameters->all();
+		$data['body']['_extendedInput'] = $data['extendedParameters'] = $extendedParameters->all();
 
         return $data;
     }
