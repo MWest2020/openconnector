@@ -385,6 +385,12 @@ class EndpointService
         return $serializedObject;
     }
 
+	/**
+	 * Create a reduced list of extend keys and extends for checking purposes
+	 *
+	 * @param array $extend The original extend array
+	 * @return array The reduced extend array
+	 */
 	private function reduceExtendKeys(array $extend): array
 	{
 		$reducedKeys = [];
@@ -405,12 +411,11 @@ class EndpointService
 			$reducedKeys[] = $value;
 		}
 
-//		var_dump($reducedKeys);
 		$reducedExtend = array_combine($reducedKeys, $reducedKeys);
 
 		$serialized = (new Dot($reducedExtend, parse: true))->jsonSerialize();
 		return $serialized;
-	}
+	} //end reduceExtendKeys()
 
     /**
      * Recursively replaces UUIDs in an array with their corresponding URLs.
@@ -456,7 +461,11 @@ class EndpointService
 
 
             if (is_array($value) === true && empty($value) === false) {
-                $data[$key] = $this->replaceUuidsInArray(data: $value, uuidToUrlMap: $uuidToUrlMap, isRelatedObject: true, extend: isset($extend[$key]) === true && is_array($extend[$key]) === true ? $extend[$key] : $extend);
+                $data[$key] = $this->replaceUuidsInArray(
+					data: $value, uuidToUrlMap: $uuidToUrlMap,
+					isRelatedObject: true,
+					extend: isset($extend[$key]) === true && is_array($extend[$key]) === true ? $extend[$key] : $extend
+				);
             } elseif (is_string($value) === true && isset($uuidToUrlMap[$value]) === true) {
                 $data[$key] = $uuidToUrlMap[$value];
             }
@@ -532,10 +541,13 @@ class EndpointService
     ): Entity|array
     {
         if (isset($pathParams['id']) === true && $pathParams['id'] === end($pathParams)) {
-			
-            $result = $this->replaceInternalReferences(mapper: $mapper, serializedObject: $this->objectService->getOpenRegisters()->renderEntity(
-                entity: $mapper->find($pathParams['id'], extend: $parameters['extend'] ?? $parameters['_extend'] ?? null)->jsonSerialize(),
-                extend: $parameters['_extend'] ?? $parameters['extend'] ?? null),
+
+            $result = $this->replaceInternalReferences(
+				mapper: $mapper,
+				serializedObject: $this->objectService->getOpenRegisters()->renderEntity(
+					entity: $mapper->find($pathParams['id'], extend: $parameters['extend'] ?? $parameters['_extend'] ?? null)->jsonSerialize(),
+					extend: $parameters['_extend'] ?? $parameters['extend'] ?? null
+				),
 				extend: $parameters['extend'] ?? $parameters['_extend'] ?? []
             );
 
