@@ -2272,8 +2272,6 @@ class SynchronizationService
 			throw new Exception("Failed to find object with UUID {$objectId}: " . $e->getMessage());
 		}
 
-        $tags[] = "object:$objectId";
-
 		try {
 			// Write file with OpenRegister FileService.
 			$fileService = $this->containerInterface->get('OCA\OpenRegister\Service\FileService');
@@ -2717,7 +2715,6 @@ class SynchronizationService
                 $openRegisters->setSchema($schemaId);
 
                 try {
-                    $tags = array_merge($config['tags'] ?? [], ["object:$objectId"]);
 
                     $objectService = $this->containerInterface->get('OCA\OpenRegister\Service\ObjectService');
                     $objectEntity = $objectService->findByUuid(uuid: $objectId);
@@ -2740,7 +2737,6 @@ class SynchronizationService
             $openRegisters->setSchema($schemaId);
 
             try {
-                $tags = array_merge($config['tags'] ?? [], ["object:$objectId"]);
 
                 $objectService = $this->containerInterface->get('OCA\OpenRegister\Service\ObjectService');
                 $objectEntity = $objectService->findByUuid(uuid: $objectId);
