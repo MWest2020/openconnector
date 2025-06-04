@@ -3221,33 +3221,69 @@ class SynchronizationService
 		$deletedCount = 0;
 
 		try {
+			error_log("=== FILE CLEANUP START ===");
+			error_log("Object ID: {$objectId}");
+			error_log("Expected new filenames: " . json_encode($newFileNames));
+			
 			// Get the object entity
 			$objectService = $this->containerInterface->get('OCA\OpenRegister\Service\ObjectService');
 			$objectEntity = $objectService->findByUuid(uuid: $objectId);
+			error_log("Found object entity: " . ($objectEntity ? 'YES' : 'NO'));
 
 			// Get the file service
 			$fileService = $this->containerInterface->get('OCA\OpenRegister\Service\FileService');
+			error_log("Got file service: " . ($fileService ? 'YES' : 'NO'));
 
 			// Get all currently attached files for this object
 			$currentFiles = $fileService->getFiles($objectEntity);
+			error_log("Current files found: " . count($currentFiles));
+
+			$currentFileNames = [];
+			foreach ($currentFiles as $file) {
+				$currentFileNames[] = $file->getName();
+			}
+			error_log("Current filenames: " . json_encode($currentFileNames));
 
 			// Check each current file to see if it should be kept
 			foreach ($currentFiles as $file) {
 				$fileName = $file->getName();
+				error_log("Checking file: {$fileName}");
 				
 				// If this file is not in the new set, delete it
 				if (!in_array($fileName, $newFileNames, true)) {
+					error_log("FILE MARKED FOR DELETION: {$fileName}");
+					error_log("File object type: " . get_class($file));
+					error_log("File path: " . $file->getPath());
+					
 					try {
-						$file->delete();
-						$deletedCount++;
-						error_log("Deleted orphaned file: {$fileName} for object: {$objectId}");
+						error_log("Attempting to delete file using FileService: {$fileName}");
+						// Use FileService's deleteFile method instead of direct deletion
+						$result = $fileService->deleteFile($file, $objectEntity);
+						error_log("FileService deleteFile returned: " . var_export($result, true));
+						
+						if ($result === true) {
+							$deletedCount++;
+							error_log("SUCCESS: Deleted orphaned file: {$fileName} for object: {$objectId}");
+						} else {
+							error_log("WARNING: FileService deleteFile returned false for file: {$fileName}");
+						}
 					} catch (Exception $e) {
-						error_log("Failed to delete orphaned file {$fileName}: " . $e->getMessage());
+						error_log("FAILED to delete orphaned file {$fileName}: " . $e->getMessage());
+						error_log("Exception type: " . get_class($e));
+						error_log("Exception trace: " . $e->getTraceAsString());
 					}
+				} else {
+					error_log("KEEPING file: {$fileName} (found in new filenames)");
 				}
 			}
+			
+			error_log("Total files processed for deletion: {$deletedCount}");
+			error_log("=== FILE CLEANUP END ===");
+			
 		} catch (Exception $e) {
-			error_log("Error during file cleanup for object {$objectId}: " . $e->getMessage());
+			error_log("FATAL ERROR during file cleanup for object {$objectId}: " . $e->getMessage());
+			error_log("Exception type: " . get_class($e));
+			error_log("Exception trace: " . $e->getTraceAsString());
 		}
 
 		return $deletedCount;
@@ -3330,12 +3366,11 @@ class SynchronizationService
 			}
 		}
 
-		// Clean up any files that weren't in the new set
-		if (!empty($newFileNames)) {
-			$deletedCount = $this->cleanupOrphanedFiles($objectId, $newFileNames);
-			if ($deletedCount > 0) {
-				error_log("Cleaned up {$deletedCount} orphaned files for object {$objectId}");
-			}
+		// Always run cleanup, even if newFileNames is empty
+		// This handles the case where all files should be removed from an object
+		$deletedCount = $this->cleanupOrphanedFiles($objectId, $newFileNames);
+		if ($deletedCount > 0) {
+			error_log("Cleaned up {$deletedCount} orphaned files for object {$objectId}");
 		}
 	}
 
