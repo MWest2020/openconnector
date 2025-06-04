@@ -3304,10 +3304,18 @@ class SynchronizationService
 	 */
 	private function processMultipleFilesWithCleanup(Source $source, array $config, array $endpoints, string $objectId): void
 	{
+		error_log("=== FILENAME TRACKING DEBUG START ===");
+		error_log("Object ID: {$objectId}");
+		error_log("Number of endpoints to process: " . count($endpoints));
+		error_log("Endpoints structure: " . json_encode($endpoints));
+		
 		$newFileNames = [];
 
 		// Process all files first and collect their filenames
-		foreach ($endpoints as $endpoint) {
+		foreach ($endpoints as $index => $endpoint) {
+			error_log("--- Processing endpoint $index ---");
+			error_log("Endpoint data: " . json_encode($endpoint));
+			
 			$filename = null;
 			$tags = [];
 			$contextObjectId = null;
@@ -3315,6 +3323,7 @@ class SynchronizationService
 
 			// Handle different endpoint types
 			if (is_array($endpoint)) {
+				error_log("Endpoint is array - extracting file context");
 				// This is an object with file metadata (multidimensional array case)
 				$actualEndpoint = $this->getFileContext(
 					config: $config, 
@@ -3323,16 +3332,47 @@ class SynchronizationService
 					tags: $tags, 
 					objectId: $contextObjectId
 				);
+				error_log("After getFileContext - filename: " . ($filename ?? 'null') . ", actualEndpoint: " . ($actualEndpoint ?? 'null'));
 			} else {
+				error_log("Endpoint is string: $endpoint");
 				// This is a simple endpoint string (indexed array case)
 				$actualEndpoint = $endpoint;
 			}
 
 			// Use context object ID if specified, otherwise fall back to the original object ID
 			$targetObjectId = $contextObjectId ?? $objectId;
+			error_log("Target object ID: $targetObjectId");
 
 			if ($actualEndpoint !== null) {
+				// Determine filename for tracking BEFORE attempting fetch
+				$trackingFilename = $filename;
+				error_log("Initial tracking filename: " . ($trackingFilename ?? 'null'));
+				
+				if ($trackingFilename === null) {
+					error_log("No filename provided, extracting from endpoint");
+					// Try to extract filename from endpoint URL
+					$pathParts = explode('/', $actualEndpoint);
+					$trackingFilename = end($pathParts);
+					error_log("Extracted filename from endpoint: $trackingFilename");
+					
+					// If still no clear filename, generate a fallback
+					if (empty($trackingFilename) || strpos($trackingFilename, '?') !== false) {
+						$trackingFilename = 'file_' . md5($actualEndpoint);
+						error_log("Generated fallback filename: $trackingFilename");
+					}
+				}
+
+				// Add to tracking array BEFORE attempting fetch (so failures don't affect cleanup)
+				if (!empty($trackingFilename)) {
+					$newFileNames[] = $trackingFilename;
+					error_log("Added filename to tracking array: $trackingFilename");
+					error_log("Current newFileNames array: " . json_encode($newFileNames));
+				} else {
+					error_log("WARNING: Could not determine filename for tracking");
+				}
+
 				try {
+					error_log("Attempting to fetch file from endpoint: $actualEndpoint");
 					// Fetch the file
 					$this->fetchFile(
 						source: $source,
@@ -3342,29 +3382,20 @@ class SynchronizationService
 						tags: $tags,
 						filename: $filename
 					);
-
-					// Determine filename for tracking - use provided filename or extract from endpoint
-					$trackingFilename = $filename;
-					if ($trackingFilename === null) {
-						// Try to extract filename from endpoint URL
-						$pathParts = explode('/', $actualEndpoint);
-						$trackingFilename = end($pathParts);
-						
-						// If still no clear filename, generate a fallback
-						if (empty($trackingFilename) || strpos($trackingFilename, '?') !== false) {
-							$trackingFilename = 'file_' . md5($actualEndpoint);
-						}
-					}
-
-					// Add to our tracking array if we have a valid filename
-					if (!empty($trackingFilename)) {
-						$newFileNames[] = $trackingFilename;
-					}
+					error_log("File fetch completed successfully");
 				} catch (Exception $e) {
 					error_log("Failed to fetch file from endpoint {$actualEndpoint}: " . $e->getMessage());
+					// Note: We still keep the filename in tracking array even if fetch fails
+					// This prevents cleanup from deleting files that should exist
 				}
+			} else {
+				error_log("WARNING: actualEndpoint is null, skipping");
 			}
 		}
+
+		error_log("=== FILENAME TRACKING DEBUG END ===");
+		error_log("Final newFileNames array: " . json_encode($newFileNames));
+		error_log("Number of tracked filenames: " . count($newFileNames));
 
 		// Always run cleanup, even if newFileNames is empty
 		// This handles the case where all files should be removed from an object
