@@ -2616,11 +2616,6 @@ class SynchronizationService
         } catch (Exception $e) {
             // Log error with detailed information but don't throw
             error_log("File fetch failed for endpoint {$endpoint}, objectId {$objectId}: " . $e->getMessage());
-            
-            // Only log stack trace for debugging if it's not a known issue
-            if (strpos($e->getMessage(), 'file versioning') === false && strpos($e->getMessage(), 'files_versions') === false) {
-                error_log("Stack trace: " . $e->getTraceAsString());
-            }
         }
 	}
 
@@ -3221,69 +3216,37 @@ class SynchronizationService
 		$deletedCount = 0;
 
 		try {
-			error_log("=== FILE CLEANUP START ===");
-			error_log("Object ID: {$objectId}");
-			error_log("Expected new filenames: " . json_encode($newFileNames));
-			
 			// Get the object entity
 			$objectService = $this->containerInterface->get('OCA\OpenRegister\Service\ObjectService');
 			$objectEntity = $objectService->findByUuid(uuid: $objectId);
-			error_log("Found object entity: " . ($objectEntity ? 'YES' : 'NO'));
 
 			// Get the file service
 			$fileService = $this->containerInterface->get('OCA\OpenRegister\Service\FileService');
-			error_log("Got file service: " . ($fileService ? 'YES' : 'NO'));
 
 			// Get all currently attached files for this object
 			$currentFiles = $fileService->getFiles($objectEntity);
-			error_log("Current files found: " . count($currentFiles));
-
-			$currentFileNames = [];
-			foreach ($currentFiles as $file) {
-				$currentFileNames[] = $file->getName();
-			}
-			error_log("Current filenames: " . json_encode($currentFileNames));
 
 			// Check each current file to see if it should be kept
 			foreach ($currentFiles as $file) {
 				$fileName = $file->getName();
-				error_log("Checking file: {$fileName}");
 				
 				// If this file is not in the new set, delete it
 				if (!in_array($fileName, $newFileNames, true)) {
-					error_log("FILE MARKED FOR DELETION: {$fileName}");
-					error_log("File object type: " . get_class($file));
-					error_log("File path: " . $file->getPath());
-					
 					try {
-						error_log("Attempting to delete file using FileService: {$fileName}");
 						// Use FileService's deleteFile method instead of direct deletion
 						$result = $fileService->deleteFile($file, $objectEntity);
-						error_log("FileService deleteFile returned: " . var_export($result, true));
 						
 						if ($result === true) {
 							$deletedCount++;
-							error_log("SUCCESS: Deleted orphaned file: {$fileName} for object: {$objectId}");
-						} else {
-							error_log("WARNING: FileService deleteFile returned false for file: {$fileName}");
 						}
 					} catch (Exception $e) {
 						error_log("FAILED to delete orphaned file {$fileName}: " . $e->getMessage());
-						error_log("Exception type: " . get_class($e));
-						error_log("Exception trace: " . $e->getTraceAsString());
 					}
-				} else {
-					error_log("KEEPING file: {$fileName} (found in new filenames)");
 				}
 			}
 			
-			error_log("Total files processed for deletion: {$deletedCount}");
-			error_log("=== FILE CLEANUP END ===");
-			
 		} catch (Exception $e) {
 			error_log("FATAL ERROR during file cleanup for object {$objectId}: " . $e->getMessage());
-			error_log("Exception type: " . get_class($e));
-			error_log("Exception trace: " . $e->getTraceAsString());
 		}
 
 		return $deletedCount;
@@ -3304,18 +3267,10 @@ class SynchronizationService
 	 */
 	private function processMultipleFilesWithCleanup(Source $source, array $config, array $endpoints, string $objectId): void
 	{
-		error_log("=== FILENAME TRACKING DEBUG START ===");
-		error_log("Object ID: {$objectId}");
-		error_log("Number of endpoints to process: " . count($endpoints));
-		error_log("Endpoints structure: " . json_encode($endpoints));
-		
 		$newFileNames = [];
 
 		// Process all files first and collect their filenames
-		foreach ($endpoints as $index => $endpoint) {
-			error_log("--- Processing endpoint $index ---");
-			error_log("Endpoint data: " . json_encode($endpoint));
-			
+		foreach ($endpoints as $endpoint) {
 			$filename = null;
 			$tags = [];
 			$contextObjectId = null;
@@ -3323,7 +3278,6 @@ class SynchronizationService
 
 			// Handle different endpoint types
 			if (is_array($endpoint)) {
-				error_log("Endpoint is array - extracting file context");
 				// This is an object with file metadata (multidimensional array case)
 				$actualEndpoint = $this->getFileContext(
 					config: $config, 
@@ -3332,47 +3286,35 @@ class SynchronizationService
 					tags: $tags, 
 					objectId: $contextObjectId
 				);
-				error_log("After getFileContext - filename: " . ($filename ?? 'null') . ", actualEndpoint: " . ($actualEndpoint ?? 'null'));
 			} else {
-				error_log("Endpoint is string: $endpoint");
 				// This is a simple endpoint string (indexed array case)
 				$actualEndpoint = $endpoint;
 			}
 
 			// Use context object ID if specified, otherwise fall back to the original object ID
 			$targetObjectId = $contextObjectId ?? $objectId;
-			error_log("Target object ID: $targetObjectId");
 
 			if ($actualEndpoint !== null) {
 				// Determine filename for tracking BEFORE attempting fetch
 				$trackingFilename = $filename;
-				error_log("Initial tracking filename: " . ($trackingFilename ?? 'null'));
 				
 				if ($trackingFilename === null) {
-					error_log("No filename provided, extracting from endpoint");
 					// Try to extract filename from endpoint URL
 					$pathParts = explode('/', $actualEndpoint);
 					$trackingFilename = end($pathParts);
-					error_log("Extracted filename from endpoint: $trackingFilename");
 					
 					// If still no clear filename, generate a fallback
 					if (empty($trackingFilename) || strpos($trackingFilename, '?') !== false) {
 						$trackingFilename = 'file_' . md5($actualEndpoint);
-						error_log("Generated fallback filename: $trackingFilename");
 					}
 				}
 
 				// Add to tracking array BEFORE attempting fetch (so failures don't affect cleanup)
 				if (!empty($trackingFilename)) {
 					$newFileNames[] = $trackingFilename;
-					error_log("Added filename to tracking array: $trackingFilename");
-					error_log("Current newFileNames array: " . json_encode($newFileNames));
-				} else {
-					error_log("WARNING: Could not determine filename for tracking");
 				}
 
 				try {
-					error_log("Attempting to fetch file from endpoint: $actualEndpoint");
 					// Fetch the file
 					$this->fetchFile(
 						source: $source,
@@ -3382,27 +3324,17 @@ class SynchronizationService
 						tags: $tags,
 						filename: $filename
 					);
-					error_log("File fetch completed successfully");
 				} catch (Exception $e) {
 					error_log("Failed to fetch file from endpoint {$actualEndpoint}: " . $e->getMessage());
 					// Note: We still keep the filename in tracking array even if fetch fails
 					// This prevents cleanup from deleting files that should exist
 				}
-			} else {
-				error_log("WARNING: actualEndpoint is null, skipping");
 			}
 		}
 
-		error_log("=== FILENAME TRACKING DEBUG END ===");
-		error_log("Final newFileNames array: " . json_encode($newFileNames));
-		error_log("Number of tracked filenames: " . count($newFileNames));
-
 		// Always run cleanup, even if newFileNames is empty
 		// This handles the case where all files should be removed from an object
-		$deletedCount = $this->cleanupOrphanedFiles($objectId, $newFileNames);
-		if ($deletedCount > 0) {
-			error_log("Cleaned up {$deletedCount} orphaned files for object {$objectId}");
-		}
+		$this->cleanupOrphanedFiles($objectId, $newFileNames);
 	}
 
 }
