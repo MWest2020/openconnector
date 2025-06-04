@@ -116,11 +116,11 @@ class SynchronizationHandler implements ConfigurationHandlerInterface
         }
 
         // Handle mapping IDs
-        if (isset($syncArray['sourceTargetMapping']) && isset($mappings['mapping']['idToSlug'][$syncArray['sourceTargetMapping']])) {
-            $syncArray['sourceTargetMapping'] = $mappings['mapping']['idToSlug'][$syncArray['sourceTargetMapping']];
+        if (isset($syncArray['sourceTargetMapping']) && isset($mappings['mapping']['idToSlug'][(int) $syncArray['sourceTargetMapping']])) {
+            $syncArray['sourceTargetMapping'] = $mappings['mapping']['idToSlug'][(int) $syncArray['sourceTargetMapping']];
         }
-        if (isset($syncArray['targetSourceMapping']) && isset($mappings['mapping']['idToSlug'][$syncArray['targetSourceMapping']])) {
-            $syncArray['targetSourceMapping'] = $mappings['mapping']['idToSlug'][$syncArray['targetSourceMapping']];
+        if (isset($syncArray['targetSourceMapping']) && isset($mappings['mapping']['idToSlug'][(int) $syncArray['targetSourceMapping']])) {
+            $syncArray['targetSourceMapping'] = $mappings['mapping']['idToSlug'][(int) $syncArray['targetSourceMapping']];
         }
 
         // Handle arrays of IDs that need to be converted to slugs

@@ -339,9 +339,9 @@ class ConfigurationService
      * @param Mapping $mapping The mapping to export
      * @return array The OpenAPI mapping specification
      */
-    private function exportMapping(Mapping $mapping): array
+    private function exportMapping(Mapping $mapping, array &$mappingIds = []): array
     {
-        return $this->handlers['mapping']->export($mapping, $this->mappings);
+        return $this->handlers['mapping']->export($mapping, $this->mappings, $mappingIds);
     }
 
     /**
@@ -529,15 +529,37 @@ class ConfigurationService
             $components['components']['rules'] = $indexedRules;
         }
 
+		$mappingIds = array_map(function(string|int$mappingId) {
+			if (is_int($mappingId)) {
+				return $mappingId;
+			}
+
+			return (int) $mappingId;
+		}, $mappingIds);
 
 		// Batch fetch and export related entities
 		if (!empty($mappingIds)) {
 			$mappings = $this->mappingMapper->findAll(ids: ['id' => $mappingIds]);
 			$indexedMappings = [];
+			$additionalMappingIds = [];
 			foreach ($mappings as $mapping) {
-				$indexedMappings[$mapping->getSlug()] = $this->exportMapping($mapping);
+				$indexedMappings[$mapping->getSlug()] = $this->exportMapping($mapping, $additionalMappingIds);
 			}
 			$components['components']['mappings'] = $indexedMappings;
+		}
+
+		while (empty($additionalMappingIds) === false) {
+			$additionalMappings = $this->mappingMapper->findAll(ids: ['id' => $additionalMappingIds]);
+			$additionalMappingIds = [];
+			$indexedAdditionalMappings = array_combine(
+				array_map(function(Mapping $mapping) {
+					return $mapping->getSlug();
+					}, $additionalMappings),
+				array_map(function (Mapping $mapping) use ($additionalMappingIds){
+					return $this->exportMapping($mapping, $additionalMappingIds);
+				}, $additionalMappings));
+
+			$components['components']['mappings'] = array_merge($components['components']['mappings'], $indexedAdditionalMappings);
 		}
 
         // Get and export related jobs
