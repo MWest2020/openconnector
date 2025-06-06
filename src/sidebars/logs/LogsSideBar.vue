@@ -12,7 +12,7 @@ import { logStore, contractStore, synchronizationStore } from '../../store/store
 		<!-- Filters Section -->
 		<div class="section">
 			<h4>{{ t('openconnector', 'Filters') }}</h4>
-			
+
 			<!-- Level Filter -->
 			<div class="filter-group">
 				<label>{{ t('openconnector', 'Level') }}</label>
@@ -128,16 +128,20 @@ import { logStore, contractStore, synchronizationStore } from '../../store/store
 			<div v-if="statistics.levelDistribution" class="chart-container">
 				<h5>{{ t('openconnector', 'Level Distribution') }}</h5>
 				<div class="level-chart">
-					<div v-for="(count, level) in statistics.levelDistribution" 
-						:key="level" 
+					<div v-for="(count, level) in statistics.levelDistribution"
+						:key="level"
 						class="level-bar"
 						:class="'level-' + level">
-						<div class="level-label">{{ getLevelLabel(level) }}</div>
-						<div class="level-progress">
-							<div class="level-fill" 
-								:style="{ width: getLevelPercentage(count) + '%' }"></div>
+						<div class="level-label">
+							{{ getLevelLabel(level) }}
 						</div>
-						<div class="level-count">{{ count }}</div>
+						<div class="level-progress">
+							<div class="level-fill"
+								:style="{ width: getLevelPercentage(count) + '%' }" />
+						</div>
+						<div class="level-count">
+							{{ count }}
+						</div>
 					</div>
 				</div>
 			</div>
@@ -248,7 +252,7 @@ export default {
 	beforeDestroy() {
 		this.$root.$off('logs-selection-count')
 		this.$root.$off('logs-filtered-count')
-		
+
 		if (this.debounceTimer) {
 			clearTimeout(this.debounceTimer)
 		}
@@ -547,5 +551,4 @@ export default {
 	text-align: right;
 	font-weight: 500;
 }
-</style> 
-</style> 
+</style>
