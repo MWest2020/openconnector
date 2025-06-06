@@ -93,8 +93,8 @@ import { contractStore, synchronizationStore, navigationStore } from '../../stor
 								</span>
 							</td>
 							<td>
-								<NcDateTime v-if="item.getLastSyncDate && item.getLastSyncDate()" 
-									:timestamp="new Date(item.getLastSyncDate())" 
+								<NcDateTime v-if="item.getLastSyncDate && item.getLastSyncDate()"
+									:timestamp="new Date(item.getLastSyncDate())"
 									:ignore-seconds="true" />
 								<span v-else>{{ t('openconnector', 'Never') }}</span>
 							</td>
@@ -170,8 +170,6 @@ import {
 	NcDateTime,
 } from '@nextcloud/vue'
 import FileDocumentOutline from 'vue-material-design-icons/FileDocumentOutline.vue'
-import Play from 'vue-material-design-icons/Play.vue'
-import Pause from 'vue-material-design-icons/Pause.vue'
 import Refresh from 'vue-material-design-icons/Refresh.vue'
 import PlayCircle from 'vue-material-design-icons/PlayCircle.vue'
 import TextBoxOutline from 'vue-material-design-icons/TextBoxOutline.vue'
@@ -189,8 +187,6 @@ export default {
 		NcActionButton,
 		NcDateTime,
 		FileDocumentOutline,
-		Play,
-		Pause,
 		Refresh,
 		PlayCircle,
 		TextBoxOutline,
@@ -299,7 +295,7 @@ export default {
 			try {
 				await contractStore.fetchContracts({
 					page: 1,
-					filters: filters,
+					filters,
 				})
 
 				// Clear selection when filters change
@@ -334,16 +330,16 @@ export default {
 		 */
 		getSyncStatusType(status) {
 			switch (status) {
-				case 'synced':
-					return 'success'
-				case 'stale':
-					return 'warning'
-				case 'unsynced':
-					return 'secondary'
-				case 'error':
-					return 'error'
-				default:
-					return 'secondary'
+			case 'synced':
+				return 'success'
+			case 'stale':
+				return 'warning'
+			case 'unsynced':
+				return 'secondary'
+			case 'error':
+				return 'error'
+			default:
+				return 'secondary'
 			}
 		},
 		/**
@@ -353,16 +349,16 @@ export default {
 		 */
 		getSyncStatusLabel(status) {
 			switch (status) {
-				case 'synced':
-					return t('openconnector', 'Synced')
-				case 'stale':
-					return t('openconnector', 'Stale')
-				case 'unsynced':
-					return t('openconnector', 'Unsynced')
-				case 'error':
-					return t('openconnector', 'Error')
-				default:
-					return t('openconnector', 'Unknown')
+			case 'synced':
+				return t('openconnector', 'Synced')
+			case 'stale':
+				return t('openconnector', 'Stale')
+			case 'unsynced':
+				return t('openconnector', 'Unsynced')
+			case 'error':
+				return t('openconnector', 'Error')
+			default:
+				return t('openconnector', 'Unknown')
 			}
 		},
 		/**
@@ -372,19 +368,19 @@ export default {
 		 */
 		getLastActionLabel(action) {
 			switch (action) {
-				case 'create':
-				case 'created':
-					return t('openconnector', 'Created')
-				case 'update':
-				case 'updated':
-					return t('openconnector', 'Updated')
-				case 'delete':
-				case 'deleted':
-					return t('openconnector', 'Deleted')
-				case 'insert':
-					return t('openconnector', 'Inserted')
-				default:
-					return t('openconnector', 'None')
+			case 'create':
+			case 'created':
+				return t('openconnector', 'Created')
+			case 'update':
+			case 'updated':
+				return t('openconnector', 'Updated')
+			case 'delete':
+			case 'deleted':
+				return t('openconnector', 'Deleted')
+			case 'insert':
+				return t('openconnector', 'Inserted')
+			default:
+				return t('openconnector', 'None')
 			}
 		},
 		/**
@@ -727,4 +723,4 @@ export default {
 	font-size: 0.75rem;
 	font-weight: 500;
 }
-</style> 
+</style>

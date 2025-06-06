@@ -1,5 +1,5 @@
 <script setup>
-import { contractStore, synchronizationStore } from '../../store/store.js'
+import { synchronizationStore } from '../../store/store.js'
 </script>
 
 <template>
@@ -12,7 +12,7 @@ import { contractStore, synchronizationStore } from '../../store/store.js'
 		<!-- Filters Section -->
 		<div class="section">
 			<h4>{{ t('openconnector', 'Filters') }}</h4>
-			
+
 			<!-- Synchronization Filter -->
 			<div class="filter-group">
 				<label>{{ t('openconnector', 'Synchronization') }}</label>
@@ -108,13 +108,10 @@ import { contractStore, synchronizationStore } from '../../store/store.js'
 <script>
 import {
 	NcSelect,
-	NcTextField,
 	NcButton,
 	NcLoadingIcon,
 	NcDateTimePickerNative,
 } from '@nextcloud/vue'
-import Play from 'vue-material-design-icons/Play.vue'
-import Pause from 'vue-material-design-icons/Pause.vue'
 import Download from 'vue-material-design-icons/Download.vue'
 import Delete from 'vue-material-design-icons/Delete.vue'
 
@@ -122,12 +119,9 @@ export default {
 	name: 'ContractsSideBar',
 	components: {
 		NcSelect,
-		NcTextField,
 		NcButton,
 		NcLoadingIcon,
 		NcDateTimePickerNative,
-		Play,
-		Pause,
 		Download,
 		Delete,
 	},
@@ -187,7 +181,7 @@ export default {
 	beforeDestroy() {
 		this.$root.$off('contracts-selection-count')
 		this.$root.$off('contracts-filtered-count')
-		
+
 		if (this.debounceTimer) {
 			clearTimeout(this.debounceTimer)
 		}
@@ -445,4 +439,4 @@ export default {
 	text-align: right;
 	font-weight: 500;
 }
-</style> 
+</style>
