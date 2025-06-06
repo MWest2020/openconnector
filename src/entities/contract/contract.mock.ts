@@ -61,4 +61,4 @@ export const mockContractData = (): TContract[] => [
 	},
 ]
 
-export const mockContract = (data: TContract[] = mockContractData()): Contract[] => data.map(item => new Contract(item)) 
+export const mockContract = (data: TContract[] = mockContractData()): Contract[] => data.map(item => new Contract(item))

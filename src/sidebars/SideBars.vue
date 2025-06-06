@@ -6,7 +6,7 @@ import { navigationStore } from '../store/store.js'
 	<div>
 		<!-- Contracts Sidebar -->
 		<ContractsSideBar v-if="navigationStore.selected === 'contracts'" />
-		
+
 		<!-- Logs Sidebar -->
 		<LogsSideBar v-if="navigationStore.selected === 'logs'" />
 	</div>

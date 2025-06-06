@@ -8,7 +8,7 @@ export const mockLogData = (): TLog[] => [
 		message: 'Synchronization completed successfully',
 		synchronizationId: 'sync-123',
 		result: [
-			{ status: 'success', processed: 10, errors: 0 }
+			{ status: 'success', processed: 10, errors: 0 },
 		],
 		userId: 'user123',
 		sessionId: 'session-abc123',
@@ -24,7 +24,7 @@ export const mockLogData = (): TLog[] => [
 		message: 'Synchronization failed due to network timeout',
 		synchronizationId: 'sync-456',
 		result: [
-			{ status: 'error', error: 'Network timeout after 30 seconds', processed: 5, errors: 1 }
+			{ status: 'error', error: 'Network timeout after 30 seconds', processed: 5, errors: 1 },
 		],
 		userId: 'user456',
 		sessionId: 'session-def456',
@@ -40,7 +40,7 @@ export const mockLogData = (): TLog[] => [
 		message: 'Test synchronization run - validation mode',
 		synchronizationId: 'sync-789',
 		result: [
-			{ status: 'info', message: 'Validation completed', items_validated: 25 }
+			{ status: 'info', message: 'Validation completed', items_validated: 25 },
 		],
 		userId: 'user789',
 		sessionId: 'session-ghi789',

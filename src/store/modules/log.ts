@@ -1,4 +1,4 @@
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 import { defineStore } from 'pinia'
 import { Log, TLog } from '../../entities/index.js'
 import { MissingParameterError } from '../../services/errors/index.js'
@@ -19,33 +19,33 @@ export const useLogStore = defineStore('log', () => {
 
 	/** @type {import('vue').Ref<Log|null>} Current log item */
 	const logItem = ref<Log>(null)
-	
+
 	/** @type {import('vue').Ref<Log[]>} Legacy log list */
 	const logList = ref<Log[]>([])
-	
+
 	/** @type {import('vue').Ref<Log[]>} List of logs (new naming) */
 	const logsList = ref<Log[]>([])
-	
+
 	/** @type {import('vue').Ref<string|null>} Active log key */
 	const activeLogKey = ref<string>(null)
-	
+
 	/** @type {import('vue').Ref<object|null>} View log item */
 	const viewLogItem = ref<Record<string, unknown>>(null)
-	
+
 	/** @type {import('vue').Ref<boolean>} Loading state for logs */
 	const logsLoading = ref<boolean>(false)
-	
+
 	/** @type {import('vue').Ref<object>} Pagination information */
 	const logsPagination = ref<object>({
 		page: 1,
 		pages: 1,
 		results: 0,
-		total: 0
+		total: 0,
 	})
-	
+
 	/** @type {import('vue').Ref<object>} Current filters */
 	const logsFilters = ref<object>({})
-	
+
 	/** @type {import('vue').Ref<object>} Statistics data */
 	const logsStatistics = ref<object>({})
 
@@ -55,7 +55,7 @@ export const useLogStore = defineStore('log', () => {
 
 	/**
 	 * Set the active log item
-	 * 
+	 *
 	 * @param {Log|TLog|null} item - The log item to set
 	 * @return {void}
 	 */
@@ -86,7 +86,7 @@ export const useLogStore = defineStore('log', () => {
 
 	/**
 	 * Set the log list (legacy)
-	 * 
+	 *
 	 * @param {Log[]|TLog[]} list - The log list to set
 	 * @return {void}
 	 */
@@ -98,7 +98,7 @@ export const useLogStore = defineStore('log', () => {
 
 	/**
 	 * Set the logs list (new naming)
-	 * 
+	 *
 	 * @param {Log[]|TLog[]} list - The logs list to set
 	 * @return {void}
 	 */
@@ -150,7 +150,7 @@ export const useLogStore = defineStore('log', () => {
 
 	/**
 	 * Set the active log key
-	 * 
+	 *
 	 * @param {string} key - The log key to set
 	 * @return {void}
 	 */
@@ -181,7 +181,7 @@ export const useLogStore = defineStore('log', () => {
 
 	/**
 	 * Set the view log item
-	 * 
+	 *
 	 * @param {object} item - The log item to set
 	 * @return {void}
 	 */
@@ -212,7 +212,7 @@ export const useLogStore = defineStore('log', () => {
 
 	/**
 	 * Set logs filters
-	 * 
+	 *
 	 * @param {object} filters - The filters to set
 	 * @return {void}
 	 */
@@ -223,7 +223,7 @@ export const useLogStore = defineStore('log', () => {
 
 	/**
 	 * Set logs loading state
-	 * 
+	 *
 	 * @param {boolean} loading - The loading state
 	 * @return {void}
 	 */
@@ -233,7 +233,7 @@ export const useLogStore = defineStore('log', () => {
 
 	/**
 	 * Set logs pagination
-	 * 
+	 *
 	 * @param {object} pagination - The pagination object
 	 * @return {void}
 	 */
@@ -247,7 +247,7 @@ export const useLogStore = defineStore('log', () => {
 
 	/**
 	 * Fetch logs from the API (new method expected by components)
-	 * 
+	 *
 	 * @param {object} options - Request options
 	 * @param {number} options.page - Page number
 	 * @param {object} options.filters - Filters to apply
@@ -255,7 +255,7 @@ export const useLogStore = defineStore('log', () => {
 	 */
 	const fetchLogs = async (options: { page?: number, filters?: object } = {}): Promise<{ response: Response, data: TLog[], entities: Log[] }> => {
 		setLogsLoading(true)
-		
+
 		try {
 			const queryParams = new URLSearchParams()
 
@@ -288,7 +288,7 @@ export const useLogStore = defineStore('log', () => {
 			const entities = data.map(logItem => new Log(logItem))
 
 			setLogsList(data)
-			
+
 			// Set pagination if available
 			if (responseData.pagination) {
 				setLogsPagination(responseData.pagination)
@@ -302,7 +302,7 @@ export const useLogStore = defineStore('log', () => {
 
 	/**
 	 * Refresh the log list (legacy method)
-	 * 
+	 *
 	 * @param {string} search - The search string to filter the list
 	 * @return {Promise<{ response: Response, data: TLog[], entities: Log[] }>} The response, data, and entities
 	 */
@@ -313,7 +313,7 @@ export const useLogStore = defineStore('log', () => {
 
 	/**
 	 * Fetch a single log
-	 * 
+	 *
 	 * @param {string} id - The ID of the log to fetch
 	 * @return {Promise<{ response: Response, data: TLog, entity: Log }>} The response, data, and entity
 	 */
@@ -338,7 +338,7 @@ export const useLogStore = defineStore('log', () => {
 
 	/**
 	 * Delete a log
-	 * 
+	 *
 	 * @param {string} id - The ID of the log to delete
 	 * @return {Promise<{ response: Response }>} The response
 	 */
@@ -364,7 +364,7 @@ export const useLogStore = defineStore('log', () => {
 
 	/**
 	 * Delete multiple logs
-	 * 
+	 *
 	 * @param {string[]} ids - Array of log IDs to delete
 	 * @return {Promise<void>}
 	 */
@@ -379,7 +379,7 @@ export const useLogStore = defineStore('log', () => {
 
 	/**
 	 * Export logs
-	 * 
+	 *
 	 * @return {Promise<{ response: Response }>}
 	 */
 	const exportLogs = async (): Promise<{ response: Response }> => {
@@ -409,7 +409,7 @@ export const useLogStore = defineStore('log', () => {
 
 	/**
 	 * Fetch log statistics
-	 * 
+	 *
 	 * @return {Promise<{ response: Response, data: object }>}
 	 */
 	const fetchStatistics = async (): Promise<{ response: Response, data: object }> => {
@@ -427,7 +427,7 @@ export const useLogStore = defineStore('log', () => {
 
 	/**
 	 * Save a log
-	 * 
+	 *
 	 * @param {Log} logItem - The log item to save
 	 * @return {Promise<{ response: Response, data: TLog, entity: Log }>} The response, data, and entity
 	 */

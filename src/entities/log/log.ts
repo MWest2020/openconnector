@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { SafeParseReturnType, z } from 'zod'
 import { TLog } from './log.types'
 import ReadonlyBaseClass from '../ReadonlyBaseClass.js'
@@ -91,8 +92,8 @@ export class Log extends ReadonlyBaseClass implements TLog {
 
 		// Check if there are errors in the result
 		if (this.result && Array.isArray(this.result)) {
-			const hasErrors = this.result.some((item: any) => 
-				item?.error || item?.status === 'error' || (item?.success === false)
+			const hasErrors = this.result.some((item: any) =>
+				item?.error || item?.status === 'error' || (item?.success === false),
 			)
 			if (hasErrors) {
 				return 'error'
@@ -152,4 +153,5 @@ export class Log extends ReadonlyBaseClass implements TLog {
 	public isTest(): boolean {
 		return this.test === true
 	}
+
 }
