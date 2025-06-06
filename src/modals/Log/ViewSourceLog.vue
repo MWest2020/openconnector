@@ -7,7 +7,7 @@ import { logStore, navigationStore } from '../../store/store.js'
 		ref="modalRef"
 		label-id="viewSourceLog"
 		@close="closeModal">
-		<div class="logModalContent">
+		<div class="logModalContent ViewSourceLog">
 			<div class="logModalContentHeader">
 				<h2>View Source Log</h2>
 			</div>
@@ -63,7 +63,16 @@ import { logStore, navigationStore } from '../../store/store.js'
 						<td class="keyColumn">
 							{{ key }}
 						</td>
-						<td>{{ value }}</td>
+						<td v-if="typeof value === 'object'">
+							<ul>
+								<li v-for="(subValue, subKey) in value" :key="subKey" :style="value.length > 1 ? 'list-style-type: disc;' : 'list-style-type: none;'">
+									{{ isNaN(subKey) ? `${subKey}: ` : '' }}{{ subValue }}
+								</li>
+							</ul>
+						</td>
+						<td v-else>
+							{{ value }}
+						</td>
 					</tr>
 				</table>
 			</div>
@@ -172,6 +181,7 @@ export default {
 }
 
 .keyColumn {
+    width: 200px; /* Fixed width for first column */
     padding-inline-end: 10px;
     font-weight: bold;
     color: var(--color-text-lighter);
@@ -190,6 +200,10 @@ export default {
     margin-block-end: 1rem;
 }
 
+/* modal */
+div[class='modal-container']:has(.ViewSourceLog) {
+    width: clamp(150px, 100%, 800px) !important;
+}
 </style>
 
 <style scoped>
@@ -211,6 +225,9 @@ export default {
   white-space: normal !important;
   overflow-wrap: break-word;
   word-break: break-word;
+}
+.dataTable td:not(.keyColumn) {
+  width: calc(100% - 200px); /* Remaining width after keyColumn */
 }
 .responseBodyJson {
     position: relative;
