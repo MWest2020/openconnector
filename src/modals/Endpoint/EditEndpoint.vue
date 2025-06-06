@@ -27,6 +27,7 @@ import { Endpoint } from '../../entities/index.js'
 						:value.sync="endpointItem.name" />
 
 					<NcTextArea
+						resize="vertical"
 						label="Description"
 						:value.sync="endpointItem.description" />
 
@@ -35,6 +36,7 @@ import { Endpoint } from '../../entities/index.js'
 						:value.sync="endpointItem.endpoint" />
 
 					<NcTextArea
+						resize="vertical"
 						label="Endpoint Array (split on ,)"
 						:value.sync="endpointItem.endpointArray" />
 

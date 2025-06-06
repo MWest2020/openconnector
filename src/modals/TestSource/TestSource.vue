@@ -31,6 +31,7 @@ import { getTheme } from '../../services/getTheme.js'
 					</div>
 					<NcTextArea
 						id="body"
+						resize="vertical"
 						label="Body"
 						:value.sync="testSourceItem.body" />
 				</div>

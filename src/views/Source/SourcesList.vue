@@ -12,7 +12,7 @@ import { sourceStore, navigationStore, searchStore } from '../../store/store.js'
 					label="Search"
 					class="searchField"
 					trailing-button-icon="close"
-					@trailing-button-click="sourceStore.refreshSourceList()">
+					@trailing-button-click="searchStore.clearSearch()">
 					<Magnify :size="20" />
 				</NcTextField>
 				<NcActions>
@@ -37,7 +37,7 @@ import { sourceStore, navigationStore, searchStore } from '../../store/store.js'
 				</NcActions>
 			</div>
 			<div v-if="sourceStore.sourceList && sourceStore.sourceList.length > 0">
-				<NcListItem v-for="(source, i) in sourceStore.sourceList"
+				<NcListItem v-for="(source, i) in sourceStore.sourceList.filter(source => searchStore.search === '' || source.name.toLowerCase().includes(searchStore.search.toLowerCase()))"
 					:key="`${source}${i}`"
 					:name="source.name"
 					:active="sourceStore.sourceItem?.id === source?.id"
@@ -147,6 +147,7 @@ export default {
 		TrashCanOutline,
 	},
 	mounted() {
+		searchStore.clearSearch()
 		sourceStore.refreshSourceList()
 	},
 }

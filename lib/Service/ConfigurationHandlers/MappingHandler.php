@@ -32,7 +32,7 @@ class MappingHandler implements ConfigurationHandlerInterface
     /**
      * {@inheritDoc}
      */
-    public function export(Entity $entity, array $mappings): array
+    public function export(Entity $entity, array $mappings, array &$mappingIds = []): array
     {
         if (!$entity instanceof Mapping) {
             throw new \InvalidArgumentException('Entity must be an instance of Mapping');
@@ -40,6 +40,11 @@ class MappingHandler implements ConfigurationHandlerInterface
 
         $mappingArray = $entity->jsonSerialize();
         unset($mappingArray['id'], $mappingArray['uuid']);
+        
+        // Ensure slug is set
+        if (empty($mappingArray['slug'])) {
+            $mappingArray['slug'] = $entity->getSlug();
+        }
 
         // Replace IDs with slugs where applicable.
         if (isset($mappingArray['source_id']) && isset($mappings['source']['idToSlug'][$mappingArray['source_id']])) {
@@ -48,6 +53,35 @@ class MappingHandler implements ConfigurationHandlerInterface
         if (isset($mappingArray['target_id']) && isset($mappings['source']['idToSlug'][$mappingArray['target_id']])) {
             $mappingArray['target_id'] = $mappings['source']['idToSlug'][$mappingArray['target_id']];
         }
+
+
+		if (isset($mappingArray['mapping']) === false) {
+			return $mappingArray;
+		}
+
+		$matchedMappings = array_map(function (string $field) use ($mappings) {
+
+			$regex = '$executeMapping\(([^)]+)\)$';
+			preg_match_all($regex, $field, $matches);
+			[$fullMatches, $subMatches] = $matches;
+
+			return array_map(callback: function (string $match) use ($mappings) {
+				[$mapping, $data] = explode(separator: ',', string: $match, limit: 2);
+				$mappingIdentifier = trim($mapping, '\' ');
+
+				if(isset($mappings['mapping']['slugToId'][$mappingIdentifier]) === true) {
+					return $mappings['mapping']['slugToId'][$mappingIdentifier];
+				}
+
+				return $mappingIdentifier;
+
+			}, array: $subMatches);
+		}, $mappingArray['mapping']);
+
+
+		$addingMappingIds = array_merge(...array_values($matchedMappings));
+
+		$mappingIds = array_merge($mappingIds, $addingMappingIds);
 
         return $mappingArray;
     }
@@ -70,7 +104,7 @@ class MappingHandler implements ConfigurationHandlerInterface
             // Update existing mapping.
             return $this->mappingMapper->updateFromArray($mappings['mapping']['slugToId'][$data['slug']], $data);
         }
-        
+
         // Create new mapping.
         return $this->mappingMapper->createFromArray($data);
     }
@@ -82,4 +116,4 @@ class MappingHandler implements ConfigurationHandlerInterface
     {
         return 'mapping';
     }
-} 
+}

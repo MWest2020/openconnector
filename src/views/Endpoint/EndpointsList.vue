@@ -12,7 +12,7 @@ import { endpointStore, navigationStore, searchStore } from '../../store/store.j
 					label="Search"
 					class="searchField"
 					trailing-button-icon="close"
-					@trailing-button-click="endpointStore.refreshEndpointList()">
+					@trailing-button-click="searchStore.clearSearch()">
 					<Magnify :size="20" />
 				</NcTextField>
 				<NcActions>
@@ -37,7 +37,7 @@ import { endpointStore, navigationStore, searchStore } from '../../store/store.j
 				</NcActions>
 			</div>
 			<div v-if="endpointStore.endpointList && endpointStore.endpointList.length > 0">
-				<NcListItem v-for="(endpoint, i) in endpointStore.endpointList"
+				<NcListItem v-for="(endpoint, i) in endpointStore.endpointList.filter(endpoint => searchStore.search === '' || endpoint.name.toLowerCase().includes(searchStore.search.toLowerCase()))"
 					:key="`${endpoint}${i}`"
 					:name="endpoint.name"
 					:active="endpointStore.endpointItem?.id === endpoint?.id"
@@ -124,6 +124,7 @@ export default {
 		TrashCanOutline,
 	},
 	mounted() {
+		searchStore.clearSearch()
 		endpointStore.refreshEndpointList()
 	},
 	methods: {

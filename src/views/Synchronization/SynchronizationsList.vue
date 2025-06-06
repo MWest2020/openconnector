@@ -12,7 +12,7 @@ import { synchronizationStore, navigationStore, searchStore } from '../../store/
 					label="Search"
 					class="searchField"
 					trailing-button-icon="close"
-					@trailing-button-click="synchronizationStore.refreshSynchronizationList()">
+					@trailing-button-click="searchStore.clearSearch()">
 					<Magnify :size="20" />
 				</NcTextField>
 				<NcActions>
@@ -37,7 +37,7 @@ import { synchronizationStore, navigationStore, searchStore } from '../../store/
 				</NcActions>
 			</div>
 			<div v-if="synchronizationStore.synchronizationList && synchronizationStore.synchronizationList.length > 0">
-				<NcListItem v-for="(synchronization, i) in synchronizationStore.synchronizationList"
+				<NcListItem v-for="(synchronization, i) in synchronizationStore.synchronizationList.filter(synchronization => searchStore.search === '' || synchronization.name.toLowerCase().includes(searchStore.search.toLowerCase()))"
 					:key="`${synchronization}${i}`"
 					:name="synchronization.name"
 					:active="synchronizationStore.synchronizationItem?.id === synchronization?.id"
@@ -151,6 +151,7 @@ export default {
 		TrashCanOutline,
 	},
 	mounted() {
+		searchStore.clearSearch()
 		synchronizationStore.refreshSynchronizationList()
 	},
 }

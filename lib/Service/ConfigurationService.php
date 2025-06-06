@@ -246,20 +246,95 @@ class ConfigurationService
      */
     public function exportConfiguration(string $configurationId): array
     {
-        $entities = $this->getEntitiesByConfiguration($configurationId);
+        // Reset all mappings
+        $this->resetMappings();
+        
+        // Get raw entities from database
+        $sources = $this->sourceMapper->findByConfiguration($configurationId);
+        $endpoints = $this->endpointMapper->findByConfiguration($configurationId);
+        $mappings = $this->mappingMapper->findByConfiguration($configurationId);
+        $rules = $this->ruleMapper->findByConfiguration($configurationId);
+        $jobs = $this->jobMapper->findByConfiguration($configurationId);
+        $synchronizations = $this->synchronizationMapper->findByConfiguration($configurationId);
+        
+        // Collect register and schema IDs from entities that reference them
+        $registerIds = [];
+        $schemaIds = [];
+        
+        foreach ($endpoints as $endpoint) {
+            if ($endpoint->getTargetType() === 'register/schema' && str_contains($endpoint->getTargetId(), '/')) {
+                [$registerId, $schemaId] = explode('/', $endpoint->getTargetId());
+                $registerIds[] = $registerId;
+                $schemaIds[] = $schemaId;
+            }
+        }
+        
+        foreach ($synchronizations as $synchronization) {
+            if ($synchronization->getSourceType() === 'register/schema' && str_contains($synchronization->getSourceId(), '/')) {
+                [$registerId, $schemaId] = explode('/', $synchronization->getSourceId());
+                $registerIds[] = $registerId;
+                $schemaIds[] = $schemaId;
+            }
+            if ($synchronization->getTargetType() === 'register/schema' && str_contains($synchronization->getTargetId(), '/')) {
+                [$registerId, $schemaId] = explode('/', $synchronization->getTargetId());
+                $registerIds[] = $registerId;
+                $schemaIds[] = $schemaId;
+            }
+        }
+        
+        // Remove duplicates and build register/schema mappings
+        $registerIds = array_filter(array_unique($registerIds));
+        $schemaIds = array_filter(array_unique($schemaIds));
+        $this->buildRegisterAndSchemaMappings($registerIds, $schemaIds);
+        
+        // Export entities using handlers to convert IDs to slugs
+        $exportedSources = [];
+        foreach ($sources as $source) {
+            $exportedSources[$source->getSlug()] = $this->exportSource($source);
+        }
+        
+        $exportedEndpoints = [];
+        foreach ($endpoints as $endpoint) {
+            $exportedEndpoints[$endpoint->getSlug()] = $this->exportEndpoint($endpoint);
+        }
+        
+        $exportedMappings = [];
+        foreach ($mappings as $mapping) {
+            $exportedMappings[$mapping->getSlug()] = $this->exportMapping($mapping);
+        }
+        
+        $exportedRules = [];
+        foreach ($rules as $rule) {
+            $exportedRules[$rule->getSlug()] = $this->exportRule($rule);
+        }
+        
+        $exportedJobs = [];
+        foreach ($jobs as $job) {
+            $slug = $job->getSlug();
+            if (empty($slug)) {
+                // Generate slug if not set
+                $slug = 'job-' . $job->getId();
+            }
+            $exportedJobs[$slug] = $this->exportJob($job);
+        }
+        
+        $exportedSynchronizations = [];
+        foreach ($synchronizations as $synchronization) {
+            $exportedSynchronizations[$synchronization->getSlug()] = $this->exportSynchronization($synchronization);
+        }
         
         // Organize entities by components
         $components = [
             'components' => [
-                'sources' => $this->organizeEntitiesByComponent($entities['sources']),
-                'endpoints' => $this->organizeEntitiesByComponent($entities['endpoints']),
-                'mappings' => $this->organizeEntitiesByComponent($entities['mappings']),
-                'rules' => $this->organizeEntitiesByComponent($entities['rules']),
-                'jobs' => $this->organizeEntitiesByComponent($entities['jobs']),
-                'synchronizations' => $this->organizeEntitiesByComponent($entities['synchronizations']),
+                'sources' => $this->organizeEntitiesByComponent($exportedSources),
+                'endpoints' => $this->organizeEntitiesByComponent($exportedEndpoints),
+                'mappings' => $this->organizeEntitiesByComponent($exportedMappings),
+                'rules' => $this->organizeEntitiesByComponent($exportedRules),
+                'jobs' => $this->organizeEntitiesByComponent($exportedJobs),
+                'synchronizations' => $this->organizeEntitiesByComponent($exportedSynchronizations),
             ],
         ];
-        
+
         return $components;
     }
 
@@ -339,9 +414,9 @@ class ConfigurationService
      * @param Mapping $mapping The mapping to export
      * @return array The OpenAPI mapping specification
      */
-    private function exportMapping(Mapping $mapping): array
+    private function exportMapping(Mapping $mapping, array &$mappingIds = []): array
     {
-        return $this->handlers['mapping']->export($mapping, $this->mappings);
+        return $this->handlers['mapping']->export($mapping, $this->mappings, $mappingIds);
     }
 
     /**
@@ -350,9 +425,9 @@ class ConfigurationService
      * @param Rule $rule The rule to export
      * @return array The OpenAPI rule specification
      */
-    private function exportRule(Rule $rule): array
+    private function exportRule(Rule $rule, array &$mappingIds = []): array
     {
-        return $this->handlers['rule']->export($rule, $this->mappings);
+        return $this->handlers['rule']->export($rule, $this->mappings, $mappingIds);
     }
 
     /**
@@ -385,14 +460,22 @@ class ConfigurationService
      */
     private function buildRegisterAndSchemaMappings(array $registerIds = [], array $schemaIds = []): void
     {
-        // Get register slugs
+        // Get register slugs and build mappings
         if (!empty($registerIds)) {
             $registers = $this->registerMapper->findAll(filters: ['id' => $registerIds]);
+            foreach ($registers as $register) {
+                $this->mappings['register']['idToSlug'][$register->getId()] = $register->getSlug();
+                $this->mappings['register']['slugToId'][$register->getSlug()] = $register->getId();
+            }
         }
 
-        // Get schema slugs
+        // Get schema slugs and build mappings
         if (!empty($schemaIds)) {
             $schemas = $this->schemaMapper->findAll(filters: ['id' => $schemaIds]);
+            foreach ($schemas as $schema) {
+                $this->mappings['schema']['idToSlug'][$schema->getId()] = $schema->getSlug();
+                $this->mappings['schema']['slugToId'][$schema->getSlug()] = $schema->getId();
+            }
         }
     }
 
@@ -443,7 +526,7 @@ class ConfigurationService
             $endpoints = $this->endpointMapper->getByTarget(registerId: $registerId);
             foreach ($endpoints as $endpoint) {
                 $endpointIds[] = $endpoint->getId();
-                
+
                 // Collect related IDs
                 if ($endpoint->getInputMapping() !== null) {
                     $mappingIds[] = $endpoint->getInputMapping();
@@ -455,12 +538,17 @@ class ConfigurationService
                     $sourceIds[] = $endpoint->getTargetId();
                 }
                 
+                // Collect register and schema IDs from register/schema type targets
+                if ($endpoint->getTargetType() === 'register/schema' && str_contains($endpoint->getTargetId(), '/')) {
+                    [$targetRegisterId, $targetSchemaId] = explode('/', $endpoint->getTargetId());
+                    $registerIds[] = $targetRegisterId;
+                    $schemaIds[] = $targetSchemaId;
+                }
+                
                 // Check if endpoint has rules and collect rule IDs
                 if (property_exists($endpoint, 'rules') && is_array($endpoint->getRules())) {
                     $ruleIds = array_merge($ruleIds, $endpoint->getRules());
                 }
-                
-                $components['components']['endpoints'][$endpoint->getSlug()] = $this->exportEndpoint($endpoint);
             }
         }
 
@@ -473,7 +561,7 @@ class ConfigurationService
             );
             foreach ($synchronizations as $synchronization) {
                 $synchronizationIds[] = $synchronization->getId();
-                
+
                 // Collect related IDs
                 if ($synchronization->getSourceTargetMapping() !== null) {
                     $mappingIds[] = $synchronization->getSourceTargetMapping();
@@ -487,13 +575,23 @@ class ConfigurationService
                 if ($synchronization->getTargetType() === 'api') {
                     $sourceIds[] = $synchronization->getTargetId();
                 }
+                
+                // Collect register and schema IDs from register/schema type sources and targets
+                if ($synchronization->getSourceType() === 'register/schema' && str_contains($synchronization->getSourceId(), '/')) {
+                    [$sourceRegisterId, $sourceSchemaId] = explode('/', $synchronization->getSourceId());
+                    $registerIds[] = $sourceRegisterId;
+                    $schemaIds[] = $sourceSchemaId;
+                }
+                if ($synchronization->getTargetType() === 'register/schema' && str_contains($synchronization->getTargetId(), '/')) {
+                    [$targetRegisterId, $targetSchemaId] = explode('/', $synchronization->getTargetId());
+                    $registerIds[] = $targetRegisterId;
+                    $schemaIds[] = $targetSchemaId;
+                }
+                
                 // Check if synchronization has actions and collect rule IDs
                 if (property_exists($synchronization, 'actions') && is_array($synchronization->getActions())) {
                     $ruleIds = array_merge($ruleIds, $synchronization->getActions());
                 }
-                
-
-                $components['components']['synchronizations'][$synchronization->getSlug()] = $this->exportSynchronization($synchronization);
             }
         }
 
@@ -506,19 +604,29 @@ class ConfigurationService
         $registerIds = array_filter(array_unique($registerIds));
         $schemaIds = array_filter(array_unique($schemaIds));
 
-
-        // Build initial ID to slug maps for registers and schemas
+        // Build initial ID to slug maps for registers and schemas BEFORE exporting entities
         $this->buildRegisterAndSchemaMappings($registerIds, $schemaIds);
-
-        // Batch fetch and export related entities
-        if (!empty($mappingIds)) {
-            $mappings = $this->mappingMapper->findAll(ids: ['id' => $mappingIds]);
-            $indexedMappings = [];
-            foreach ($mappings as $mapping) {
-                $indexedMappings[$mapping->getSlug()] = $this->exportMapping($mapping);
+        
+        // Re-export synchronizations now that we have the register/schema mappings
+        if ($includeSynchronizations) {
+            $synchronizations = $this->synchronizationMapper->getByTarget(
+                registerId: $registerId,
+                searchSource: $searchSource,
+                searchTarget: $searchTarget
+            );
+            foreach ($synchronizations as $synchronization) {
+                $components['components']['synchronizations'][$synchronization->getSlug()] = $this->exportSynchronization($synchronization);
             }
-            $components['components']['mappings'] = $indexedMappings;
         }
+        
+        // Re-export endpoints now that we have the register/schema mappings
+        if ($includeEndpoints) {
+            $endpoints = $this->endpointMapper->getByTarget(registerId: $registerId);
+            foreach ($endpoints as $endpoint) {
+                $components['components']['endpoints'][$endpoint->getSlug()] = $this->exportEndpoint($endpoint);
+            }
+        }
+
 
         if (!empty($sourceIds)) {
             $sources = $this->sourceMapper->findAll(ids: ['id' => $sourceIds]);
@@ -533,10 +641,44 @@ class ConfigurationService
             $rules = $this->ruleMapper->findAll(ids: ['id' => $ruleIds]);
             $indexedRules = [];
             foreach ($rules as $rule) {
-                $indexedRules[$rule->getSlug()] = $this->exportRule($rule);
+                $indexedRules[$rule->getSlug()] = $this->exportRule($rule, $mappingIds, $mappingIds);
             }
             $components['components']['rules'] = $indexedRules;
         }
+
+		$mappingIds = array_map(function(string|int$mappingId) {
+			if (is_int($mappingId)) {
+				return $mappingId;
+			}
+
+			return (int) $mappingId;
+		}, $mappingIds);
+
+		// Batch fetch and export related entities
+		if (!empty($mappingIds)) {
+			$mappings = $this->mappingMapper->findAll(ids: ['id' => $mappingIds]);
+			$indexedMappings = [];
+			$additionalMappingIds = [];
+			foreach ($mappings as $mapping) {
+				$indexedMappings[$mapping->getSlug()] = $this->exportMapping($mapping, $additionalMappingIds);
+			}
+			$components['components']['mappings'] = $indexedMappings;
+		}
+
+		while (empty($additionalMappingIds) === false) {
+			$additionalMappings = $this->mappingMapper->findAll(ids: ['id' => $additionalMappingIds]);
+			$additionalMappingIds = [];
+			$indexedAdditionalMappings = array_combine(
+				array_map(function(Mapping $mapping) {
+					return $mapping->getSlug();
+					}, $additionalMappings),
+				array_map(function (Mapping $mapping) use ($additionalMappingIds){
+					return $this->exportMapping($mapping, $additionalMappingIds);
+				}, $additionalMappings));
+
+			$components['components']['mappings'] = array_merge($components['components']['mappings'], $indexedAdditionalMappings);
+		}
+
         // Get and export related jobs
         if (!empty($endpointIds) || !empty($synchronizationIds) || !empty($sourceIds)) {
             $jobs = $this->jobMapper->findByArgumentIds(
@@ -546,7 +688,12 @@ class ConfigurationService
             );
             $indexedJobs = [];
             foreach ($jobs as $job) {
-                $indexedJobs[$job->getSlug()] = $this->exportJob($job);
+                $slug = $job->getSlug();
+                if (empty($slug)) {
+                    // Generate slug if not set
+                    $slug = 'job-' . $job->getId();
+                }
+                $indexedJobs[$slug] = $this->exportJob($job);
             }
             $components['components']['jobs'] = $indexedJobs;
         }
@@ -643,4 +790,4 @@ class ConfigurationService
 
         return $result;
     }
-} 
+}

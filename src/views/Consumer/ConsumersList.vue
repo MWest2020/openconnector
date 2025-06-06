@@ -12,7 +12,7 @@ import { consumerStore, navigationStore, searchStore } from '../../store/store.j
 					label="Search"
 					class="searchField"
 					trailing-button-icon="close"
-					@trailing-button-click="consumerStore.refreshConsumerList()">
+					@trailing-button-click="searchStore.clearSearch()">
 					<Magnify :size="20" />
 				</NcTextField>
 				<NcActions>
@@ -31,7 +31,7 @@ import { consumerStore, navigationStore, searchStore } from '../../store/store.j
 				</NcActions>
 			</div>
 			<div v-if="consumerStore.consumerList && consumerStore.consumerList.length > 0">
-				<NcListItem v-for="(consumer, i) in consumerStore.consumerList"
+				<NcListItem v-for="(consumer, i) in consumerStore.consumerList.filter(consumer => searchStore.search === '' || consumer.name.toLowerCase().includes(searchStore.search.toLowerCase()))"
 					:key="`${consumer}${i}`"
 					:name="consumer.name"
 					:active="consumerStore.consumerItem?.id === consumer?.id"
@@ -102,6 +102,7 @@ export default {
 		TrashCanOutline,
 	},
 	mounted() {
+		searchStore.clearSearch()
 		consumerStore.refreshConsumerList()
 	},
 }

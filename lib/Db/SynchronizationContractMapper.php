@@ -383,6 +383,39 @@ class SynchronizationContractMapper extends QBMapper
     }
 
     /**
+     * Get total count of synchronization contracts with optional filters
+     *
+     * @param array $filters Optional filters to apply
+     * @return int Total number of contracts matching filters
+     */
+    public function getTotalCount(array $filters = []): int
+    {
+        // Create query builder
+        $qb = $this->db->getQueryBuilder();
+
+        // Build count query
+        $qb->select($qb->createFunction('COUNT(*) as count'))
+           ->from('openconnector_synchronization_contracts');
+
+        // Add filters if provided
+        foreach ($filters as $filter => $value) {
+            if ($value === 'IS NOT NULL') {
+                $qb->andWhere($qb->expr()->isNotNull($filter));
+            } elseif ($value === 'IS NULL') {
+                $qb->andWhere($qb->expr()->isNull($filter));
+            } else {
+                $qb->andWhere($qb->expr()->eq($filter, $qb->createNamedParameter($value)));
+            }
+        }
+
+        $result = $qb->executeQuery();
+        $row = $result->fetch();
+        $result->closeCursor();
+
+        return (int)$row['count'];
+    }
+
+    /**
      * Handle object removal by updating or removing associated contracts
      *
      * This method finds all contracts associated with the given object identifier,
