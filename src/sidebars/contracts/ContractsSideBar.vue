@@ -1,5 +1,5 @@
 <script setup>
-import { contractStore, synchronizationStore } from '../../store/store.js'
+import { synchronizationStore } from '../../store/store.js'
 </script>
 
 <template>
@@ -108,13 +108,10 @@ import { contractStore, synchronizationStore } from '../../store/store.js'
 <script>
 import {
 	NcSelect,
-	NcTextField,
 	NcButton,
 	NcLoadingIcon,
 	NcDateTimePickerNative,
 } from '@nextcloud/vue'
-import Play from 'vue-material-design-icons/Play.vue'
-import Pause from 'vue-material-design-icons/Pause.vue'
 import Download from 'vue-material-design-icons/Download.vue'
 import Delete from 'vue-material-design-icons/Delete.vue'
 
@@ -122,12 +119,9 @@ export default {
 	name: 'ContractsSideBar',
 	components: {
 		NcSelect,
-		NcTextField,
 		NcButton,
 		NcLoadingIcon,
 		NcDateTimePickerNative,
-		Play,
-		Pause,
 		Download,
 		Delete,
 	},

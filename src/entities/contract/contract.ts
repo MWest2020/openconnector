@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { SafeParseReturnType, z } from 'zod'
 import { TContract } from './contract.types'
 import getValidISOstring from '../../services/getValidISOstring.js'

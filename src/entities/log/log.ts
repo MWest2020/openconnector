@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { SafeParseReturnType, z } from 'zod'
 import { TLog } from './log.types'
 import ReadonlyBaseClass from '../ReadonlyBaseClass.js'
