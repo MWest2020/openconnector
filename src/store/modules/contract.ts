@@ -1,4 +1,5 @@
-import { ref, computed } from 'vue'
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { ref } from 'vue'
 import { defineStore } from 'pinia'
 import { Contract, TContract } from '../../entities/index.js'
 

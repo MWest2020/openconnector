@@ -170,8 +170,6 @@ import {
 	NcDateTime,
 } from '@nextcloud/vue'
 import FileDocumentOutline from 'vue-material-design-icons/FileDocumentOutline.vue'
-import Play from 'vue-material-design-icons/Play.vue'
-import Pause from 'vue-material-design-icons/Pause.vue'
 import Refresh from 'vue-material-design-icons/Refresh.vue'
 import PlayCircle from 'vue-material-design-icons/PlayCircle.vue'
 import TextBoxOutline from 'vue-material-design-icons/TextBoxOutline.vue'
@@ -189,8 +187,6 @@ export default {
 		NcActionButton,
 		NcDateTime,
 		FileDocumentOutline,
-		Play,
-		Pause,
 		Refresh,
 		PlayCircle,
 		TextBoxOutline,

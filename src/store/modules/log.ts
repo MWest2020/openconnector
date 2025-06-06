@@ -1,4 +1,4 @@
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 import { defineStore } from 'pinia'
 import { Log, TLog } from '../../entities/index.js'
 import { MissingParameterError } from '../../services/errors/index.js'
