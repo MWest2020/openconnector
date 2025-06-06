@@ -12,7 +12,7 @@ import { jobStore, navigationStore, searchStore } from '../../store/store.js'
 					label="Search"
 					class="searchField"
 					trailing-button-icon="close"
-					@trailing-button-click="jobStore.refreshJobList()">
+					@trailing-button-click="searchStore.clearSearch()">
 					<Magnify :size="20" />
 				</NcTextField>
 				<NcActions>
@@ -37,7 +37,7 @@ import { jobStore, navigationStore, searchStore } from '../../store/store.js'
 				</NcActions>
 			</div>
 			<div v-if="jobStore.jobList && jobStore.jobList.length > 0">
-				<NcListItem v-for="(job, i) in jobStore.jobList"
+				<NcListItem v-for="(job, i) in jobStore.jobList.filter(job => searchStore.search === '' || job.name.toLowerCase().includes(searchStore.search.toLowerCase()))"
 					:key="`${job}${i}`"
 					:name="job.name"
 					:active="jobStore.jobItem?.id === job?.id"
@@ -145,6 +145,7 @@ export default {
 		TrashCanOutline,
 	},
 	mounted() {
+		searchStore.clearSearch()
 		jobStore.refreshJobList()
 	},
 }

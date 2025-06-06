@@ -12,7 +12,7 @@ import { mappingStore, navigationStore, searchStore } from '../../store/store.js
 					label="Search"
 					class="searchField"
 					trailing-button-icon="close"
-					@trailing-button-click="mappingStore.refreshMappingList()">
+					@trailing-button-click="searchStore.clearSearch()">
 					<Magnify :size="20" />
 				</NcTextField>
 				<NcActions>
@@ -37,7 +37,7 @@ import { mappingStore, navigationStore, searchStore } from '../../store/store.js
 				</NcActions>
 			</div>
 			<div v-if="mappingStore.mappingList && mappingStore.mappingList.length > 0">
-				<NcListItem v-for="(mapping, i) in mappingStore.mappingList"
+				<NcListItem v-for="(mapping, i) in mappingStore.mappingList.filter(mapping => searchStore.search === '' || mapping.name.toLowerCase().includes(searchStore.search.toLowerCase()))"
 					:key="`${mapping}${i}`"
 					:name="mapping.name"
 					:active="mappingStore.mappingItem?.id === mapping?.id"
@@ -122,6 +122,7 @@ export default {
 		TrashCanOutline,
 	},
 	mounted() {
+		searchStore.clearSearch()
 		mappingStore.refreshMappingList()
 	},
 }

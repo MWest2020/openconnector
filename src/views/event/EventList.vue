@@ -12,7 +12,7 @@ import { eventStore, navigationStore, searchStore } from '../../store/store.js'
 					label="Search"
 					class="searchField"
 					trailing-button-icon="close"
-					@trailing-button-click="eventStore.refreshEventList()">
+					@trailing-button-click="searchStore.clearSearch()">
 					<Magnify :size="20" />
 				</NcTextField>
 				<NcActions>
@@ -31,7 +31,7 @@ import { eventStore, navigationStore, searchStore } from '../../store/store.js'
 				</NcActions>
 			</div>
 			<div v-if="eventStore.eventList && eventStore.eventList.length > 0">
-				<NcListItem v-for="(event, i) in eventStore.eventList"
+				<NcListItem v-for="(event, i) in eventStore.eventList.filter(event => searchStore.search === '' || event.name.toLowerCase().includes(searchStore.search.toLowerCase()))"
 					:key="`${event}${i}`"
 					:name="event.name"
 					:active="eventStore.eventItem?.id === event?.id"
@@ -101,6 +101,7 @@ export default {
 		TrashCanOutline,
 	},
 	mounted() {
+		searchStore.clearSearch()
 		eventStore.refreshEventList()
 	},
 }

@@ -12,7 +12,7 @@ import { ruleStore, navigationStore, searchStore } from '../../store/store.js'
 					label="Search"
 					class="searchField"
 					trailing-button-icon="close"
-					@trailing-button-click="ruleStore.refreshRuleList()">
+					@trailing-button-click="searchStore.clearSearch()">
 					<Magnify :size="20" />
 				</NcTextField>
 				<NcActions>
@@ -37,7 +37,7 @@ import { ruleStore, navigationStore, searchStore } from '../../store/store.js'
 				</NcActions>
 			</div>
 			<div v-if="ruleStore.ruleList && ruleStore.ruleList.length > 0">
-				<NcListItem v-for="(rule, i) in ruleStore.ruleList"
+				<NcListItem v-for="(rule, i) in ruleStore.ruleList.filter(rule => searchStore.search === '' || rule.name.toLowerCase().includes(searchStore.search.toLowerCase()))"
 					:key="`${rule}${i}`"
 					:name="rule.name"
 					:active="ruleStore.ruleItem?.id === rule?.id"
@@ -116,6 +116,7 @@ export default {
 		FileImportOutline,
 	},
 	mounted() {
+		searchStore.clearSearch()
 		ruleStore.refreshRuleList()
 	},
 }
