@@ -16,13 +16,13 @@ import { eventStore, navigationStore, searchStore } from '../../store/store.js'
 					<Magnify :size="20" />
 				</NcTextField>
 				<NcActions>
-					<NcActionButton @click="eventStore.refreshEventList()">
+					<NcActionButton close-after-click @click="eventStore.refreshEventList()">
 						<template #icon>
 							<Refresh :size="20" />
 						</template>
 						Refresh
 					</NcActionButton>
-					<NcActionButton @click="eventStore.setEventItem(null); navigationStore.setModal('editEvent')">
+					<NcActionButton close-after-click @click="eventStore.setEventItem(null); navigationStore.setModal('editEvent')">
 						<template #icon>
 							<Plus :size="20" />
 						</template>
@@ -46,13 +46,13 @@ import { eventStore, navigationStore, searchStore } from '../../store/store.js'
 						{{ event?.description }}
 					</template>
 					<template #actions>
-						<NcActionButton @click="eventStore.setEventItem(event); navigationStore.setModal('editEvent')">
+						<NcActionButton close-after-click @click="eventStore.setEventItem(event); navigationStore.setModal('editEvent')">
 							<template #icon>
 								<Pencil />
 							</template>
 							Edit
 						</NcActionButton>
-						<NcActionButton @click="eventStore.setEventItem(event); navigationStore.setDialog('deleteEvent')">
+						<NcActionButton close-after-click @click="eventStore.setEventItem(event); navigationStore.setDialog('deleteEvent')">
 							<template #icon>
 								<TrashCanOutline />
 							</template>

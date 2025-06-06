@@ -103,19 +103,19 @@ import { contractStore, synchronizationStore, navigationStore } from '../../stor
 							</td>
 							<td class="actions-column">
 								<NcActions>
-									<NcActionButton @click="enforceContract(item)">
+									<NcActionButton close-after-click @click="enforceContract(item)">
 										<template #icon>
 											<PlayCircle :size="20" />
 										</template>
 										{{ t('openconnector', 'Enforce Contract') }}
 									</NcActionButton>
-									<NcActionButton @click="viewLogs(item)">
+									<NcActionButton close-after-click @click="viewLogs(item)">
 										<template #icon>
 											<TextBoxOutline :size="20" />
 										</template>
 										{{ t('openconnector', 'View Logs') }}
 									</NcActionButton>
-									<NcActionButton @click="deleteContract(item)">
+									<NcActionButton close-after-click @click="deleteContract(item)">
 										<template #icon>
 											<Delete :size="20" />
 										</template>

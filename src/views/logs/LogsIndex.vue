@@ -129,19 +129,19 @@ import { logStore, contractStore, synchronizationStore, navigationStore } from '
 							</td>
 							<td class="actions-column">
 								<NcActions>
-									<NcActionButton @click="viewFullLog(item)">
+									<NcActionButton close-after-click @click="viewFullLog(item)">
 										<template #icon>
 											<OpenInNew :size="20" />
 										</template>
 										{{ t('openconnector', 'View Full Log') }}
 									</NcActionButton>
-									<NcActionButton v-if="item.synchronizationId" @click="viewSynchronization(item)">
+									<NcActionButton v-if="item.synchronizationId" close-after-click @click="viewSynchronization(item)">
 										<template #icon>
 											<FileDocumentOutline :size="20" />
 										</template>
 										{{ t('openconnector', 'View Synchronization') }}
 									</NcActionButton>
-									<NcActionButton @click="deleteLog(item)">
+									<NcActionButton close-after-click @click="deleteLog(item)">
 										<template #icon>
 											<Delete :size="20" />
 										</template>
