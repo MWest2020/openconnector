@@ -73,7 +73,7 @@ import { sourceStore, navigationStore, searchStore } from '../../store/store.js'
 							<template #icon>
 								<Plus :size="20" />
 							</template>
-							Add Configuration
+							Add configuration
 						</NcActionButton>
 						<NcActionButton close-after-click
 							@click="() => {
@@ -84,7 +84,7 @@ import { sourceStore, navigationStore, searchStore } from '../../store/store.js'
 							<template #icon>
 								<Plus :size="20" />
 							</template>
-							Add Authentication
+							Add authentication
 						</NcActionButton>
 						<NcActionButton close-after-click @click="sourceStore.exportSource(source.id)">
 							<template #icon>
@@ -107,10 +107,10 @@ import { sourceStore, navigationStore, searchStore } from '../../store/store.js'
 			class="loadingIcon"
 			:size="64"
 			appearance="dark"
-			name="Bronnen aan het laden" />
+			name="Loading sources" />
 
 		<div v-if="!sourceStore.sourceList.length" class="emptyListHeader">
-			No sources defined.
+			No sources defined
 		</div>
 	</NcAppContentList>
 </template>

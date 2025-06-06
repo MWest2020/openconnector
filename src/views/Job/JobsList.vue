@@ -67,7 +67,7 @@ import { jobStore, navigationStore, searchStore } from '../../store/store.js'
 							<template #icon>
 								<Plus :size="20" />
 							</template>
-							Add Argument
+							Add argument
 						</NcActionButton>
 						<NcActionButton close-after-click @click="jobStore.setJobItem(job); navigationStore.setModal('testJob')">
 							<template #icon>
@@ -85,7 +85,7 @@ import { jobStore, navigationStore, searchStore } from '../../store/store.js'
 							<template #icon>
 								<Sync :size="20" />
 							</template>
-							Refresh Logs
+							Refresh logs
 						</NcActionButton>
 						<NcActionButton close-after-click @click="jobStore.exportJob(job.id)">
 							<template #icon>
@@ -108,10 +108,10 @@ import { jobStore, navigationStore, searchStore } from '../../store/store.js'
 			class="loadingIcon"
 			:size="64"
 			appearance="dark"
-			name="Taken aan het laden" />
+			name="Loading jobs" />
 
 		<div v-if="!jobStore.jobList.length" class="emptyListHeader">
-			No jobs defined.
+			No jobs defined
 		</div>
 	</NcAppContentList>
 </template>
