@@ -91,24 +91,27 @@ import { logStore, navigationStore } from '../../store/store.js'
 								Copy to clipboard
 							</NcActionButton>
 						</NcActions>
-				<div class="responseBody">
-					<span class="responseBodyLabel">body</span>
-					<div class="responseBodyContent">
-						<div v-if="isValidJson(responseItems.body)" class="responseBodyJson">
-							<NcActions class="responseBodyJsonActions">
-								<NcActionButton close-after-click @click="copyToClipboard(JSON.stringify(JSON.parse(responseItems.body), null, 2))">
-									<template #icon>
-										<ContentCopy :size="20" />
-									</template>
-									Copy to clipboard
-								</NcActionButton>
-							</NcActions>
+						<div class="responseBody">
+							<span class="responseBodyLabel">body</span>
+							<div class="responseBodyContent">
+								<div v-if="isValidJson(responseItems.body)" class="responseBodyJson">
+									<NcActions class="responseBodyJsonActions">
+										<NcActionButton close-after-click @click="copyToClipboard(JSON.stringify(JSON.parse(responseItems.body), null, 2))">
+											<template #icon>
+												<ContentCopy :size="20" />
+											</template>
+											Copy to clipboard
+										</NcActionButton>
+									</NcActions>
 
-							{{ JSON.stringify(JSON.parse(responseItems.body), null, 2) }}
+									{{ JSON.stringify(JSON.parse(responseItems.body), null, 2) }}
+								</div>
+								<div v-else>
+									{{ responseItems.body }}
+								</div>
+							</div>
 						</div>
-						<div v-else>
-							{{ responseItems.body }}
-						</div>
+					</div>
 				</div>
 			</div>
 		</div>
