@@ -12,7 +12,7 @@ import { contractStore, synchronizationStore } from '../../store/store.js'
 		<!-- Filters Section -->
 		<div class="section">
 			<h4>{{ t('openconnector', 'Filters') }}</h4>
-			
+
 			<!-- Synchronization Filter -->
 			<div class="filter-group">
 				<label>{{ t('openconnector', 'Synchronization') }}</label>
@@ -187,7 +187,7 @@ export default {
 	beforeDestroy() {
 		this.$root.$off('contracts-selection-count')
 		this.$root.$off('contracts-filtered-count')
-		
+
 		if (this.debounceTimer) {
 			clearTimeout(this.debounceTimer)
 		}
@@ -445,4 +445,4 @@ export default {
 	text-align: right;
 	font-weight: 500;
 }
-</style> 
+</style>

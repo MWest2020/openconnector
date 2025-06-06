@@ -70,7 +70,7 @@ import { logStore, navigationStore } from '../../store/store.js'
 					<div class="responseBodyContent">
 						<div v-if="isValidJson(responseItems.body)" class="responseBodyJson">
 							<NcActions class="responseBodyJsonActions">
-								<NcActionButton @click="copyToClipboard(JSON.stringify(JSON.parse(responseItems.body), null, 2))">
+								<NcActionButton close-after-click @click="copyToClipboard(JSON.stringify(JSON.parse(responseItems.body), null, 2))">
 									<template #icon>
 										<ContentCopy :size="20" />
 									</template>

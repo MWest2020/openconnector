@@ -16,19 +16,19 @@ import { synchronizationStore, navigationStore, searchStore } from '../../store/
 					<Magnify :size="20" />
 				</NcTextField>
 				<NcActions>
-					<NcActionButton @click="synchronizationStore.refreshSynchronizationList()">
+					<NcActionButton close-after-click @click="synchronizationStore.refreshSynchronizationList()">
 						<template #icon>
 							<Refresh :size="20" />
 						</template>
 						Refresh
 					</NcActionButton>
-					<NcActionButton @click="synchronizationStore.setSynchronizationItem(null); navigationStore.setModal('editSynchronization')">
+					<NcActionButton close-after-click @click="synchronizationStore.setSynchronizationItem(null); navigationStore.setModal('editSynchronization')">
 						<template #icon>
 							<Plus :size="20" />
 						</template>
 						Add synchronization
 					</NcActionButton>
-					<NcActionButton @click="navigationStore.setModal('importFile')">
+					<NcActionButton close-after-click @click="navigationStore.setModal('importFile')">
 						<template #icon>
 							<FileImportOutline :size="20" />
 						</template>
@@ -52,51 +52,53 @@ import { synchronizationStore, navigationStore, searchStore } from '../../store/
 						{{ synchronization?.description }}
 					</template>
 					<template #actions>
-						<NcActionButton @click="synchronizationStore.setSynchronizationItem(synchronization); navigationStore.setModal('editSynchronization')">
+						<NcActionButton close-after-click @click="synchronizationStore.setSynchronizationItem(synchronization); navigationStore.setModal('editSynchronization')">
 							<template #icon>
 								<Pencil />
 							</template>
 							Edit
 						</NcActionButton>
-						<NcActionButton @click="() => {
-							synchronizationStore.setSynchronizationItem(synchronization)
-							synchronizationStore.setSynchronizationSourceConfigKey(null)
-							navigationStore.setModal('editSynchronizationSourceConfig')
-						}">
+						<NcActionButton close-after-click
+							@click="() => {
+								synchronizationStore.setSynchronizationItem(synchronization)
+								synchronizationStore.setSynchronizationSourceConfigKey(null)
+								navigationStore.setModal('editSynchronizationSourceConfig')
+							}">
 							<template #icon>
 								<DatabaseSettingsOutline :size="20" />
 							</template>
 							Add Source Config
 						</NcActionButton>
-						<NcActionButton @click="() => {
-							synchronizationStore.setSynchronizationItem(synchronization)
-							synchronizationStore.setSynchronizationTargetConfigKey(null)
-							navigationStore.setModal('editSynchronizationTargetConfig')
-						}">
+						<NcActionButton close-after-click
+							@click="() => {
+								synchronizationStore.setSynchronizationItem(synchronization)
+								synchronizationStore.setSynchronizationTargetConfigKey(null)
+								navigationStore.setModal('editSynchronizationTargetConfig')
+							}">
 							<template #icon>
 								<CardBulletedSettingsOutline :size="20" />
 							</template>
 							Add Target Config
 						</NcActionButton>
-						<NcActionButton @click="synchronizationStore.setSynchronizationItem(synchronization); navigationStore.setModal('testSynchronization')">
+						<NcActionButton close-after-click @click="synchronizationStore.setSynchronizationItem(synchronization); navigationStore.setModal('testSynchronization')">
 							<template #icon>
 								<Sync :size="20" />
 							</template>
 							Test
 						</NcActionButton>
-						<NcActionButton @click="synchronizationStore.setSynchronizationItem(synchronization); navigationStore.setModal('runSynchronization')">
+						<NcActionButton close-after-click @click="synchronizationStore.setSynchronizationItem(synchronization); navigationStore.setModal('runSynchronization')">
 							<template #icon>
 								<Play :size="20" />
 							</template>
 							Run
 						</NcActionButton>
-						<NcActionButton @click="synchronizationStore.exportSynchronization(synchronization.id)">
+						<NcActionButton close-after-click @click="synchronizationStore.exportSynchronization(synchronization.id)">
 							<template #icon>
 								<FileExportOutline :size="20" />
 							</template>
 							Export synchronization
 						</NcActionButton>
-						<NcActionButton @click="synchronizationStore.setSynchronizationItem(synchronization); navigationStore.setDialog('deleteSynchronization')">
+						<NcActionButton close-after-click @click="synchronizationStore.setSynchronizationItem(synchronization); navigationStore.setDialog('deleteSynchronization')">
 							<template #icon>
 								<TrashCanOutline />
 							</template>

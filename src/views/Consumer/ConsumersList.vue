@@ -16,13 +16,13 @@ import { consumerStore, navigationStore, searchStore } from '../../store/store.j
 					<Magnify :size="20" />
 				</NcTextField>
 				<NcActions>
-					<NcActionButton @click="consumerStore.refreshConsumerList()">
+					<NcActionButton close-after-click @click="consumerStore.refreshConsumerList()">
 						<template #icon>
 							<Refresh :size="20" />
 						</template>
 						Ververs
 					</NcActionButton>
-					<NcActionButton @click="consumerStore.setConsumerItem(null); navigationStore.setModal('editConsumer')">
+					<NcActionButton close-after-click @click="consumerStore.setConsumerItem(null); navigationStore.setModal('editConsumer')">
 						<template #icon>
 							<Plus :size="20" />
 						</template>
@@ -46,13 +46,13 @@ import { consumerStore, navigationStore, searchStore } from '../../store/store.j
 						{{ consumer?.description }}
 					</template>
 					<template #actions>
-						<NcActionButton @click="consumerStore.setConsumerItem(consumer); navigationStore.setModal('editConsumer')">
+						<NcActionButton close-after-click @click="consumerStore.setConsumerItem(consumer); navigationStore.setModal('editConsumer')">
 							<template #icon>
 								<Pencil />
 							</template>
 							Bewerken
 						</NcActionButton>
-						<NcActionButton @click="consumerStore.setConsumerItem(consumer); navigationStore.setDialog('deleteConsumer')">
+						<NcActionButton close-after-click @click="consumerStore.setConsumerItem(consumer); navigationStore.setDialog('deleteConsumer')">
 							<template #icon>
 								<TrashCanOutline />
 							</template>

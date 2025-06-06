@@ -93,8 +93,8 @@ import { contractStore, synchronizationStore, navigationStore } from '../../stor
 								</span>
 							</td>
 							<td>
-								<NcDateTime v-if="item.getLastSyncDate && item.getLastSyncDate()" 
-									:timestamp="new Date(item.getLastSyncDate())" 
+								<NcDateTime v-if="item.getLastSyncDate && item.getLastSyncDate()"
+									:timestamp="new Date(item.getLastSyncDate())"
 									:ignore-seconds="true" />
 								<span v-else>{{ t('openconnector', 'Never') }}</span>
 							</td>
@@ -103,19 +103,19 @@ import { contractStore, synchronizationStore, navigationStore } from '../../stor
 							</td>
 							<td class="actions-column">
 								<NcActions>
-									<NcActionButton @click="enforceContract(item)">
+									<NcActionButton close-after-click @click="enforceContract(item)">
 										<template #icon>
 											<PlayCircle :size="20" />
 										</template>
 										{{ t('openconnector', 'Enforce Contract') }}
 									</NcActionButton>
-									<NcActionButton @click="viewLogs(item)">
+									<NcActionButton close-after-click @click="viewLogs(item)">
 										<template #icon>
 											<TextBoxOutline :size="20" />
 										</template>
 										{{ t('openconnector', 'View Logs') }}
 									</NcActionButton>
-									<NcActionButton @click="deleteContract(item)">
+									<NcActionButton close-after-click @click="deleteContract(item)">
 										<template #icon>
 											<Delete :size="20" />
 										</template>
@@ -299,7 +299,7 @@ export default {
 			try {
 				await contractStore.fetchContracts({
 					page: 1,
-					filters: filters,
+					filters,
 				})
 
 				// Clear selection when filters change
@@ -334,16 +334,16 @@ export default {
 		 */
 		getSyncStatusType(status) {
 			switch (status) {
-				case 'synced':
-					return 'success'
-				case 'stale':
-					return 'warning'
-				case 'unsynced':
-					return 'secondary'
-				case 'error':
-					return 'error'
-				default:
-					return 'secondary'
+			case 'synced':
+				return 'success'
+			case 'stale':
+				return 'warning'
+			case 'unsynced':
+				return 'secondary'
+			case 'error':
+				return 'error'
+			default:
+				return 'secondary'
 			}
 		},
 		/**
@@ -353,16 +353,16 @@ export default {
 		 */
 		getSyncStatusLabel(status) {
 			switch (status) {
-				case 'synced':
-					return t('openconnector', 'Synced')
-				case 'stale':
-					return t('openconnector', 'Stale')
-				case 'unsynced':
-					return t('openconnector', 'Unsynced')
-				case 'error':
-					return t('openconnector', 'Error')
-				default:
-					return t('openconnector', 'Unknown')
+			case 'synced':
+				return t('openconnector', 'Synced')
+			case 'stale':
+				return t('openconnector', 'Stale')
+			case 'unsynced':
+				return t('openconnector', 'Unsynced')
+			case 'error':
+				return t('openconnector', 'Error')
+			default:
+				return t('openconnector', 'Unknown')
 			}
 		},
 		/**
@@ -372,19 +372,19 @@ export default {
 		 */
 		getLastActionLabel(action) {
 			switch (action) {
-				case 'create':
-				case 'created':
-					return t('openconnector', 'Created')
-				case 'update':
-				case 'updated':
-					return t('openconnector', 'Updated')
-				case 'delete':
-				case 'deleted':
-					return t('openconnector', 'Deleted')
-				case 'insert':
-					return t('openconnector', 'Inserted')
-				default:
-					return t('openconnector', 'None')
+			case 'create':
+			case 'created':
+				return t('openconnector', 'Created')
+			case 'update':
+			case 'updated':
+				return t('openconnector', 'Updated')
+			case 'delete':
+			case 'deleted':
+				return t('openconnector', 'Deleted')
+			case 'insert':
+				return t('openconnector', 'Inserted')
+			default:
+				return t('openconnector', 'None')
 			}
 		},
 		/**
@@ -727,4 +727,4 @@ export default {
 	font-size: 0.75rem;
 	font-weight: 500;
 }
-</style> 
+</style>

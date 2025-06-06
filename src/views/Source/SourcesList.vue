@@ -16,19 +16,19 @@ import { sourceStore, navigationStore, searchStore } from '../../store/store.js'
 					<Magnify :size="20" />
 				</NcTextField>
 				<NcActions>
-					<NcActionButton @click="sourceStore.refreshSourceList()">
+					<NcActionButton close-after-click @click="sourceStore.refreshSourceList()">
 						<template #icon>
 							<Refresh :size="20" />
 						</template>
 						Refresh
 					</NcActionButton>
-					<NcActionButton @click="sourceStore.setSourceItem({}); navigationStore.setModal('editSource')">
+					<NcActionButton close-after-click @click="sourceStore.setSourceItem({}); navigationStore.setModal('editSource')">
 						<template #icon>
 							<Plus :size="20" />
 						</template>
 						Add source
 					</NcActionButton>
-					<NcActionButton @click="navigationStore.setModal('importFile')">
+					<NcActionButton close-after-click @click="navigationStore.setModal('importFile')">
 						<template #icon>
 							<FileImportOutline :size="20" />
 						</template>
@@ -52,45 +52,47 @@ import { sourceStore, navigationStore, searchStore } from '../../store/store.js'
 						{{ source?.description }}
 					</template>
 					<template #actions>
-						<NcActionButton @click="sourceStore.setSourceItem(source); navigationStore.setModal('editSource')">
+						<NcActionButton close-after-click @click="sourceStore.setSourceItem(source); navigationStore.setModal('editSource')">
 							<template #icon>
 								<Pencil />
 							</template>
 							Edit
 						</NcActionButton>
-						<NcActionButton @click="sourceStore.setSourceItem(source); navigationStore.setModal('testSource')">
+						<NcActionButton close-after-click @click="sourceStore.setSourceItem(source); navigationStore.setModal('testSource')">
 							<template #icon>
 								<Sync :size="20" />
 							</template>
 							Test
 						</NcActionButton>
-						<NcActionButton @click="() => {
-							sourceStore.setSourceItem(source)
-							sourceStore.setSourceConfigurationKey(null)
-							navigationStore.setModal('editSourceConfiguration')
-						}">
+						<NcActionButton close-after-click
+							@click="() => {
+								sourceStore.setSourceItem(source)
+								sourceStore.setSourceConfigurationKey(null)
+								navigationStore.setModal('editSourceConfiguration')
+							}">
 							<template #icon>
 								<Plus :size="20" />
 							</template>
 							Add Configuration
 						</NcActionButton>
-						<NcActionButton @click="() => {
-							sourceStore.setSourceItem(source)
-							sourceStore.setSourceConfigurationKey(null)
-							navigationStore.setModal('editSourceConfigurationAuthentication')
-						}">
+						<NcActionButton close-after-click
+							@click="() => {
+								sourceStore.setSourceItem(source)
+								sourceStore.setSourceConfigurationKey(null)
+								navigationStore.setModal('editSourceConfigurationAuthentication')
+							}">
 							<template #icon>
 								<Plus :size="20" />
 							</template>
 							Add Authentication
 						</NcActionButton>
-						<NcActionButton @click="sourceStore.exportSource(source.id)">
+						<NcActionButton close-after-click @click="sourceStore.exportSource(source.id)">
 							<template #icon>
 								<FileExportOutline :size="20" />
 							</template>
 							Export source
 						</NcActionButton>
-						<NcActionButton @click="sourceStore.setSourceItem(source); navigationStore.setDialog('deleteSource')">
+						<NcActionButton close-after-click @click="sourceStore.setSourceItem(source); navigationStore.setDialog('deleteSource')">
 							<template #icon>
 								<TrashCanOutline />
 							</template>

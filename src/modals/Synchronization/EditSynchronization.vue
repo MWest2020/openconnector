@@ -48,7 +48,7 @@ import { Synchronization } from '../../entities/index.js'
 					</div>
 					<div class="close-button">
 						<NcActions>
-							<NcActionButton @click="openRegisterCloseAlert = true">
+							<NcActionButton close-after-click @click="openRegisterCloseAlert = true">
 								<template #icon>
 									<Close :size="20" />
 								</template>

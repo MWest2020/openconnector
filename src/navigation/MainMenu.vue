@@ -53,8 +53,8 @@ import { navigationStore } from '../store/store.js'
 					</NcAppNavigationItem>
 				</template>
 			</NcAppNavigationItem>
-			<NcAppNavigationItem :active="navigationStore.selected === 'synchronizations'" 
-				name="Synchronization" 
+			<NcAppNavigationItem :active="navigationStore.selected === 'synchronizations'"
+				name="Synchronization"
 				:allow-collapse="true"
 				:open="true"
 				@click="navigationStore.setSelected('synchronizations')">

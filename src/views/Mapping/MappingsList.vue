@@ -16,19 +16,19 @@ import { mappingStore, navigationStore, searchStore } from '../../store/store.js
 					<Magnify :size="20" />
 				</NcTextField>
 				<NcActions>
-					<NcActionButton @click="mappingStore.refreshMappingList()">
+					<NcActionButton close-after-click @click="mappingStore.refreshMappingList()">
 						<template #icon>
 							<Refresh :size="20" />
 						</template>
 						Refresh
 					</NcActionButton>
-					<NcActionButton @click="mappingStore.setMappingItem({}); navigationStore.setModal('editMapping')">
+					<NcActionButton close-after-click @click="mappingStore.setMappingItem({}); navigationStore.setModal('editMapping')">
 						<template #icon>
 							<Plus :size="20" />
 						</template>
 						Add mapping
 					</NcActionButton>
-					<NcActionButton @click="navigationStore.setModal('importFile')">
+					<NcActionButton close-after-click @click="navigationStore.setModal('importFile')">
 						<template #icon>
 							<FileImportOutline :size="20" />
 						</template>
@@ -52,25 +52,25 @@ import { mappingStore, navigationStore, searchStore } from '../../store/store.js
 						{{ mapping?.description }}
 					</template>
 					<template #actions>
-						<NcActionButton @click="mappingStore.setMappingItem(mapping); navigationStore.setModal('editMapping')">
+						<NcActionButton close-after-click @click="mappingStore.setMappingItem(mapping); navigationStore.setModal('editMapping')">
 							<template #icon>
 								<Pencil />
 							</template>
 							Bewerken
 						</NcActionButton>
-						<NcActionButton @click="mappingStore.setMappingItem(mapping); navigationStore.setModal('testMapping')">
+						<NcActionButton close-after-click @click="mappingStore.setMappingItem(mapping); navigationStore.setModal('testMapping')">
 							<template #icon>
 								<TestTube :size="20" />
 							</template>
 							Test
 						</NcActionButton>
-						<NcActionButton @click="mappingStore.exportMapping(mapping.id)">
+						<NcActionButton close-after-click @click="mappingStore.exportMapping(mapping.id)">
 							<template #icon>
 								<FileExportOutline :size="20" />
 							</template>
 							Export mapping
 						</NcActionButton>
-						<NcActionButton @click="mappingStore.setMappingItem(mapping); navigationStore.setDialog('deleteMapping')">
+						<NcActionButton close-after-click @click="mappingStore.setMappingItem(mapping); navigationStore.setDialog('deleteMapping')">
 							<template #icon>
 								<TrashCanOutline />
 							</template>

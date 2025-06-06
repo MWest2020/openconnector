@@ -16,19 +16,19 @@ import { endpointStore, navigationStore, searchStore } from '../../store/store.j
 					<Magnify :size="20" />
 				</NcTextField>
 				<NcActions>
-					<NcActionButton @click="endpointStore.refreshEndpointList()">
+					<NcActionButton close-after-click @click="endpointStore.refreshEndpointList()">
 						<template #icon>
 							<Refresh :size="20" />
 						</template>
 						Refresh
 					</NcActionButton>
-					<NcActionButton @click="endpointStore.setEndpointItem(null); navigationStore.setModal('editEndpoint')">
+					<NcActionButton close-after-click @click="endpointStore.setEndpointItem(null); navigationStore.setModal('editEndpoint')">
 						<template #icon>
 							<Plus :size="20" />
 						</template>
 						Add endpoint
 					</NcActionButton>
-					<NcActionButton @click="navigationStore.setModal('importFile')">
+					<NcActionButton close-after-click @click="navigationStore.setModal('importFile')">
 						<template #icon>
 							<FileImportOutline :size="20" />
 						</template>
@@ -53,25 +53,25 @@ import { endpointStore, navigationStore, searchStore } from '../../store/store.j
 						{{ endpoint?.description }}
 					</template>
 					<template #actions>
-						<NcActionButton @click="endpointStore.setEndpointItem(endpoint); navigationStore.setModal('editEndpoint')">
+						<NcActionButton close-after-click @click="endpointStore.setEndpointItem(endpoint); navigationStore.setModal('editEndpoint')">
 							<template #icon>
 								<Pencil />
 							</template>
 							Bewerken
 						</NcActionButton>
-						<NcActionButton @click="endpointStore.exportEndpoint(endpoint.id)">
+						<NcActionButton close-after-click @click="endpointStore.exportEndpoint(endpoint.id)">
 							<template #icon>
 								<FileExportOutline :size="20" />
 							</template>
 							Export endpoint
 						</NcActionButton>
-						<NcActionButton @click="endpointStore.setEndpointItem(endpoint); navigationStore.setDialog('deleteEndpoint')">
+						<NcActionButton close-after-click @click="endpointStore.setEndpointItem(endpoint); navigationStore.setDialog('deleteEndpoint')">
 							<template #icon>
 								<TrashCanOutline />
 							</template>
 							Verwijderen
 						</NcActionButton>
-						<NcActionButton @click="endpointStore.setEndpointItem(endpoint); navigationStore.setModal('addEndpointRule')">
+						<NcActionButton close-after-click @click="endpointStore.setEndpointItem(endpoint); navigationStore.setModal('addEndpointRule')">
 							<template #icon>
 								<Plus :size="20" />
 							</template>

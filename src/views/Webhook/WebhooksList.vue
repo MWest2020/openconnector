@@ -16,13 +16,13 @@ import { webhookStore, navigationStore, searchStore } from '../../store/store.js
 					<Magnify :size="20" />
 				</NcTextField>
 				<NcActions>
-					<NcActionButton @click="webhookStore.refreshWebhookList()">
+					<NcActionButton close-after-click @click="webhookStore.refreshWebhookList()">
 						<template #icon>
 							<Refresh :size="20" />
 						</template>
 						Ververs
 					</NcActionButton>
-					<NcActionButton @click="webhookStore.setWebhookItem({}); navigationStore.setModal('editWebhook')">
+					<NcActionButton close-after-click @click="webhookStore.setWebhookItem({}); navigationStore.setModal('editWebhook')">
 						<template #icon>
 							<Plus :size="20" />
 						</template>
@@ -46,13 +46,13 @@ import { webhookStore, navigationStore, searchStore } from '../../store/store.js
 						{{ webhook?.description }}
 					</template>
 					<template #actions>
-						<NcActionButton @click="webhookStore.setWebhookItem(webhook); navigationStore.setModal('editWebhook')">
+						<NcActionButton close-after-click @click="webhookStore.setWebhookItem(webhook); navigationStore.setModal('editWebhook')">
 							<template #icon>
 								<Pencil />
 							</template>
 							Bewerken
 						</NcActionButton>
-						<NcActionButton @click="webhookStore.setWebhookItem(webhook); navigationStore.setDialog('deleteWebhook')">
+						<NcActionButton close-after-click @click="webhookStore.setWebhookItem(webhook); navigationStore.setDialog('deleteWebhook')">
 							<template #icon>
 								<TrashCanOutline />
 							</template>

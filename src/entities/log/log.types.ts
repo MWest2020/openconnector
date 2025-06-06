@@ -3,16 +3,16 @@ export type TLog = {
     uuid?: string
     message?: string
     synchronizationId?: string
-    synchronization_id?: string  // API snake_case version
+    synchronization_id?: string // API snake_case version
     result?: any[]
     userId?: string
-    user_id?: string             // API snake_case version
+    user_id?: string // API snake_case version
     sessionId?: string
-    session_id?: string          // API snake_case version
+    session_id?: string // API snake_case version
     test?: boolean
     force?: boolean
     executionTime?: number
-    execution_time?: number      // API snake_case version
+    execution_time?: number // API snake_case version
     created?: string
     expires?: string
 }
