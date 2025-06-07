@@ -1,4 +1,5 @@
-import { ref, computed } from 'vue'
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { ref } from 'vue'
 import { defineStore } from 'pinia'
 import { Contract, TContract } from '../../entities/index.js'
 
@@ -18,27 +19,27 @@ export const useContractStore = defineStore('contract', () => {
 
 	/** @type {import('vue').Ref<Contract|null>} Current contract item */
 	const contractItem = ref<Contract>(null)
-	
+
 	/** @type {import('vue').Ref<Contract[]>} List of contracts */
 	const contractsList = ref<Contract[]>([])
-	
+
 	/** @type {import('vue').Ref<boolean>} Loading state for contracts */
 	const contractsLoading = ref<boolean>(false)
-	
+
 	/** @type {import('vue').Ref<object>} Pagination information */
 	const contractsPagination = ref<object>({
 		page: 1,
 		pages: 1,
 		results: 0,
-		total: 0
+		total: 0,
 	})
-	
+
 	/** @type {import('vue').Ref<object>} Current filters */
 	const contractsFilters = ref<object>({})
-	
+
 	/** @type {import('vue').Ref<object>} Statistics data */
 	const contractsStatistics = ref<object>({})
-	
+
 	/** @type {import('vue').Ref<object>} Performance data */
 	const contractsPerformance = ref<object>({})
 
@@ -48,7 +49,7 @@ export const useContractStore = defineStore('contract', () => {
 
 	/**
 	 * Set the active contract item
-	 * 
+	 *
 	 * @param {Contract|TContract|null} item - The contract item to set
 	 * @return {void}
 	 */
@@ -79,7 +80,7 @@ export const useContractStore = defineStore('contract', () => {
 
 	/**
 	 * Set the contract list
-	 * 
+	 *
 	 * @param {Contract[]|TContract[]} list - The contract list to set
 	 * @return {void}
 	 */
@@ -110,7 +111,7 @@ export const useContractStore = defineStore('contract', () => {
 
 	/**
 	 * Set contracts filters
-	 * 
+	 *
 	 * @param {object} filters - The filters to set
 	 * @return {void}
 	 */
@@ -121,7 +122,7 @@ export const useContractStore = defineStore('contract', () => {
 
 	/**
 	 * Set contracts loading state
-	 * 
+	 *
 	 * @param {boolean} loading - The loading state
 	 * @return {void}
 	 */
@@ -131,7 +132,7 @@ export const useContractStore = defineStore('contract', () => {
 
 	/**
 	 * Set contracts pagination
-	 * 
+	 *
 	 * @param {object} pagination - The pagination object
 	 * @return {void}
 	 */
@@ -145,7 +146,7 @@ export const useContractStore = defineStore('contract', () => {
 
 	/**
 	 * Fetch contracts from the API
-	 * 
+	 *
 	 * @param {object} options - Request options
 	 * @param {number} options.page - Page number
 	 * @param {object} options.filters - Filters to apply
@@ -153,7 +154,7 @@ export const useContractStore = defineStore('contract', () => {
 	 */
 	const fetchContracts = async (options: { page?: number, filters?: object } = {}): Promise<{ response: Response, data: TContract[], entities: Contract[] }> => {
 		setContractsLoading(true)
-		
+
 		try {
 			const queryParams = new URLSearchParams()
 
@@ -186,7 +187,7 @@ export const useContractStore = defineStore('contract', () => {
 			const entities = data.map(contractItem => new Contract(contractItem))
 
 			setContractsList(data)
-			
+
 			// Set pagination if available
 			if (responseData.pagination) {
 				setContractsPagination(responseData.pagination)
@@ -200,7 +201,7 @@ export const useContractStore = defineStore('contract', () => {
 
 	/**
 	 * Fetch a single contract
-	 * 
+	 *
 	 * @param {string} id - The ID of the contract to fetch
 	 * @return {Promise<{ response: Response, data: TContract, entity: Contract }>}
 	 */
@@ -225,7 +226,7 @@ export const useContractStore = defineStore('contract', () => {
 
 	/**
 	 * Delete a contract
-	 * 
+	 *
 	 * @param {string} id - The ID of the contract to delete
 	 * @return {Promise<{ response: Response }>}
 	 */
@@ -251,7 +252,7 @@ export const useContractStore = defineStore('contract', () => {
 
 	/**
 	 * Delete multiple contracts
-	 * 
+	 *
 	 * @param {string[]} ids - Array of contract IDs to delete
 	 * @return {Promise<void>}
 	 */
@@ -266,7 +267,7 @@ export const useContractStore = defineStore('contract', () => {
 
 	/**
 	 * Enforce a contract (equivalent to executing/running it)
-	 * 
+	 *
 	 * @param {string} id - The ID of the contract to enforce
 	 * @return {Promise<{ response: Response }>}
 	 */
@@ -288,7 +289,7 @@ export const useContractStore = defineStore('contract', () => {
 
 	/**
 	 * Fetch contract statistics
-	 * 
+	 *
 	 * @return {Promise<{ response: Response, data: object }>}
 	 */
 	const fetchStatistics = async (): Promise<{ response: Response, data: object }> => {
@@ -306,7 +307,7 @@ export const useContractStore = defineStore('contract', () => {
 
 	/**
 	 * Fetch contract performance data
-	 * 
+	 *
 	 * @return {Promise<{ response: Response, data: object }>}
 	 */
 	const fetchPerformance = async (): Promise<{ response: Response, data: object }> => {
@@ -324,7 +325,7 @@ export const useContractStore = defineStore('contract', () => {
 
 	/**
 	 * Export filtered contracts
-	 * 
+	 *
 	 * @return {Promise<{ response: Response }>}
 	 */
 	const exportFiltered = async (): Promise<{ response: Response }> => {
@@ -354,7 +355,7 @@ export const useContractStore = defineStore('contract', () => {
 
 	/**
 	 * Save a contract
-	 * 
+	 *
 	 * @param {Contract} contractItem - The contract item to save
 	 * @return {Promise<{ response: Response, data: TContract, entity: Contract }>}
 	 */
@@ -423,4 +424,4 @@ export const useContractStore = defineStore('contract', () => {
 		exportFiltered,
 		saveContract,
 	}
-}) 
+})

@@ -83,7 +83,7 @@ import { logStore, contractStore, synchronizationStore, navigationStore } from '
 						<tr v-for="item in paginatedItems"
 							:key="item.id"
 							class="item-row"
-							:class="{ 
+							:class="{
 								selected: selectedItems.includes(item.id),
 								'log-error': item.getLevel && item.getLevel() === 'error',
 								'log-warning': item.getLevel && item.getLevel() === 'warning',
@@ -107,10 +107,10 @@ import { logStore, contractStore, synchronizationStore, navigationStore } from '
 							<td class="message-column">
 								<div class="message-content">
 									<span class="message-text">{{ item.message }}</span>
-									<NcButton v-if="item.result && item.result.length > 0" 
-										type="tertiary" 
-										@click="toggleDetails(item.id)"
-										:aria-expanded="expandedItems.includes(item.id)">
+									<NcButton v-if="item.result && item.result.length > 0"
+										type="tertiary"
+										:aria-expanded="expandedItems.includes(item.id)"
+										@click="toggleDetails(item.id)">
 										<template #icon>
 											<ChevronDown v-if="!expandedItems.includes(item.id)" :size="16" />
 											<ChevronUp v-else :size="16" />
@@ -129,19 +129,19 @@ import { logStore, contractStore, synchronizationStore, navigationStore } from '
 							</td>
 							<td class="actions-column">
 								<NcActions>
-									<NcActionButton @click="viewFullLog(item)">
+									<NcActionButton close-after-click @click="viewFullLog(item)">
 										<template #icon>
 											<OpenInNew :size="20" />
 										</template>
 										{{ t('openconnector', 'View Full Log') }}
 									</NcActionButton>
-									<NcActionButton v-if="item.synchronizationId" @click="viewSynchronization(item)">
+									<NcActionButton v-if="item.synchronizationId" close-after-click @click="viewSynchronization(item)">
 										<template #icon>
 											<FileDocumentOutline :size="20" />
 										</template>
 										{{ t('openconnector', 'View Synchronization') }}
 									</NcActionButton>
-									<NcActionButton @click="deleteLog(item)">
+									<NcActionButton close-after-click @click="deleteLog(item)">
 										<template #icon>
 											<Delete :size="20" />
 										</template>
@@ -333,7 +333,7 @@ export default {
 			try {
 				await logStore.fetchLogs({
 					page: 1,
-					filters: filters,
+					filters,
 				})
 
 				// Clear selection when filters change
@@ -380,17 +380,17 @@ export default {
 		 */
 		getLevelType(level) {
 			switch (level?.toLowerCase()) {
-				case 'error':
-					return 'error'
-				case 'warning':
-					return 'warning'
-				case 'success':
-				case 'info':
-					return 'success'
-				case 'debug':
-					return 'secondary'
-				default:
-					return 'secondary'
+			case 'error':
+				return 'error'
+			case 'warning':
+				return 'warning'
+			case 'success':
+			case 'info':
+				return 'success'
+			case 'debug':
+				return 'secondary'
+			default:
+				return 'secondary'
 			}
 		},
 		/**
@@ -400,18 +400,18 @@ export default {
 		 */
 		getLevelLabel(level) {
 			switch (level?.toLowerCase()) {
-				case 'error':
-					return t('openconnector', 'Error')
-				case 'warning':
-					return t('openconnector', 'Warning')
-				case 'success':
-					return t('openconnector', 'Success')
-				case 'info':
-					return t('openconnector', 'Info')
-				case 'debug':
-					return t('openconnector', 'Debug')
-				default:
-					return level || t('openconnector', 'Unknown')
+			case 'error':
+				return t('openconnector', 'Error')
+			case 'warning':
+				return t('openconnector', 'Warning')
+			case 'success':
+				return t('openconnector', 'Success')
+			case 'info':
+				return t('openconnector', 'Info')
+			case 'debug':
+				return t('openconnector', 'Debug')
+			default:
+				return level || t('openconnector', 'Unknown')
 			}
 		},
 		/**
@@ -802,4 +802,4 @@ export default {
 	font-size: 0.75rem;
 	font-weight: 500;
 }
-</style> 
+</style>
