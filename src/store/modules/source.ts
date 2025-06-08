@@ -14,6 +14,7 @@ export const useSourceStore = defineStore('source', () => {
 	const sourceLog = ref<object>(null)
 	const sourceLogs = ref<object[]>([])
 	const sourceConfigurationKey = ref<string | null>(null)
+	const viewMode = ref<string>('cards')
 
 	// ################################
 	// ||    Setters and Getters     ||
@@ -210,6 +211,35 @@ export const useSourceStore = defineStore('source', () => {
 	 * @return {string} The active source configuration key
 	 */
 	const getSourceConfigurationKey = (): string => sourceConfigurationKey.value as string
+
+	/**
+	 * Set the view mode.
+	 * @param mode - The view mode to set ('cards' or 'table')
+	 */
+	const setViewMode = (mode: string) => {
+		viewMode.value = mode
+		console.info('Source view mode set to ' + mode)
+	}
+
+	/**
+	 * Get the view mode.
+	 *
+	 * @description
+	 * Returns the currently active view mode. Note that the return value is non-reactive.
+	 *
+	 * For reactive usage, either:
+	 * 1. Reference the `viewMode` state directly:
+	 * ```js
+	 * const viewMode = useSourceStore().viewMode // reactive state
+	 * ```
+	 * 2. Or wrap in a `computed` property:
+	 * ```js
+	 * const viewMode = computed(() => useSourceStore().getViewMode())
+	 * ```
+	 *
+	 * @return {string} The active view mode
+	 */
+	const getViewMode = (): string => viewMode.value as string
 
 	// ################################
 	// ||          Actions           ||
@@ -428,6 +458,7 @@ export const useSourceStore = defineStore('source', () => {
 		sourceLog,
 		sourceLogs,
 		sourceConfigurationKey,
+		viewMode,
 
 		// setters and getters
 		setSourceItem,
@@ -442,6 +473,8 @@ export const useSourceStore = defineStore('source', () => {
 		getSourceLogs,
 		setSourceConfigurationKey,
 		getSourceConfigurationKey,
+		setViewMode,
+		getViewMode,
 
 		// actions
 		refreshSourceList,

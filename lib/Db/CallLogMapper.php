@@ -87,25 +87,42 @@ class CallLogMapper extends QBMapper
 	/**
 	 * Clear expired logs from the database.
 	 *
-	 * This method deletes all call logs that have expired (i.e., their 'expired' date is earlier than the current date and time).
+	 * This method deletes all call logs that have expired (i.e., their 'expires' date is earlier than the current date and time)
+	 * and have the 'expires' column set. This helps maintain database performance by removing old log entries that are no longer needed.
 	 *
 	 * @return bool True if any logs were deleted, false otherwise.
-	 * @throws Exception
+	 *
+	 * @throws \Exception Database operation exceptions
+	 *
+	 * @psalm-return bool
+	 * @phpstan-return bool
 	 */
     public function clearLogs(): bool
     {
-        // Get the query builder
-        $qb = $this->db->getQueryBuilder();
+        try {
+            // Get the query builder for database operations
+            $qb = $this->db->getQueryBuilder();
 
-        // Build the delete query
-        $qb->delete('openconnector_call_logs')
-           ->where($qb->expr()->lt('expires', $qb->createFunction('NOW()')));
+            // Build the delete query to remove expired call logs that have the 'expires' column set
+            $qb->delete('openconnector_call_logs')
+               ->where($qb->expr()->isNotNull('expires'))
+               ->andWhere($qb->expr()->lt('expires', $qb->createFunction('NOW()')));
 
-        // Execute the query and get the number of affected rows
-        $result = $qb->execute();
+            // Execute the query and get the number of affected rows
+            $result = $qb->executeStatement();
 
-        // Return true if any rows were affected (i.e., any logs were deleted)
-        return $result > 0;
+            // Return true if any rows were affected (i.e., any logs were deleted)
+            return $result > 0;
+        } catch (\Exception $e) {
+            // Log the error for debugging purposes
+            \OC::$server->getLogger()->error('Failed to clear expired call logs: ' . $e->getMessage(), [
+                'app' => 'openconnector',
+                'exception' => $e
+            ]);
+            
+            // Re-throw the exception so the caller knows something went wrong
+            throw $e;
+        }
     }
 
 	/**

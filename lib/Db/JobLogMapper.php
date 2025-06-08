@@ -226,4 +226,45 @@ class JobLogMapper extends QBMapper
 
         return $stats;
     }
+
+    /**
+     * Clear expired logs from the database
+     *
+     * This method deletes all job logs that have expired (i.e., their 'expires' date is earlier than the current date and time)
+     * and have the 'expires' column set. This helps maintain database performance by removing old log entries that are no longer needed.
+     *
+     * @return bool True if any logs were deleted, false otherwise
+     *
+     * @throws \Exception Database operation exceptions
+     *
+     * @psalm-return bool
+     * @phpstan-return bool
+     */
+    public function clearLogs(): bool
+    {
+        try {
+            // Get the query builder for database operations
+            $qb = $this->db->getQueryBuilder();
+
+            // Build the delete query to remove expired job logs that have the 'expires' column set
+            $qb->delete('openconnector_job_logs')
+               ->where($qb->expr()->isNotNull('expires'))
+               ->andWhere($qb->expr()->lt('expires', $qb->createFunction('NOW()')));
+
+            // Execute the query and get the number of affected rows
+            $result = $qb->executeStatement();
+
+            // Return true if any rows were affected (i.e., any logs were deleted)
+            return $result > 0;
+        } catch (\Exception $e) {
+            // Log the error for debugging purposes
+            \OC::$server->getLogger()->error('Failed to clear expired job logs: ' . $e->getMessage(), [
+                'app' => 'openconnector',
+                'exception' => $e
+            ]);
+            
+            // Re-throw the exception so the caller knows something went wrong
+            throw $e;
+        }
+    }
 }
