@@ -3,6 +3,7 @@ import { defineStore } from 'pinia'
 import { Synchronization, TSynchronization } from '../../entities/index.js'
 import { importExportStore } from '../store.js'
 import { MissingParameterError } from '../../services/errors/index.js'
+import { useLogStore } from './log'
 
 const apiEndpoint = '/index.php/apps/openconnector/api/synchronizations'
 
@@ -411,22 +412,37 @@ export const useSynchronizationStore = defineStore('synchronization', () => {
 	}
 
 	// logs
-	const refreshSynchronizationLogs = async (id: number, search?: string) => {
-		let endpoint = `/index.php/apps/openconnector/api/synchronizations-logs/${id}`
-
-		if (search && search !== '') {
-			endpoint = endpoint + '?_search=' + search
+	const refreshSynchronizationLogs = async (filters: object = {}) => {
+		const logStore = useLogStore()
+		logStore.setLogsLoading(true)
+		
+		try {
+			// Build query parameters
+			const queryParams = new URLSearchParams()
+			// Only add synchronization_id if not already present in filters
+			if (!('synchronization_id' in filters) && synchronizationItem.value?.id) {
+				queryParams.append('synchronization_id', synchronizationItem.value.id.toString())
+			}
+			// Add other filters
+			Object.entries(filters).forEach(([key, value]) => {
+				if (value !== null && value !== undefined && value !== '') {
+					queryParams.append(key, value.toString())
+				}
+			})
+			// Build the endpoint
+			const endpoint = `/index.php/apps/openconnector/api/synchronizations/logs${queryParams.toString() ? '?' + queryParams.toString() : ''}`
+			const response = await fetch(endpoint, {
+				method: 'GET',
+			})
+			const data = await response.json()
+			setSynchronizationLogs(data)
+			return { response, data }
+		} catch (error) {
+			console.error('Error refreshing synchronization logs:', error)
+			throw error
+		} finally {
+			logStore.setLogsLoading(false)
 		}
-
-		const response = await fetch(endpoint, {
-			method: 'GET',
-		})
-
-		const data = await response.json() as TSynchronization[]
-
-		setSynchronizationLogs(data)
-
-		return { response, data }
 	}
 
 	// synchronization actions
@@ -450,7 +466,7 @@ export const useSynchronizationStore = defineStore('synchronization', () => {
 		setSynchronizationTest(data)
 
 		console.info('Synchronization tested')
-		refreshSynchronizationLogs(synchronizationItem.value.id)
+		refreshSynchronizationLogs({})
 
 		return { response, data }
 	}
@@ -475,7 +491,7 @@ export const useSynchronizationStore = defineStore('synchronization', () => {
 		setSynchronizationRun(data)
 
 		console.info('Synchronization run')
-		refreshSynchronizationLogs(synchronizationItem.value.id)
+		refreshSynchronizationLogs({})
 
 		return { response, data }
 	}

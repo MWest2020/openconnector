@@ -3,6 +3,7 @@ import { defineStore } from 'pinia'
 import { importExportStore } from '../store.js'
 import { Source, TSource } from '../../entities/index.js'
 import { MissingParameterError } from '../../services/errors/index.js'
+import { useLogStore } from './log'
 
 const apiEndpoint = '/index.php/apps/openconnector/api/sources'
 
@@ -379,26 +380,36 @@ export const useSourceStore = defineStore('source', () => {
 	 * @return {Promise<{ response: Response, data: object[] }>} The response and data
 	 */
 	const refreshSourceLogs = async (filters: object = {}) => {
-		// Build query parameters
-		const queryParams = new URLSearchParams()
-		// Only add source_id if not already present in filters
-		if (!('source_id' in filters) && sourceItem.value?.id) {
-			queryParams.append('source_id', sourceItem.value.id.toString())
-		}
-		// Add other filters
-		Object.entries(filters).forEach(([key, value]) => {
-			if (value !== null && value !== undefined && value !== '') {
-				queryParams.append(key, value.toString())
+		const logStore = useLogStore()
+		logStore.setLogsLoading(true)
+		
+		try {
+			// Build query parameters
+			const queryParams = new URLSearchParams()
+			// Only add source_id if not already present in filters
+			if (!('source_id' in filters) && sourceItem.value?.id) {
+				queryParams.append('source_id', sourceItem.value.id.toString())
 			}
-		})
-		// Build the endpoint
-		const endpoint = `/index.php/apps/openconnector/api/sources/logs${queryParams.toString() ? '?' + queryParams.toString() : ''}`
-		const response = await fetch(endpoint, {
-			method: 'GET',
-		})
-		const data = await response.json()
-		setSourceLogs(data)
-		return data
+			// Add other filters
+			Object.entries(filters).forEach(([key, value]) => {
+				if (value !== null && value !== undefined && value !== '') {
+					queryParams.append(key, value.toString())
+				}
+			})
+			// Build the endpoint
+			const endpoint = `/index.php/apps/openconnector/api/sources/logs${queryParams.toString() ? '?' + queryParams.toString() : ''}`
+			const response = await fetch(endpoint, {
+				method: 'GET',
+			})
+			const data = await response.json()
+			setSourceLogs(data)
+			return { response, data }
+		} catch (error) {
+			console.error('Error refreshing source logs:', error)
+			throw error
+		} finally {
+			logStore.setLogsLoading(false)
+		}
 	}
 
 	/**
