@@ -3,6 +3,7 @@ import { Job, TJob } from '../../entities/index.js'
 import { importExportStore } from '../store.js'
 import { ref } from 'vue'
 import { MissingParameterError } from '../../services/errors/index.js'
+import { useLogStore } from './log'
 
 const apiEndpoint = '/index.php/apps/openconnector/api/jobs'
 
@@ -432,19 +433,31 @@ export const useJobStore = defineStore('job', () => {
 	 * @return {Promise<{ response: Response, data: object }>} The response and data
 	 */
 	const refreshJobLogs = async (id: string = null, filters: object = {}): Promise<{ response: Response, data: object }> => {
-		// Convert all filter values to strings for URLSearchParams
-		const stringFilters = Object.fromEntries(
-			Object.entries(filters).map(([k, v]) => [k, v != null ? String(v) : ''])
-		)
-		const params = new URLSearchParams(stringFilters)
-		if (id) {
-			params.set('job_id', id)
+		// Set loading state
+		const logStore = useLogStore()
+		logStore.setLogsLoading(true)
+
+		try {
+			// Convert all filter values to strings for URLSearchParams
+			const stringFilters = Object.fromEntries(
+				Object.entries(filters).map(([k, v]) => [k, v != null ? String(v) : ''])
+			)
+			const params = new URLSearchParams(stringFilters)
+			if (id) {
+				params.set('job_id', id)
+			}
+			const endpoint = `/index.php/apps/openconnector/api/jobs/logs${params.toString() ? '?' + params.toString() : ''}`
+			const response = await fetch(endpoint)
+			const data = await response.json()
+			setJobLogs(data)
+			return { response, data }
+		} catch (error) {
+			console.error('Error refreshing job logs:', error)
+			throw error
+		} finally {
+			// Reset loading state
+			logStore.setLogsLoading(false)
 		}
-		const endpoint = `/index.php/apps/openconnector/api/jobs/logs${params.toString() ? '?' + params.toString() : ''}`
-		const response = await fetch(endpoint)
-		const data = await response.json()
-		setJobLogs(data)
-		return { response, data }
 	}
 
 	// Export a job
