@@ -197,6 +197,9 @@ export default {
     }
   },
   computed: {
+    endpointStore() {
+      return endpointStore
+    },
     hasActiveFilters() {
       return false // TODO: Implement filter logic
     },

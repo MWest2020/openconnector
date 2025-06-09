@@ -3,7 +3,7 @@ import { defineStore } from 'pinia'
 import { Log, TLog } from '../../entities/index.js'
 import { MissingParameterError } from '../../services/errors/index.js'
 
-const apiEndpoint = '/index.php/apps/openconnector/api/logs'
+const apiEndpoint = '/index.php/apps/openconnector/api/synchronizations/logs'
 
 /**
  * Log store for managing synchronization logs

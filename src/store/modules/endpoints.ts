@@ -10,6 +10,9 @@ export const useEndpointStore = defineStore('endpoint', () => {
 	// state
 	const endpointItem = ref<Endpoint | null>(null)
 	const endpointList = ref<Endpoint[]>([])
+	const endpointLogs = ref([])
+	const loading = ref(false)
+	const error = ref(null)
 
 	// ################################
 	// ||    Setters and Getters     ||
@@ -74,6 +77,51 @@ export const useEndpointStore = defineStore('endpoint', () => {
 	 * @return {Endpoint[]} The endpoint list
 	 */
 	const getEndpointList = (): Endpoint[] => endpointList.value as Endpoint[]
+
+	/**
+	 * Set the endpoint logs
+	 * @param logs - The logs to set
+	 */
+	const setEndpointLogs = (logs) => {
+		endpointLogs.value = logs
+	}
+
+	/**
+	 * Refresh the endpoint logs
+	 * @param filters - Optional filters to apply to the logs
+	 * @return {Promise<{ response: Response, data: object[] }>} The response and data
+	 */
+	const refreshEndpointLogs = async (filters = {}) => {
+		loading.value = true
+		error.value = null
+		try {
+			// Build query parameters
+			const queryParams = new URLSearchParams()
+			// Only add endpoint_id if not already present in filters
+			if (!('endpoint_id' in filters) && endpointItem.value?.id) {
+				queryParams.append('endpoint_id', endpointItem.value.id.toString())
+			}
+			// Add other filters
+			Object.entries(filters).forEach(([key, value]) => {
+				if (value !== null && value !== undefined && value !== '') {
+					queryParams.append(key, value.toString())
+				}
+			})
+			// Build the endpoint
+			const endpoint = `/index.php/apps/openconnector/api/endpoints/logs${queryParams.toString() ? '?' + queryParams.toString() : ''}`
+			const response = await fetch(endpoint, {
+				method: 'GET',
+			})
+			const data = await response.json()
+			setEndpointLogs(data)
+			return { response, data }
+		} catch (err) {
+			error.value = err.message || 'Failed to load endpoint logs'
+			throw err
+		} finally {
+			loading.value = false
+		}
+	}
 
 	// ################################
 	// ||          Actions           ||
@@ -238,17 +286,22 @@ export const useEndpointStore = defineStore('endpoint', () => {
 		// state
 		endpointItem,
 		endpointList,
+		endpointLogs,
+		loading,
+		error,
 		// setter / getter
 		setEndpointItem,
 		getEndpointItem,
 		setEndpointList,
 		getEndpointList,
+		setEndpointLogs,
 		// actions
 		refreshEndpointList,
 		fetchEndpoint,
 		deleteEndpoint,
 		saveEndpoint,
 		exportEndpoint,
+		refreshEndpointLogs,
 	}
 
 })

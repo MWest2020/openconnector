@@ -233,6 +233,7 @@ export default {
   },
   mounted() {
     synchronizationStore.refreshSynchronizationLogs()
+    synchronizationStore.fetchSynchronizationLogsStatistics()
   },
   methods: {
     toggleSelectAll(checked) {

@@ -9,6 +9,7 @@ use OCA\OpenConnector\Service\ObjectService;
 use OCA\OpenConnector\Service\SearchService;
 use OCA\OpenConnector\Service\EndpointService;
 use OCA\OpenConnector\Db\EndpointMapper;
+use OCA\OpenConnector\Db\EndpointLogMapper;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
 use OCP\AppFramework\Http\Attribute\PublicPage;
@@ -46,6 +47,13 @@ class EndpointsController extends Controller
 	private int $corsMaxAge;
 
 	/**
+	 * EndpointLogMapper
+	 *
+	 * @var EndpointLogMapper
+	 */
+	private EndpointLogMapper $endpointLogMapper;
+
+	/**
 	 * Constructor for the EndpointsController
 	 *
 	 * @param string $appName The name of the app
@@ -53,6 +61,7 @@ class EndpointsController extends Controller
 	 * @param IAppConfig $config The app configuration object
 	 * @param EndpointMapper $endpointMapper The endpoint mapper object
 	 * @param EndpointService $endpointService Service for handling endpoint operations
+	 * @param EndpointLogMapper $endpointLogMapper The endpoint log mapper object
 	 */
 	public function __construct(
 		$appName,
@@ -61,6 +70,7 @@ class EndpointsController extends Controller
 		private EndpointMapper $endpointMapper,
 		private EndpointService $endpointService,
 		private AuthorizationService $authorizationService,
+		EndpointLogMapper $endpointLogMapper,
 		$corsMethods = 'PUT, POST, GET, DELETE, PATCH',
 		$corsAllowedHeaders = 'Authorization, Content-Type, Accept',
 		$corsMaxAge = 1728000
@@ -70,6 +80,7 @@ class EndpointsController extends Controller
         $this->corsMethods = $corsMethods;
         $this->corsAllowedHeaders = $corsAllowedHeaders;
         $this->corsMaxAge = $corsMaxAge;
+        $this->endpointLogMapper = $endpointLogMapper;
 	}
 
 	/**

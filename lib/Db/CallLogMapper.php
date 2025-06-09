@@ -314,4 +314,32 @@ class CallLogMapper extends QBMapper
 
         return $stats;
     }
+
+    /**
+     * Get the total count of all call logs matching the given filters.
+     *
+     * @param array $filters
+     * @return int
+     */
+    public function getTotalCount(array $filters = []): int
+    {
+        $qb = $this->db->getQueryBuilder();
+        $qb->select($qb->createFunction('COUNT(*) as count'))
+            ->from('openconnector_call_logs');
+
+        foreach ($filters as $filter => $value) {
+            if ($value === 'IS NOT NULL') {
+                $qb->andWhere($qb->expr()->isNotNull($filter));
+            } elseif ($value === 'IS NULL') {
+                $qb->andWhere($qb->expr()->isNull($filter));
+            } else {
+                $qb->andWhere($qb->expr()->eq($filter, $qb->createNamedParameter($value)));
+            }
+        }
+
+        $result = $qb->execute();
+        $row = $result->fetch();
+
+        return (int)$row['count'];
+    }
 }

@@ -445,6 +445,26 @@ export const useSynchronizationStore = defineStore('synchronization', () => {
 		}
 	}
 
+	// Add new method for fetching log statistics
+	const fetchSynchronizationLogsStatistics = async () => {
+		const logStore = useLogStore()
+		logStore.setLogsLoading(true)
+		
+		try {
+			const endpoint = '/index.php/apps/openconnector/api/synchronizations/logs/statistics'
+			const response = await fetch(endpoint, {
+				method: 'GET',
+			})
+			const data = await response.json()
+			return { response, data }
+		} catch (error) {
+			console.error('Error fetching synchronization log statistics:', error)
+			throw error
+		} finally {
+			logStore.setLogsLoading(false)
+		}
+	}
+
 	// synchronization actions
 	const testSynchronization = async () => {
 		if (!synchronizationItem.value) {
@@ -550,6 +570,7 @@ export const useSynchronizationStore = defineStore('synchronization', () => {
 		saveSynchronization,
 		refreshSynchronizationContracts,
 		refreshSynchronizationLogs,
+		fetchSynchronizationLogsStatistics,
 		testSynchronization,
 		runSynchronization,
 		exportSynchronization,

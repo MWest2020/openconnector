@@ -68,8 +68,8 @@ return [
 		['name' => 'events#pull', 'url' => '/api/events/subscriptions/{subscriptionId}/pull', 'verb' => 'GET'],
 
 		// Logs endpoints
-		['name' => 'logs#statistics', 'url' => '/api/logs/statistics', 'verb' => 'GET'],
-		['name' => 'logs#export', 'url' => '/api/logs/export', 'verb' => 'GET'],
+		['name' => 'synchronizations#logsStatistics', 'url' => '/api/synchronizations/logs/statistics', 'verb' => 'GET'],
+		['name' => 'synchronizations#logsExport', 'url' => '/api/synchronizations/logs/export', 'verb' => 'GET'],
 
 		// Synchronization Contracts endpoints  
 		['name' => 'synchronizationContracts#statistics', 'url' => '/api/synchronization-contracts/statistics', 'verb' => 'GET'],
