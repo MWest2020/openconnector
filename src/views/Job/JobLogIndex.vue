@@ -165,8 +165,8 @@
       <PaginationComponent
         v-if="filteredLogs.length > 0"
         :current-page="pagination.page || 1"
-        :total-pages="Math.ceil(filteredLogs.length / (pagination.limit || 20))"
-        :total-items="filteredLogs.length"
+        :total-pages="jobStore.jobLogs.pages || 1"
+        :total-items="jobStore.jobLogs.total || filteredLogs.length"
         :current-page-size="pagination.limit || 20"
         :min-items-to-show="10"
         @page-changed="onPageChanged"
@@ -313,12 +313,16 @@ export default {
         this.selectedLogs = this.selectedLogs.filter(id => id !== logId)
       }
     },
-    onPageChanged(page) {
+    async onPageChanged(page) {
       this.pagination.page = page
+      await jobStore.refreshJobLogs(undefined, { _page: page, _limit: this.pagination.limit })
+      this.selectedLogs = []
     },
-    onPageSizeChanged(pageSize) {
+    async onPageSizeChanged(pageSize) {
       this.pagination.page = 1
       this.pagination.limit = pageSize
+      await jobStore.refreshJobLogs(undefined, { _page: 1, _limit: pageSize })
+      this.selectedLogs = []
     },
     getJobName(jobId) {
       if (!jobId) return t('openconnector', 'Unknown Job')

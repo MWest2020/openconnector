@@ -215,10 +215,11 @@ class JobsController extends Controller
             $filters = $this->request->getParams();
             $specialFilters = [];
 
-            // Pagination
-            $limit = isset($filters['limit']) ? (int)$filters['limit'] : 20;
-            $offset = isset($filters['offset']) ? (int)$filters['offset'] : 0;
-            unset($filters['limit'], $filters['offset']);
+            // Pagination using _page and _limit
+            $limit = isset($filters['_limit']) ? (int)$filters['_limit'] : 20;
+            $page = isset($filters['_page']) ? (int)$filters['_page'] : 1;
+            $offset = ($page - 1) * $limit;
+            unset($filters['_limit'], $filters['_page']);
 
             // Handle special filters
             if (!empty($filters['date_from'])) {

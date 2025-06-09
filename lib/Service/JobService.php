@@ -269,10 +269,8 @@ class JobService
 
         // Check if the job is scheduled to run (unless force run is requested)
         if ($forceRun === false && $job->getNextRun() !== null && $job->getNextRun() > new DateTime()) {
-            return $this->jobLogMapper->createForJob($job, [
-                'level'			=> 'WARNING',
-                'message'		=> 'Next Run is still in the future for this job'
-            ]);
+            // Do not log, just skip execution
+            return null;
         }
 
         // Set user session if job has a specific user configured
