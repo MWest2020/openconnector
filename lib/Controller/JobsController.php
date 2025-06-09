@@ -271,7 +271,7 @@ class JobsController extends Controller
             );
 
             // Get total count for pagination
-            $total = $this->jobLogMapper->getTotalCallCount();
+            $total = $this->jobLogMapper->getTotalCount($filters);
             $pages = $limit > 0 ? ceil($total / $limit) : 1;
             $currentPage = $limit > 0 ? floor($offset / $limit) + 1 : 1;
 

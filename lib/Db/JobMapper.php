@@ -172,17 +172,33 @@ class JobMapper extends QBMapper
 	}
 
     /**
-     * Get the total count of all call logs.
+     * Get the total count of all jobs.
      *
-     * @return int The total number of call logs in the database.
+     * @param array $filters Optional filters to apply
+     * @return int The total number of jobs in the database.
+     * @throws \OCP\DB\Exception Database operation exceptions
+     *
+     * @psalm-return int
+     * @phpstan-return int
      */
-    public function getTotalCallCount(): int
+    public function getTotalCount(array $filters = []): int
     {
         $qb = $this->db->getQueryBuilder();
 
-        // Select count of all logs
+        // Select count of all jobs
         $qb->select($qb->createFunction('COUNT(*) as count'))
            ->from('openconnector_jobs');
+
+        // Apply filters if provided
+        foreach ($filters as $filter => $value) {
+            if ($value === 'IS NOT NULL') {
+                $qb->andWhere($qb->expr()->isNotNull($filter));
+            } elseif ($value === 'IS NULL') {
+                $qb->andWhere($qb->expr()->isNull($filter));
+            } else {
+                $qb->andWhere($qb->expr()->eq($filter, $qb->createNamedParameter($value)));
+            }
+        }
 
         $result = $qb->execute();
         $row = $result->fetch();

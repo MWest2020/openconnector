@@ -267,4 +267,40 @@ class JobLogMapper extends QBMapper
             throw $e;
         }
     }
+
+    /**
+     * Get the total count of all job logs.
+     *
+     * @param array $filters Optional filters to apply
+     * @return int The total number of job logs in the database.
+     * @throws \OCP\DB\Exception Database operation exceptions
+     *
+     * @psalm-return int
+     * @phpstan-return int
+     */
+    public function getTotalCount(array $filters = []): int
+    {
+        $qb = $this->db->getQueryBuilder();
+
+        // Select count of all logs
+        $qb->select($qb->createFunction('COUNT(*) as count'))
+           ->from('openconnector_job_logs');
+
+        // Apply filters if provided
+        foreach ($filters as $filter => $value) {
+            if ($value === 'IS NOT NULL') {
+                $qb->andWhere($qb->expr()->isNotNull($filter));
+            } elseif ($value === 'IS NULL') {
+                $qb->andWhere($qb->expr()->isNull($filter));
+            } else {
+                $qb->andWhere($qb->expr()->eq($filter, $qb->createNamedParameter($value)));
+            }
+        }
+
+        $result = $qb->execute();
+        $row = $result->fetch();
+
+        // Return the total count
+        return (int)$row['count'];
+    }
 }

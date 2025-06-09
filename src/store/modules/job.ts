@@ -428,21 +428,22 @@ export const useJobStore = defineStore('job', () => {
 	/**
 	 * Refreshes job logs for the current job
 	 * @param id - The ID of the job to refresh logs for
+	 * @param filters - Optional filters object
 	 * @return {Promise<{ response: Response, data: object }>} The response and data
 	 */
-	const refreshJobLogs = async (id: string): Promise<{ response: Response, data: object }> => {
-		if (!id) {
-			throw new MissingParameterError('id')
+	const refreshJobLogs = async (id: string = null, filters: object = {}): Promise<{ response: Response, data: object }> => {
+		// Convert all filter values to strings for URLSearchParams
+		const stringFilters = Object.fromEntries(
+			Object.entries(filters).map(([k, v]) => [k, v != null ? String(v) : ''])
+		)
+		const params = new URLSearchParams(stringFilters)
+		if (id) {
+			params.set('job_id', id)
 		}
-
-		const endpoint = `/index.php/apps/openconnector/api/jobs-logs/${id}`
-
+		const endpoint = `/index.php/apps/openconnector/api/jobs/logs${params.toString() ? '?' + params.toString() : ''}`
 		const response = await fetch(endpoint)
-
 		const data = await response.json()
-
 		setJobLogs(data)
-
 		return { response, data }
 	}
 
