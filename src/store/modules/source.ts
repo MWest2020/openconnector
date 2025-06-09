@@ -375,22 +375,29 @@ export const useSourceStore = defineStore('source', () => {
 
 	/**
 	 * Refresh the source logs
+	 * @param filters - Optional filters to apply to the logs
 	 * @return {Promise<{ response: Response, data: object[] }>} The response and data
 	 */
-	const refreshSourceLogs = async () => {
-		if (!sourceItem.value?.id) {
-			return console.warn('No source item to refresh logs')
+	const refreshSourceLogs = async (filters: object = {}) => {
+		// Build query parameters
+		const queryParams = new URLSearchParams()
+		// Only add source_id if not already present in filters
+		if (!('source_id' in filters) && sourceItem.value?.id) {
+			queryParams.append('source_id', sourceItem.value.id.toString())
 		}
-		const endpoint = `/index.php/apps/openconnector/api/sources-logs/${sourceItem.value.id}`
-
+		// Add other filters
+		Object.entries(filters).forEach(([key, value]) => {
+			if (value !== null && value !== undefined && value !== '') {
+				queryParams.append(key, value.toString())
+			}
+		})
+		// Build the endpoint
+		const endpoint = `/index.php/apps/openconnector/api/sources/logs${queryParams.toString() ? '?' + queryParams.toString() : ''}`
 		const response = await fetch(endpoint, {
 			method: 'GET',
 		})
-
 		const data = await response.json()
-
 		setSourceLogs(data)
-
 		return data
 	}
 
@@ -409,7 +416,7 @@ export const useSourceStore = defineStore('source', () => {
 
 		console.info('Testing source...')
 
-		const endpoint = `/index.php/apps/openconnector/api/source-test/${sourceItem.value.id}`
+		const endpoint = `/index.php/apps/openconnector/api/sources/test/${sourceItem.value.id}`
 
 		const response = await fetch(endpoint, {
 			method: 'POST',

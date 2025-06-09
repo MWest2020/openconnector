@@ -10,7 +10,6 @@ return [
 		'Consumers' => ['url' => 'api/consumers'],
 		'Rules' => ['url' => 'api/rules'],
 		'Events' => ['url' => 'api/events'],
-		'Logs' => ['url' => 'api/logs'],
 		'SynchronizationContracts' => ['url' => 'api/synchronization-contracts'],
 	],
 	'routes' => [
@@ -19,19 +18,25 @@ return [
 		['name' => 'dashboard#getCallStats', 'url' => '/api/dashboard/callstats', 'verb' => 'GET'],
 		['name' => 'dashboard#getJobStats', 'url' => '/api/dashboard/jobstats', 'verb' => 'GET'],
 		['name' => 'dashboard#getSyncStats', 'url' => '/api/dashboard/syncstats', 'verb' => 'GET'],
-		['name' => 'sources#test', 'url' => '/api/source-test/{id}', 'verb' => 'POST'],
-		['name' => 'sources#logs', 'url' => '/api/sources-logs/{id}', 'verb' => 'GET'],
-		['name' => 'jobs#run', 'url' => '/api/jobs-test/{id}', 'verb' => 'POST'],
-		['name' => 'jobs#logs', 'url' => '/api/jobs-logs/{id}', 'verb' => 'GET'],
-		['name' => 'endpoints#test', 'url' => '/api/endpoints-test/{id}', 'verb' => 'POST'],
-		['name' => 'endpoints#logs', 'url' => '/api/endpoints-logs/{id}', 'verb' => 'GET'],
-
+		// Source endpoints
+		['name' => 'sources#test', 'url' => '/api/sources/test/{id}', 'verb' => 'POST'],
+		['name' => 'sources#logs', 'url' => '/api/sources/logs', 'verb' => 'GET'],
+		['name' => 'sources#statistics', 'url' => '/api/sources/statistics', 'verb' => 'GET'],
+		// Job endpoints
+		['name' => 'jobs#test', 'url' => '/api/jobs/test/{id}', 'verb' => 'POST'],
+		['name' => 'jobs#logs', 'url' => '/api/jobs/logs', 'verb' => 'GET'],
+		['name' => 'jobs#statistics', 'url' => '/api/jobs/statistics', 'verb' => 'GET'],
+		['name' => 'jobs#run', 'url' => '/api/jobs/run/{id}', 'verb' => 'POST'],
+		// Endpoint endpoints
+		['name' => 'endpoints#test', 'url' => '/api/endpoints/test/{id}', 'verb' => 'POST'],
+		['name' => 'endpoints#logs', 'url' => '/api/endpoints/logs', 'verb' => 'GET'],
+		['name' => 'endpoints#statistics', 'url' => '/api/endpoints/statistics', 'verb' => 'GET'],
 		// Synchronization endpoints
-		['name' => 'synchronizations#contracts', 'url' => '/api/synchronizations-contracts/{id}', 'verb' => 'GET'],
-		['name' => 'synchronizations#logs', 'url' => '/api/synchronizations-logs/{uuid}', 'verb' => 'GET'],
-		['name' => 'synchronizations#test', 'url' => '/api/synchronizations-test/{id}', 'verb' => 'POST'],
-		['name' => 'synchronizations#run', 'url' => '/api/synchronizations-run/{id}', 'verb' => 'POST'],
-
+		['name' => 'synchronizations#test', 'url' => '/api/synchronizations/test/{id}', 'verb' => 'POST'],
+		['name' => 'synchronizations#logs', 'url' => '/api/synchronizations/logs', 'verb' => 'GET'],
+		['name' => 'synchronizations#statistics', 'url' => '/api/synchronizations/statistics', 'verb' => 'GET'],
+		['name' => 'synchronizations#contracts', 'url' => '/api/synchronizations/contracts/{id}', 'verb' => 'GET'],
+		['name' => 'synchronizations#run', 'url' => '/api/synchronizations/run/{id}', 'verb' => 'POST'],
 		// Mapping endpoints
 		['name' => 'mappings#test', 'url' => '/api/mappings/test', 'verb' => 'POST'],
 		['name' => 'mappings#saveObject', 'url' => '/api/mappings/objects', 'verb' => 'POST'],

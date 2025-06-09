@@ -44,26 +44,40 @@ import { sourceStore, navigationStore, logStore, synchronizationStore } from '..
 			</div>
 
 			<!-- Tabs -->
-			<NcAppNavigationTab id="configurations-tab" name="Configurations" :order="1">
-				<template #icon>
-					<FileCogOutline :size="20" />
-				</template>
-			</NcAppNavigationTab>
-			<NcAppNavigationTab id="authentication-tab" name="Authentication" :order="2">
-				<template #icon>
-					<KeyOutline :size="20" />
-				</template>
-			</NcAppNavigationTab>
-			<NcAppNavigationTab id="synchronizations-tab" name="Synchronizations" :order="3">
-				<template #icon>
-					<VectorPolylinePlus :size="20" />
-				</template>
-			</NcAppNavigationTab>
-			<NcAppNavigationTab id="logs-tab" name="Logs" :order="4">
-				<template #icon>
-					<TimelineQuestionOutline :size="20" />
-				</template>
-			</NcAppNavigationTab>
+			<div class="tab-navigation">
+				<NcButton 
+					:type="activeTab === 'configurations-tab' ? 'primary' : 'secondary'"
+					@click="activeTab = 'configurations-tab'">
+					<template #icon>
+						<FileCogOutline :size="20" />
+					</template>
+					{{ t('openconnector', 'Configurations') }}
+				</NcButton>
+				<NcButton 
+					:type="activeTab === 'authentication-tab' ? 'primary' : 'secondary'"
+					@click="activeTab = 'authentication-tab'">
+					<template #icon>
+						<KeyOutline :size="20" />
+					</template>
+					{{ t('openconnector', 'Authentication') }}
+				</NcButton>
+				<NcButton 
+					:type="activeTab === 'synchronizations-tab' ? 'primary' : 'secondary'"
+					@click="activeTab = 'synchronizations-tab'">
+					<template #icon>
+						<VectorPolylinePlus :size="20" />
+					</template>
+					{{ t('openconnector', 'Synchronizations') }}
+				</NcButton>
+				<NcButton 
+					:type="activeTab === 'logs-tab' ? 'primary' : 'secondary'"
+					@click="activeTab = 'logs-tab'">
+					<template #icon>
+						<TimelineQuestionOutline :size="20" />
+					</template>
+					{{ t('openconnector', 'Logs') }}
+				</NcButton>
+			</div>
 
 			<div class="tab-content">
 				<!-- Configurations Tab -->
@@ -275,7 +289,7 @@ import { sourceStore, navigationStore, logStore, synchronizationStore } from '..
 </template>
 
 <script>
-import { NcModal, NcButton, NcListItem, NcActionButton, NcEmptyContent, NcAppNavigationTab } from '@nextcloud/vue'
+import { NcModal, NcButton, NcListItem, NcActionButton, NcEmptyContent } from '@nextcloud/vue'
 import FileCogOutline from 'vue-material-design-icons/FileCogOutline.vue'
 import KeyOutline from 'vue-material-design-icons/KeyOutline.vue'
 import VectorPolylinePlus from 'vue-material-design-icons/VectorPolylinePlus.vue'
@@ -295,7 +309,6 @@ export default {
 		NcListItem,
 		NcActionButton,
 		NcEmptyContent,
-		NcAppNavigationTab,
 		FileCogOutline,
 		KeyOutline,
 		VectorPolylinePlus,
@@ -414,6 +427,20 @@ export default {
 .property-item strong {
 	min-width: 80px;
 	color: var(--color-text-maxcontrast);
+}
+
+.tab-navigation {
+	display: flex;
+	gap: 8px;
+	margin: 20px 0;
+	padding: 0 0 15px 0;
+	border-bottom: 1px solid var(--color-border);
+	flex-wrap: wrap;
+}
+
+.tab-navigation .button-vue {
+	flex: 1;
+	min-width: max-content;
 }
 
 .tab-content {

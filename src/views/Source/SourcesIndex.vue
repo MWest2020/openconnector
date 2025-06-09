@@ -1,5 +1,6 @@
 <script setup>
 import { sourceStore, navigationStore } from '../../store/store.js'
+import { translate as t } from '@nextcloud/l10n'
 </script>
 
 <template>
@@ -62,14 +63,6 @@ import { sourceStore, navigationStore } from '../../store/store.js'
 						</NcActionButton>
 						<NcActionButton
 							close-after-click
-							@click="navigationStore.setModal('importFile')">
-							<template #icon>
-								<FileImportOutline :size="20" />
-							</template>
-							Import
-						</NcActionButton>
-						<NcActionButton
-							close-after-click
 							@click="sourceStore.refreshSourceList()">
 							<template #icon>
 								<Refresh :size="20" />
@@ -127,6 +120,12 @@ import { sourceStore, navigationStore } from '../../store/store.js'
 										</template>
 										Test
 									</NcActionButton>
+									<NcActionButton close-after-click @click="sourceStore.setSourceItem(source); navigationStore.setSelected('source-logs')">
+										<template #icon>
+											<TextBoxOutline :size="20" />
+										</template>
+										View Logs
+									</NcActionButton>
 									<NcActionButton close-after-click @click="addSourceConfiguration(source)">
 										<template #icon>
 											<Plus :size="20" />
@@ -138,12 +137,6 @@ import { sourceStore, navigationStore } from '../../store/store.js'
 											<Plus :size="20" />
 										</template>
 										Add Authentication
-									</NcActionButton>
-									<NcActionButton close-after-click @click="sourceStore.exportSource(source.id)">
-										<template #icon>
-											<FileExportOutline :size="20" />
-										</template>
-										Export
 									</NcActionButton>
 									<NcActionButton close-after-click @click="sourceStore.setSourceItem(source); navigationStore.setDialog('deleteSource')">
 										<template #icon>
@@ -164,46 +157,38 @@ import { sourceStore, navigationStore } from '../../store/store.js'
 										<tr>
 											<th>{{ t('openconnector', 'Property') }}</th>
 											<th>{{ t('openconnector', 'Value') }}</th>
-											<th>{{ t('openconnector', 'Status') }}</th>
 										</tr>
 									</thead>
 									<tbody>
 										<tr>
 											<td>{{ t('openconnector', 'Type') }}</td>
 											<td>{{ source.type || 'Unknown' }}</td>
-											<td>{{ source.type ? 'Configured' : 'Not Set' }}</td>
 										</tr>
 										<tr v-if="source.location">
 											<td>{{ t('openconnector', 'Location') }}</td>
 											<td class="truncatedUrl">
 												{{ source.location }}
 											</td>
-											<td>{{ 'Connected' }}</td>
 										</tr>
 										<tr v-if="source.version">
 											<td>{{ t('openconnector', 'Version') }}</td>
 											<td>{{ source.version }}</td>
-											<td>{{ 'Available' }}</td>
 										</tr>
 										<tr>
 											<td>{{ t('openconnector', 'Configurations') }}</td>
 											<td>{{ getConfigurationCount(source) }}</td>
-											<td>{{ getConfigurationCount(source) > 0 ? 'Configured' : 'Empty' }}</td>
 										</tr>
 										<tr>
 											<td>{{ t('openconnector', 'Authentication') }}</td>
 											<td>{{ getAuthenticationCount(source) }}</td>
-											<td>{{ getAuthenticationCount(source) > 0 ? 'Secured' : 'Open' }}</td>
 										</tr>
 										<tr>
 											<td>{{ t('openconnector', 'Created') }}</td>
 											<td>{{ source.created ? new Date(source.created).toLocaleDateString() : '-' }}</td>
-											<td>-</td>
 										</tr>
 										<tr>
 											<td>{{ t('openconnector', 'Updated') }}</td>
 											<td>{{ source.updated ? new Date(source.updated).toLocaleDateString() : '-' }}</td>
-											<td>-</td>
 										</tr>
 									</tbody>
 								</table>
@@ -282,6 +267,12 @@ import { sourceStore, navigationStore } from '../../store/store.js'
 												</template>
 												Test
 											</NcActionButton>
+											<NcActionButton close-after-click @click="sourceStore.setSourceItem(source); navigationStore.setSelected('source-logs')">
+												<template #icon>
+													<TextBoxOutline :size="20" />
+												</template>
+												View Logs
+											</NcActionButton>
 											<NcActionButton close-after-click @click="addSourceConfiguration(source)">
 												<template #icon>
 													<Plus :size="20" />
@@ -293,12 +284,6 @@ import { sourceStore, navigationStore } from '../../store/store.js'
 													<Plus :size="20" />
 												</template>
 												Add Authentication
-											</NcActionButton>
-											<NcActionButton close-after-click @click="sourceStore.exportSource(source.id)">
-												<template #icon>
-													<FileExportOutline :size="20" />
-												</template>
-												Export
 											</NcActionButton>
 											<NcActionButton close-after-click @click="sourceStore.setSourceItem(source); navigationStore.setDialog('deleteSource')">
 												<template #icon>
@@ -322,7 +307,7 @@ import { sourceStore, navigationStore } from '../../store/store.js'
 				:total-pages="Math.ceil(filteredSources.length / (pagination.limit || 20))"
 				:total-items="filteredSources.length"
 				:current-page-size="pagination.limit || 20"
-				:min-items-to-show="10"
+				:min-items-to-show="0"
 				@page-changed="onPageChanged"
 				@page-size-changed="onPageSizeChanged" />
 		</div>
@@ -331,6 +316,7 @@ import { sourceStore, navigationStore } from '../../store/store.js'
 
 <script>
 import { NcAppContent, NcEmptyContent, NcLoadingIcon, NcActions, NcActionButton, NcCheckboxRadioSwitch, NcButton } from '@nextcloud/vue'
+import { translate as t } from '@nextcloud/l10n'
 import DatabaseArrowLeftOutline from 'vue-material-design-icons/DatabaseArrowLeftOutline.vue'
 import DotsHorizontal from 'vue-material-design-icons/DotsHorizontal.vue'
 import Pencil from 'vue-material-design-icons/Pencil.vue'
@@ -339,10 +325,10 @@ import Refresh from 'vue-material-design-icons/Refresh.vue'
 import Plus from 'vue-material-design-icons/Plus.vue'
 import Eye from 'vue-material-design-icons/Eye.vue'
 import Sync from 'vue-material-design-icons/Sync.vue'
-import FileExportOutline from 'vue-material-design-icons/FileExportOutline.vue'
-import FileImportOutline from 'vue-material-design-icons/FileImportOutline.vue'
+import TextBoxOutline from 'vue-material-design-icons/TextBoxOutline.vue'
 
 import PaginationComponent from '../../components/PaginationComponent.vue'
+import { sourceStore, navigationStore } from '../../store/store.js'
 
 export default {
 	name: 'SourcesIndex',
@@ -362,12 +348,13 @@ export default {
 		Plus,
 		Eye,
 		Sync,
-		FileExportOutline,
-		FileImportOutline,
+		TextBoxOutline,
 		PaginationComponent,
 	},
 	data() {
 		return {
+			sourceStore,
+			navigationStore,
 			selectedSources: [],
 			pagination: {
 				page: 1,
@@ -377,8 +364,8 @@ export default {
 	},
 	computed: {
 		filteredSources() {
-			if (!sourceStore.sourceList) return []
-			return sourceStore.sourceList
+			if (!this.sourceStore.sourceList) return []
+			return this.sourceStore.sourceList
 		},
 		paginatedSources() {
 			const start = ((this.pagination.page || 1) - 1) * (this.pagination.limit || 20)
@@ -392,28 +379,28 @@ export default {
 			return this.selectedSources.length > 0 && !this.allSelected
 		},
 		emptyContentName() {
-			if (sourceStore.loading) {
+			if (this.sourceStore.loading) {
 				return t('openconnector', 'Loading sources...')
-			} else if (sourceStore.error) {
-				return sourceStore.error
-			} else if (!sourceStore.sourceList?.length) {
+			} else if (this.sourceStore.error) {
+				return this.sourceStore.error
+			} else if (!this.sourceStore.sourceList?.length) {
 				return t('openconnector', 'No sources found')
 			}
 			return ''
 		},
 		emptyContentDescription() {
-			if (sourceStore.loading) {
+			if (this.sourceStore.loading) {
 				return t('openconnector', 'Please wait while we fetch your sources.')
-			} else if (sourceStore.error) {
+			} else if (this.sourceStore.error) {
 				return t('openconnector', 'Please try again later.')
-			} else if (!sourceStore.sourceList?.length) {
+			} else if (!this.sourceStore.sourceList?.length) {
 				return t('openconnector', 'No sources are available.')
 			}
 			return ''
 		},
 	},
 	mounted() {
-		sourceStore.refreshSourceList()
+		this.sourceStore.refreshSourceList()
 	},
 	methods: {
 		toggleSelectAll(checked) {
@@ -447,14 +434,14 @@ export default {
 			return Object.keys(authentication).length
 		},
 		addSourceConfiguration(source) {
-			sourceStore.setSourceItem(source)
-			sourceStore.setSourceConfigurationKey(null)
-			navigationStore.setModal('editSourceConfiguration')
+			this.sourceStore.setSourceItem(source)
+			this.sourceStore.setSourceConfigurationKey(null)
+			this.navigationStore.setModal('editSourceConfiguration')
 		},
 		addSourceAuthentication(source) {
-			sourceStore.setSourceItem(source)
-			sourceStore.setSourceConfigurationKey(null)
-			navigationStore.setModal('editSourceConfigurationAuthentication')
+			this.sourceStore.setSourceItem(source)
+			this.sourceStore.setSourceConfigurationKey(null)
+			this.navigationStore.setModal('editSourceConfigurationAuthentication')
 		},
 	},
 }

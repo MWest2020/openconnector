@@ -4,6 +4,9 @@ import { navigationStore } from '../store/store.js'
 
 <template>
 	<div>
+		<!-- Source Logs Sidebar -->
+		<SourceLogSideBar v-if="navigationStore.selected === 'source-logs'" />
+
 		<!-- Contracts Sidebar -->
 		<ContractsSideBar v-if="navigationStore.selected === 'contracts'" />
 
@@ -13,12 +16,14 @@ import { navigationStore } from '../store/store.js'
 </template>
 
 <script>
+import SourceLogSideBar from './Source/SourceLogSideBar.vue'
 import ContractsSideBar from './contracts/ContractsSideBar.vue'
 import LogsSideBar from './logs/LogsSideBar.vue'
 
 export default {
 	name: 'SideBars',
 	components: {
+		SourceLogSideBar,
 		ContractsSideBar,
 		LogsSideBar,
 	},

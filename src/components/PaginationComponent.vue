@@ -3,7 +3,7 @@
 		<!-- Page info first -->
 		<div class="viewPaginationInfo">
 			<span class="viewPageInfo">
-				{{ t('openregister', 'Page {current} of {total}', { current: currentPage, total: totalPages }) }}
+				{{ t('openconnector', 'Page {current} of {total}', { current: currentPage, total: totalPages }) }}
 			</span>
 		</div>
 
@@ -13,14 +13,14 @@
 			<NcButton
 				:disabled="currentPage === 1"
 				@click="changePage(1)">
-				{{ t('openregister', 'First') }}
+				{{ t('openconnector', 'First') }}
 			</NcButton>
 
 			<!-- Previous page button -->
 			<NcButton
 				:disabled="currentPage === 1"
 				@click="changePage(currentPage - 1)">
-				{{ t('openregister', 'Previous') }}
+				{{ t('openconnector', 'Previous') }}
 			</NcButton>
 
 			<!-- Page number buttons -->
@@ -42,20 +42,20 @@
 			<NcButton
 				:disabled="currentPage === totalPages"
 				@click="changePage(currentPage + 1)">
-				{{ t('openregister', 'Next') }}
+				{{ t('openconnector', 'Next') }}
 			</NcButton>
 
 			<!-- Last page button -->
 			<NcButton
 				:disabled="currentPage === totalPages"
 				@click="changePage(totalPages)">
-				{{ t('openregister', 'Last') }}
+				{{ t('openconnector', 'Last') }}
 			</NcButton>
 		</div>
 
 		<!-- Page size selector last -->
 		<div class="viewPaginationPageSize">
-			<label for="pageSize">{{ t('openregister', 'Items per page:') }}</label>
+			<label for="pageSize">{{ t('openconnector', 'Items per page:') }}</label>
 			<NcSelect
 				id="pageSize"
 				class="pagination-page-size-select"
@@ -71,7 +71,7 @@
 import { NcButton, NcSelect } from '@nextcloud/vue'
 
 /**
- * Reusable pagination component for OpenRegister views
+ * Reusable pagination component for OpenConnector views
  *
  * @package
  * @author Ruben Linde <ruben@conduction.nl>
