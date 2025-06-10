@@ -27,6 +27,7 @@ import { Mapping } from '../../entities/index.js'
 
 					<NcTextArea
 						id="description"
+						resize="vertical"
 						label="Description"
 						:value.sync="mappingItem.description" />
 
