@@ -317,8 +317,54 @@ class JobsController extends Controller
                 }
             }
 
+            // Prepare arguments for executeJob
+            $arguments = array_merge(['jobId' => $job->getId()], $parameters);
+
             // Execute the job
-            $result = $this->jobService->execute($job, $parameters);
+            $result = $this->jobService->executeJob($arguments);
+
+            // Return the execution results
+            return new JSONResponse($result);
+        } catch (DoesNotExistException $e) {
+            return new JSONResponse(['error' => 'Job not found'], 404);
+        } catch (Exception $e) {
+            return new JSONResponse(['error' => 'Failed to execute job: ' . $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Test a job
+     *
+     * This method executes a job based on its ID and returns the execution results.
+     * The job can be executed with optional parameters provided in the request body.
+     *
+     * @NoAdminRequired
+     * @NoCSRFRequired
+     *
+     * @param int $id The ID of the job to execute
+     * @return JSONResponse A JSON response containing the execution results
+     */
+    public function test(int $id): JSONResponse
+    {
+        try {
+            // Get the job
+            $job = $this->jobMapper->find($id);
+
+            // Get execution parameters from request
+            $parameters = $this->request->getParams();
+
+            // Remove non-parameter fields
+            foreach ($parameters as $key => $value) {
+                if (str_starts_with($key, '_')) {
+                    unset($parameters[$key]);
+                }
+            }
+
+            // Prepare arguments for executeJob
+            $arguments = array_merge(['jobId' => $job->getId()], $parameters);
+
+            // Execute the job
+            $result = $this->jobService->executeJob($arguments);
 
             // Return the execution results
             return new JSONResponse($result);

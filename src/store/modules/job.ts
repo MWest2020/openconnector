@@ -382,7 +382,7 @@ export const useJobStore = defineStore('job', () => {
 
 		console.info('Testing event...')
 
-		const endpoint = `/index.php/apps/openconnector/api/jobs/${id}/test`
+		const endpoint = `/index.php/apps/openconnector/api/jobs/run/${id}?test=true`
 
 		const response = await fetch(endpoint, {
 			method: 'POST',

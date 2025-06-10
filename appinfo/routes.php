@@ -32,11 +32,11 @@ return [
 		['name' => 'endpoints#logs', 'url' => '/api/endpoints/logs', 'verb' => 'GET'],
 		['name' => 'endpoints#statistics', 'url' => '/api/endpoints/statistics', 'verb' => 'GET'],
 		// Synchronization endpoints
-		['name' => 'synchronizations#test', 'url' => '/api/synchronizations/test/{id}', 'verb' => 'POST'],
+		['name' => 'synchronizations#run', 'url' => '/api/synchronizations/{id}/run', 'verb' => 'POST'],
+		['name' => 'synchronizations#test', 'url' => '/api/synchronizations/{id}/test', 'verb' => 'POST'],
 		['name' => 'synchronizations#logs', 'url' => '/api/synchronizations/logs', 'verb' => 'GET'],
 		['name' => 'synchronizations#statistics', 'url' => '/api/synchronizations/statistics', 'verb' => 'GET'],
 		['name' => 'synchronizations#contracts', 'url' => '/api/synchronizations/contracts/{id}', 'verb' => 'GET'],
-		['name' => 'synchronizations#run', 'url' => '/api/synchronizations/run/{id}', 'verb' => 'POST'],
 		// Mapping endpoints
 		['name' => 'mappings#test', 'url' => '/api/mappings/test', 'verb' => 'POST'],
 		['name' => 'mappings#saveObject', 'url' => '/api/mappings/objects', 'verb' => 'POST'],
