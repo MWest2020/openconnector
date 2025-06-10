@@ -808,6 +808,11 @@ class SynchronizationService
             $object = $this->processRules(synchronization: $synchronization, data: $object, timing: 'before');
         }
 
+		if($object instanceof JSONResponse === true) {
+			var_dump($object->getData());
+			die;
+		}
+
             // set the target hash
         $targetHash = md5(serialize($object));
 
@@ -905,6 +910,11 @@ class SynchronizationService
 		// Save the object to the target
 		switch ($action) {
 			case 'save':
+				if (isset($targetObject['id']) === true && $synchronizationContract->getTargetId() === null) {
+					$synchronizationContract->setTargetId($targetObject['id']);
+				}
+
+
 				$target = $objectService->saveObject(register: $register, schema: $schema, object: $targetObject, uuid: $synchronizationContract->getTargetId());
 				// Get the id form the target object
 				$synchronizationContract->setTargetId($target->getUuid());
@@ -1720,10 +1730,12 @@ class SynchronizationService
 
 		}
 
+		$serializedObject = $object->jsonSerialize();
+
 		$synchronizationContract = $this->synchronizeContract(
 			synchronizationContract: $synchronizationContract,
 			synchronization: $synchronization,
-			object: $object->jsonSerialize(),
+			object: $serializedObject,
 			isTest: $test,
 			force: $force,
 			log: $log
@@ -1978,14 +1990,21 @@ class SynchronizationService
             throw new Exception('Could not write file: no filename could be determined');
         }
 
+		$tags[] = "object:$objectId";
+
 		$objectService = $this->containerInterface->get('OCA\OpenRegister\Service\ObjectService');
-		$objectEntity = $objectService->findByUuid(uuid: $objectId);
-
-        $tags[] = "object:$objectId";
-
-		// Write file with OpenRegister FileService.
 		$fileService = $this->containerInterface->get('OCA\OpenRegister\Service\FileService');
-		$file = $fileService->addFile(objectEntity: $objectEntity, fileName: $filename, content: $response['body'], share: isset($config['autoShare']) ? $config['autoShare'] : false, tags: $tags);
+		try {
+			$objectEntity = $objectService->findByUuid(uuid: $objectId);
+
+			$file = $fileService->addFile(objectEntity: $objectEntity, fileName: $filename, content: $response['body'], share: isset($config['autoShare']) ? $config['autoShare'] : false, tags: $tags);
+
+		} catch (DoesNotExistException $exception) {
+			// If the object cannot be found, continue with register/schema/objectId combination
+			$register = $config['register'] ?? null;
+			$schema   = $config['schema'] ?? null;
+			$file = $fileService->addFile(objectEntity: $objectId, fileName: $filename, content: $response['body'], share: isset($config['autoShare']) ? $config['autoShare'] : false, tags: $tags, register: $register, schema: $schema);
+		}
 
 		return $originalEndpoint;
 	}
@@ -2115,7 +2134,7 @@ class SynchronizationService
 	 * @throws \OCP\DB\Exception
 	 * @throws Exception
 	 */
-	private function processFetchFileRule(Rule $rule, array $data, string $objectId): array
+	private function processFetchFileRule(Rule $rule, array $data, ?string $objectId = null): array
 	{
         $appManager = \OC::$server->get(\OCP\App\IAppManager::class);
         if ($appManager->isEnabledForUser('openregister') === false) {
@@ -2131,6 +2150,10 @@ class SynchronizationService
 		$source = $this->sourceMapper->find($config['source']);
 		$dataDot = new Dot($data);
 		$endpoint = $dataDot->get($config['filePath']);
+
+		if ($objectId === null && isset($config['objectIdPath']) === true) {
+			$objectId = $dataDot->get($config['objectIdPath']);
+		}
 
 		if ($endpoint === null) {
 			return $dataDot->jsonSerialize();
@@ -2157,7 +2180,6 @@ class SynchronizationService
 				foreach ($endpoint as $object) {
 					$filename = null;
 					$tags = [];
-					$objectId = $objectId;
 					$endpoint = $this->getFileContext(config: $config, endpoint: $object, filename: $filename, tags: $tags, objectId: $objectId);
 					if ($endpoint === null) {
 						throw new Exception('Could not get endpoint for fetch file rule' . $rule->getId());
