@@ -60,7 +60,7 @@ class JobTask extends TimedJob
 		$this->setInterval(300);
 
 		// Set as time insensitive to run during low-load periods
-		$this->setTimeSensitivity(IJob::TIME_INSENSITIVE);
+		$this->setTimeSensitivity(IJob::TIME_SENSITIVE);
 
 		// Only run one instance of this job at a time
 		$this->setAllowParallelRuns(false);
@@ -83,8 +83,6 @@ class JobTask extends TimedJob
 	public function run(mixed $argument): void
 	{
 		// Delegate job execution to the service layer
-		if (is_array($argument)) {
-			$this->jobService->executeJob($argument);
-		}
+		$this->jobService->run();
 	}
 }

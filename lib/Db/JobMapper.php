@@ -314,4 +314,20 @@ class JobMapper extends QBMapper
         }
         return $mappings;
     }
+
+    /**
+     * Find all jobs that are enabled and scheduled to run (nextRun <= now)
+     *
+     * @return array<Job> Array of runnable Job entities
+     */
+    public function findRunnable(): array
+    {
+        $qb = $this->db->getQueryBuilder();
+        $qb->select('*')
+            ->from('openconnector_jobs')
+            ->where($qb->expr()->eq('is_enabled', $qb->createNamedParameter(true)))
+            ->andWhere($qb->expr()->isNotNull('next_run'))
+            ->andWhere($qb->expr()->lte('next_run', $qb->createNamedParameter((new \DateTime())->format('Y-m-d H:i:s'))));
+        return $this->findEntities(query: $qb);
+    }
 }

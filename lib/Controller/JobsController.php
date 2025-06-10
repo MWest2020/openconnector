@@ -317,11 +317,11 @@ class JobsController extends Controller
                 }
             }
 
-            // Prepare arguments for executeJob
-            $arguments = array_merge(['jobId' => $job->getId()], $parameters);
+            // Determine if forceRun is set
+            $forceRun = isset($parameters['forceRun']) ? filter_var($parameters['forceRun'], FILTER_VALIDATE_BOOLEAN) : false;
 
             // Execute the job
-            $result = $this->jobService->executeJob($arguments);
+            $result = $this->jobService->executeJob($job, $forceRun);
 
             // Return the execution results
             return new JSONResponse($result);
@@ -360,11 +360,11 @@ class JobsController extends Controller
                 }
             }
 
-            // Prepare arguments for executeJob
-            $arguments = array_merge(['jobId' => $job->getId()], $parameters);
+            // Always force run for test
+            $forceRun = true;
 
             // Execute the job
-            $result = $this->jobService->executeJob($arguments);
+            $result = $this->jobService->executeJob($job, $forceRun);
 
             // Return the execution results
             return new JSONResponse($result);

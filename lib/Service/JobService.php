@@ -207,7 +207,7 @@ class JobService
     }
 
     /**
-     * Execute a job based on the provided arguments
+     * Execute a job based on the provided job object and optional forceRun flag
      *
      * This method handles the complete job execution process including:
      * - Job validation and retrieval
@@ -216,7 +216,8 @@ class JobService
      * - Result processing and logging
      * - Next run scheduling
      *
-     * @param array $argument The job execution arguments containing jobId and optional forceRun flag
+     * @param Job $job The job object to be executed
+     * @param bool $forceRun Optional flag to force run the job
      *
      * @return JobLog The job log entry created for this execution
      *
@@ -224,38 +225,16 @@ class JobService
      * @throws ContainerExceptionInterface Container operation exceptions
      * @throws NotFoundExceptionInterface When required services are not found
      *
-     * @psalm-param JobArgument $argument
+     * @psalm-param Job $job
      * @psalm-return JobLog
-     * @phpstan-param array{jobId?: int, forceRun?: bool} $argument
+     * @phpstan-param Job $job
      * @phpstan-return JobLog
      */
-    public function executeJob(array $argument): JobLog
+    public function executeJob(Job $job, bool $forceRun = false): JobLog
     {
-        // Validate that we have a valid job ID in the arguments
-        if (isset($argument['jobId']) === false || is_int($argument['jobId']) === false) {
-            return $this->jobLogMapper->createFromArray([
-                'jobId'         => 'null',
-                'level'			=> 'ERROR',
-                'message'		=> "Couldn't find a jobId in the action argument"
-            ]);
-        }
-
-        // Attempt to retrieve the job from the database
-        try {
-            $job = $this->jobMapper->find($argument['jobId']);
-        } catch (Exception $e) {
-            return $this->jobLogMapper->createFromArray([
-                'jobId'         => $argument['jobId'],
-                'level'			=> 'ERROR',
-                'message'		=> "Couldn't find a Job with this jobId, message: ".$e->getMessage()
-            ]);
-        }
-
-        // Initialize force run flag and stack trace for logging
-        $forceRun = false;
+        // Initialize stack trace for logging
         $stackTrace = [];
-        if (isset($argument['forceRun']) === true && $argument['forceRun'] === true) {
-            $forceRun = true;
+        if ($forceRun === true) {
             $stackTrace[] = 'Doing a force run for this job, ignoring "enabled" & "nextRun" check...';
         }
 
@@ -326,7 +305,7 @@ class JobService
 
         // Create initial job log entry with success status
         $jobLog = $this->jobLogMapper->createForJob($job, [
-            'level'			=> 'INFO',
+            'level'			=> 'SUCCESS',
             'message'		=> 'Success',
             'executionTime' => $executionTime
         ]);
@@ -349,5 +328,26 @@ class JobService
         $this->jobLogMapper->update(entity: $jobLog);
 
         return $jobLog;
+    }
+
+    /**
+     * Run all jobs that are scheduled to run (nextRun <= now)
+     *
+     * @return JobLog[] Array of job log results
+     * @psalm-return array<JobLog>
+     * @phpstan-return JobLog[]
+     */
+    public function run(): array
+    {
+        // Use the mapper to get all runnable jobs
+        $jobs = $this->jobMapper->findRunnable();
+        $results = [];
+        foreach ($jobs as $job) {
+            $log = $this->executeJob($job);
+            if ($log !== null) {
+                $results[] = $log;
+            }
+        }
+        return $results;
     }
 }
