@@ -412,25 +412,34 @@ export const useSynchronizationStore = defineStore('synchronization', () => {
 	}
 
 	// logs
-	const refreshSynchronizationLogs = async (filters: object = {}) => {
+	const refreshSynchronizationLogs = async (filters: { page?: number; limit?: number; [key: string]: unknown } = {}) => {
 		const logStore = useLogStore()
 		logStore.setLogsLoading(true)
-		
+
 		try {
 			// Build query parameters
 			const queryParams = new URLSearchParams()
+
+			// Add pagination parameters with defaults using correct backend parameter names
+			const page = filters.page || 1
+			const limit = filters.limit || 20
+			queryParams.append('_page', page.toString())
+			queryParams.append('_limit', limit.toString())
+
 			// Only add synchronization_id if not already present in filters
 			if (!('synchronization_id' in filters) && synchronizationItem.value?.id) {
 				queryParams.append('synchronization_id', synchronizationItem.value.id.toString())
 			}
-			// Add other filters
+
+			// Add other filters (exclude page and limit to avoid duplication)
 			Object.entries(filters).forEach(([key, value]) => {
-				if (value !== null && value !== undefined && value !== '') {
+				if (key !== 'page' && key !== 'limit' && value !== null && value !== undefined && value !== '') {
 					queryParams.append(key, value.toString())
 				}
 			})
+
 			// Build the endpoint
-			const endpoint = `/index.php/apps/openconnector/api/synchronizations/logs${queryParams.toString() ? '?' + queryParams.toString() : ''}`
+			const endpoint = `/index.php/apps/openconnector/api/synchronizations/logs?${queryParams.toString()}`
 			const response = await fetch(endpoint, {
 				method: 'GET',
 			})
@@ -449,7 +458,7 @@ export const useSynchronizationStore = defineStore('synchronization', () => {
 	const fetchSynchronizationLogsStatistics = async () => {
 		const logStore = useLogStore()
 		logStore.setLogsLoading(true)
-		
+
 		try {
 			const endpoint = '/index.php/apps/openconnector/api/synchronizations/logs/statistics'
 			const response = await fetch(endpoint, {
@@ -534,6 +543,58 @@ export const useSynchronizationStore = defineStore('synchronization', () => {
 			})
 	}
 
+	/**
+	 * Delete a single synchronization log
+	 *
+	 * @param {string} id - The ID of the synchronization log to delete
+	 * @return {Promise<{ response: Response }>}
+	 */
+	const deleteSynchronizationLog = async (id: string): Promise<{ response: Response }> => {
+		if (!id) {
+			throw new MissingParameterError('id')
+		}
+
+		console.info('Deleting synchronization log...')
+
+		const endpoint = `/index.php/apps/openconnector/api/synchronizations/logs/${id}`
+
+		const response = await fetch(endpoint, {
+			method: 'DELETE',
+		})
+
+		return { response }
+	}
+
+	/**
+	 * Export synchronization logs
+	 *
+	 * @return {Promise<{ response: Response }>}
+	 */
+	const exportSynchronizationLogs = async (): Promise<{ response: Response }> => {
+		console.info('Exporting synchronization logs...')
+
+		const endpoint = '/index.php/apps/openconnector/api/synchronizations/logs/export'
+
+		const response = await fetch(endpoint, {
+			method: 'GET',
+		})
+
+		// Handle file download
+		if (response.ok) {
+			const blob = await response.blob()
+			const url = window.URL.createObjectURL(blob)
+			const a = document.createElement('a')
+			a.href = url
+			a.download = 'synchronization-logs.csv'
+			document.body.appendChild(a)
+			a.click()
+			window.URL.revokeObjectURL(url)
+			document.body.removeChild(a)
+		}
+
+		return { response }
+	}
+
 	return {
 		// state
 		synchronizationItem,
@@ -574,5 +635,7 @@ export const useSynchronizationStore = defineStore('synchronization', () => {
 		testSynchronization,
 		runSynchronization,
 		exportSynchronization,
+		deleteSynchronizationLog,
+		exportSynchronizationLogs,
 	}
 })

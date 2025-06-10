@@ -360,9 +360,9 @@ export default {
 		getResponseTimeClass(responseTime) {
 			if (!responseTime) return ''
 			const timeInSeconds = responseTime / 1000
-			if (timeInSeconds < 1) return 'fast-response'
-			if (timeInSeconds < 3) return 'medium-response'
-			return 'slow-response'
+			if (timeInSeconds <= 0.3) return 'fast-response' // 300 ms or less is fast-response
+			if (timeInSeconds <= 1) return 'medium-response' // 1 second or less is medium-response
+			return 'slow-response' // More than 1 second is slow-response
 		},
 		viewLogDetails(log) {
 			logStore.setViewLogItem(log)

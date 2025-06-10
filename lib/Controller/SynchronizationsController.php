@@ -417,4 +417,31 @@ class SynchronizationsController extends Controller
             );
         }
     }
+
+    /**
+     * Deletes a single synchronization log
+     *
+     * This method deletes a synchronization log based on its ID.
+     *
+     * @NoAdminRequired
+     * @NoCSRFRequired
+     *
+     * @param int $id The ID of the synchronization log to delete
+     * @return JSONResponse A JSON response indicating success or failure
+     */
+    public function deleteLog(int $id): JSONResponse
+    {
+        try {
+            $log = $this->synchronizationLogMapper->find($id);
+            $this->synchronizationLogMapper->delete($log);
+            
+            return new JSONResponse(['message' => 'Log deleted successfully'], 200);
+        } catch (DoesNotExistException $exception) {
+            return new JSONResponse(['error' => 'Log not found'], 404);
+        } catch (\Exception $exception) {
+            return new JSONResponse(['error' => 'Failed to delete log: ' . $exception->getMessage()], 500);
+        }
+    }
+
+
 }
