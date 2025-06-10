@@ -394,7 +394,7 @@ export const useSynchronizationStore = defineStore('synchronization', () => {
 
 	// contracts
 	const refreshSynchronizationContracts = async (id: string, search?: string) => {
-		let endpoint = `/index.php/apps/openconnector/api/synchronizations-contracts/${id}`
+		let endpoint = `/index.php/apps/openconnector/api/synchronizations/${id}/contracts`
 
 		if (search && search !== '') {
 			endpoint = endpoint + '?_search=' + search
@@ -473,7 +473,7 @@ export const useSynchronizationStore = defineStore('synchronization', () => {
 
 		console.info('Testing synchronization...')
 
-		const endpoint = `/index.php/apps/openconnector/api/synchronizations-test/${synchronizationItem.value.id}`
+		const endpoint = `/index.php/apps/openconnector/api/synchronizations/${synchronizationItem.value.id}/test`
 
 		const response = await fetch(endpoint, {
 			method: 'POST',
@@ -498,7 +498,7 @@ export const useSynchronizationStore = defineStore('synchronization', () => {
 
 		console.info('Testing synchronization...')
 
-		const endpoint = `/index.php/apps/openconnector/api/synchronizations-run/${id}?test=${test}&force=${force}`
+		const endpoint = `/index.php/apps/openconnector/api/synchronizations/${id}/run?test=${test}&force=${force}`
 
 		const response = await fetch(endpoint, {
 			method: 'POST',

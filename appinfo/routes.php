@@ -23,10 +23,10 @@ return [
 		['name' => 'sources#logs', 'url' => '/api/sources/logs', 'verb' => 'GET'],
 		['name' => 'sources#statistics', 'url' => '/api/sources/statistics', 'verb' => 'GET'],
 		// Job endpoints
+		['name' => 'jobs#run', 'url' => '/api/jobs/run/{id}', 'verb' => 'POST'],
 		['name' => 'jobs#test', 'url' => '/api/jobs/test/{id}', 'verb' => 'POST'],
 		['name' => 'jobs#logs', 'url' => '/api/jobs/logs', 'verb' => 'GET'],
 		['name' => 'jobs#statistics', 'url' => '/api/jobs/statistics', 'verb' => 'GET'],
-		['name' => 'jobs#run', 'url' => '/api/jobs/run/{id}', 'verb' => 'POST'],
 		// Endpoint endpoints
 		['name' => 'endpoints#test', 'url' => '/api/endpoints/test/{id}', 'verb' => 'POST'],
 		['name' => 'endpoints#logs', 'url' => '/api/endpoints/logs', 'verb' => 'GET'],

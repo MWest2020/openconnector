@@ -1,6 +1,7 @@
 import { ref } from 'vue'
 import { defineStore } from 'pinia'
 import { Endpoint, TEndpoint } from '../../entities/index.js'
+import { TLog } from '../../entities/log/log.types.js'
 import { MissingParameterError } from '../../services/errors/index.js'
 import { importExportStore } from '../../store/store.js'
 
@@ -82,7 +83,7 @@ export const useEndpointStore = defineStore('endpoint', () => {
 	 * Set the endpoint logs
 	 * @param logs - The logs to set
 	 */
-	const setEndpointLogs = (logs) => {
+	const setEndpointLogs = (logs: TLog[]): void => {
 		endpointLogs.value = logs
 	}
 
