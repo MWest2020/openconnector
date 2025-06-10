@@ -61,6 +61,7 @@
 				class="pagination-page-size-select"
 				:value="currentPageSizeOption"
 				:options="pageSizeOptions"
+				:aria-label-combobox="t('openconnector', 'Select page size')"
 				:clearable="false"
 				@option:selected="changePageSize" />
 		</div>

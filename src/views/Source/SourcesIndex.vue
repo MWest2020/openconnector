@@ -448,20 +448,5 @@ export default {
 </script>
 
 <style scoped>
-.sourceDetails {
-	margin-top: 1rem;
-}
-
-.sourceDescription {
-	color: var(--color-text-lighter);
-	margin-bottom: 1rem;
-}
-
-.truncatedUrl {
-	max-width: 200px;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
-	display: inline-block;
-}
+/* All CSS is provided by main.css */
 </style>

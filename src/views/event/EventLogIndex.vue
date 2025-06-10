@@ -1,5 +1,6 @@
 <script setup>
 import { logStore, navigationStore, eventStore } from '../../store/store.js'
+import { translate as t } from '@nextcloud/l10n'
 </script>
 
 <template>
@@ -218,7 +219,6 @@ import InformationOutline from 'vue-material-design-icons/InformationOutline.vue
 import ContentCopy from 'vue-material-design-icons/ContentCopy.vue'
 import Check from 'vue-material-design-icons/Check.vue'
 import DatabaseSearch from 'vue-material-design-icons/DatabaseSearch.vue'
-
 import PaginationComponent from '../../components/PaginationComponent.vue'
 
 export default {
@@ -419,171 +419,5 @@ export default {
 </script>
 
 <style scoped>
-/* Specific column widths for event logs table */
-.levelColumn {
-	width: 120px;
-}
-
-.eventColumn {
-	width: 200px;
-}
-
-.messageColumn {
-	min-width: 300px;
-}
-
-.executionTimeColumn {
-	width: 120px;
-}
-
-.timestampColumn {
-	width: 180px;
-}
-
-/* Level-specific row styling */
-.viewTableRow.successLevel {
-	border-left: 4px solid var(--color-success);
-}
-
-.viewTableRow.warningLevel {
-	border-left: 4px solid var(--color-warning);
-}
-
-.viewTableRow.errorLevel {
-	border-left: 4px solid var(--color-error);
-}
-
-.viewTableRow.infoLevel {
-	border-left: 4px solid var(--color-info);
-}
-
-.viewTableRow.unknownLevel {
-	border-left: 4px solid var(--color-text-maxcontrast);
-}
-
-/* Level badge styling */
-.levelBadge {
-	display: inline-flex;
-	align-items: center;
-	gap: 4px;
-	padding: 4px 8px;
-	border-radius: 12px;
-	font-size: 0.75rem;
-	font-weight: 600;
-	color: white;
-	background: var(--color-text-maxcontrast);
-}
-
-.levelBadge.successLevel {
-	background: var(--color-success);
-}
-
-.levelBadge.warningLevel {
-	background: var(--color-warning);
-}
-
-.levelBadge.errorLevel {
-	background: var(--color-error);
-}
-
-.levelBadge.infoLevel {
-	background: var(--color-info);
-}
-
-/* Execution time styling */
-.fast-execution {
-	color: var(--color-success);
-	font-weight: 600;
-}
-
-.medium-execution {
-	color: var(--color-warning);
-	font-weight: 600;
-}
-
-.slow-execution {
-	color: var(--color-error);
-	font-weight: 600;
-}
-
-.copySuccessIcon {
-	color: var(--color-success) !important;
-}
-
-:deep(.deleteAction) {
-	color: var(--color-error) !important;
-}
-
-:deep(.deleteAction:hover) {
-	background-color: var(--color-error) !important;
-	color: var(--color-main-background) !important;
-}
-
-.viewLoading {
-	display: flex;
-	flex-direction: column;
-	align-items: center;
-	justify-content: center;
-	min-height: 200px;
-	gap: 16px;
-}
-
-.eventInfo {
-	display: flex;
-	align-items: center;
-	gap: 8px;
-}
-
-.eventName {
-	font-weight: 500;
-}
-
-.eventType {
-	font-size: 0.8em;
-	color: var(--color-text-maxcontrast);
-}
-
-.messageInfo {
-	display: flex;
-	align-items: center;
-	gap: 8px;
-}
-
-.messageText {
-	flex: 1;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
-}
-
-.contextIndicator {
-	color: var(--color-text-maxcontrast);
-	cursor: help;
-}
-
-.executionInfo {
-	display: flex;
-	align-items: center;
-	gap: 8px;
-}
-
-.memoryUsage {
-	font-size: 0.8em;
-	color: var(--color-text-maxcontrast);
-}
-
-.timestampInfo {
-	display: flex;
-	flex-direction: column;
-	gap: 4px;
-}
-
-.createdTime {
-	font-weight: 500;
-}
-
-.expiresTime {
-	font-size: 0.8em;
-	color: var(--color-text-maxcontrast);
-}
+/* All CSS is provided by main.css */
 </style> 

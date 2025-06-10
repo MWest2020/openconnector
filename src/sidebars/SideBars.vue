@@ -17,7 +17,7 @@ import { navigationStore } from '../store/store.js'
 		<ContractsSideBar v-if="navigationStore.selected === 'contracts'" />
 
 		<!-- Logs Sidebar -->
-		<LogsSideBar v-if="navigationStore.selected === 'logs'" />
+		<LogsSideBar v-if="navigationStore.selected === 'synchronization-logs'" />
 
 		<!-- Event Logs Sidebar -->
 		<EventLogSideBar v-if="navigationStore.selected === 'event-logs'" />

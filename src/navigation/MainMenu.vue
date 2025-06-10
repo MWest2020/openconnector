@@ -113,7 +113,7 @@ import { navigationStore } from '../store/store.js'
 							<FileDocumentOutline :size="20" />
 						</template>
 					</NcAppNavigationItem>
-					<NcAppNavigationItem :active="navigationStore.selected === 'logs'" name="Logs" @click="navigationStore.setSelected('logs')">
+					<NcAppNavigationItem :active="navigationStore.selected === 'synchronization-logs'" name="Logs" @click="navigationStore.setSelected('synchronization-logs')">
 						<template #icon>
 							<TextBoxOutline :size="20" />
 						</template>
