@@ -1009,7 +1009,7 @@ class EndpointService
                 };
 
                 // If result is JSONResponse, return error immediately
-                if ($result instanceof JSONResponse === true) {
+                if ($result instanceof JSONResponse === true || $result instanceof DataDownloadResponse === true ) {
                     return $result;
                 }
 
@@ -1674,14 +1674,22 @@ class EndpointService
             $filename = $dot->get($config['filenamePosition']);
         }
 
+		$fileService = $this->containerInterface->get('OCA\OpenRegister\Service\FileService');
+        $files = $fileService->getFiles(object: $object, sharedFilesOnly: false);
+
+        // Try to get filename from object its files (only works when object has 1 file)
         if (isset($filename) === false && count($object->getFiles()) === 1) {
             $filename = $object->getFiles()[0]['title'];
-        } else if (isset($filename) === false) {
-            throw new Exception('File could not be determined');
         }
 
-
-		$fileService = $this->containerInterface->get('OCA\OpenRegister\Service\FileService');
+        // Try to get filename from files found with fileservice (only works when object has 1 file)
+        if (isset($filename) === false && count($files) === 1) {
+            $filename = $files[0]->getName();
+        }
+        
+        if (isset($filename) === false) {
+            throw new Exception('File could not be determined');
+        }
 
         if(isset($data['parameters']['version']) === true) {
             $file = $fileService->getFile(object: $object, filePath: $filename, version: $data['parameters']['version']);
