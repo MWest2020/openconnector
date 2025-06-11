@@ -208,6 +208,10 @@ class EndpointService
                     return $ruleResult;
                 }
 
+				if ($result->getStatus() !== 200 && $result->getStatus() !== 201) {
+					return new JSONResponse(data: $ruleResult['body'], statusCode: $result->getStatus(), headers: $ruleResult['headers']);
+				}
+
                 // Set the proper status code for the method.
                 //@TODO: we might want an override from rule processing.
                 switch ($incomingMethod) {
@@ -1004,6 +1008,7 @@ class EndpointService
                     'filepart_upload' => $this->processFilePartUploadRule(rule: $rule, data: $data, request: $request, objectId: $objectId),
                     'download' => $this->processDownloadRule(rule: $rule, data: $data, objectId: $objectId),
                     'extend_input' => $this->processExtendInputRule(rule: $rule, data: $data),
+					'extend_external_input' => $this->ruleService->extendExternalUrl(rule: $rule, data: $data),
                     'audit_trail' => $this->processAuditTrailRule(rule: $rule, endpoint: $endpoint, data: $data, objectId: $objectId),
                     'write_file' => $this->processWriteFileRule(rule: $rule, data: $data, objectId: $objectId),
                     'locking' => $this->processLockingRule(rule: $rule, data: $data, objectId: $objectId),
@@ -1218,7 +1223,13 @@ class EndpointService
 
         }
 
-		$data['body']['_extendedInput'] = $data['extendedParameters'] = $extendedParameters->all();
+		if (isset($data['extendedParameters']) === true) {
+			$data['extendedParameters'] = array_merge($extendedParameters->all(), $data['extendedParameters']);
+		} else {
+            $data['extendedParameters'] = $extendedParameters->all();
+        }
+
+		$data['body']['_extendedInput'] = $data['extendedParameters'];
 
         return $data;
     }
