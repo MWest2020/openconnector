@@ -819,6 +819,9 @@ class RuleService
 	{
 		$source = $this->sourceMapper->findOrCreateByLocation($url);
 
+		//@TODO The previous line returns an incomplete source, by fetching it again from the database we receive a working source
+		$source = $this->sourceMapper->find($source->getId());
+
 		$result = $this->callService->call($source);
 
 		if($result->getStatusCode() !== 200) {
