@@ -40,6 +40,11 @@ class EndpointHandler implements ConfigurationHandlerInterface
 
         $endpointArray = $entity->jsonSerialize();
         unset($endpointArray['id'], $endpointArray['uuid']);
+        
+        // Ensure slug is set
+        if (empty($endpointArray['slug'])) {
+            $endpointArray['slug'] = $entity->getSlug();
+        }
 
         // Handle targetId based on targetType.
         if (isset($endpointArray['targetId']) && isset($endpointArray['targetType'])) {
