@@ -796,7 +796,25 @@ class RuleService
         }
     }
 
-
+	/**
+	 * Fetches an external object and if requested, validate it.
+	 *
+	 * @param string $url The url to retrieve the object from.
+	 * @param array $configuration Configuration of the rule
+	 * @param string|int $schemaId The schema to validate against
+	 *
+	 * @return array The object found on $url
+	 *
+	 * @throws ValidationException
+	 * @throws \GuzzleHttp\Exception\GuzzleException
+	 * @throws \OCP\AppFramework\Db\DoesNotExistException
+	 * @throws \OCP\AppFramework\Db\MultipleObjectsReturnedException
+	 * @throws \OCP\DB\Exception
+	 * @throws \Psr\Container\ContainerExceptionInterface
+	 * @throws \Psr\Container\NotFoundExceptionInterface
+	 * @throws \Twig\Error\LoaderError
+	 * @throws \Twig\Error\SyntaxError
+	 */
 	private function getExternalObject(string $url, array $configuration, string|int $schemaId): array
 	{
 		$source = $this->sourceMapper->findOrCreateByLocation($url);
@@ -809,8 +827,6 @@ class RuleService
 
 
 		$object = json_decode($result->getResponse()['body'], true);
-
-		var_dump($object);
 
 		if ($configuration['extend_external_input']['validate'] === false) {
 			return $object;
@@ -828,6 +844,16 @@ class RuleService
 
 	}
 
+	/**
+	 * Extend an object with an external url
+	 *
+	 * @param Rule $rule The rule to execute.
+	 * @param array $data The data to extend.
+	 * @return array|JSONResponse
+	 * @throws \GuzzleHttp\Exception\GuzzleException
+	 * @throws \Psr\Container\ContainerExceptionInterface
+	 * @throws \Psr\Container\NotFoundExceptionInterface
+	 */
 	public function extendExternalUrl(Rule $rule, array $data): array|JSONResponse
 	{
 		$config = $rule->getConfiguration();
