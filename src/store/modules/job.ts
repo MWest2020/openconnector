@@ -16,6 +16,7 @@ export const useJobStore = defineStore('job', () => {
 	const jobLog = ref<object>(null)
 	const jobLogs = ref<object[]>([])
 	const jobArgumentKey = ref<string>(null)
+	const viewMode = ref<string>('cards')
 
 	// ################################
 	// ||    Setters and Getters     ||
@@ -230,6 +231,35 @@ export const useJobStore = defineStore('job', () => {
 	 * @return {string | null} The active job argument key
 	 */
 	const getJobArgumentKey = (): string | null => jobArgumentKey.value
+
+	/**
+	 * Set the view mode.
+	 * @param mode - The view mode to set
+	 */
+	const setViewMode = (mode: string) => {
+		viewMode.value = mode
+		console.info('Job view mode set to ' + mode)
+	}
+
+	/**
+	 * Get the view mode.
+	 *
+	 * @description
+	 * Returns the currently active view mode. Note that the return value is non-reactive.
+	 *
+	 * For reactive usage, either:
+	 * 1. Reference the `viewMode` state directly:
+	 * ```js
+	 * const viewMode = useJobStore().viewMode // reactive state
+	 * ```
+	 * 2. Or wrap in a `computed` property:
+	 * ```js
+	 * const viewMode = computed(() => useJobStore().getViewMode())
+	 * ```
+	 *
+	 * @return {string} The active view mode
+	 */
+	const getViewMode = (): string => viewMode.value as string
 
 	// ################################
 	// ||          Actions           ||
@@ -485,6 +515,7 @@ export const useJobStore = defineStore('job', () => {
 		jobLog,
 		jobLogs,
 		jobArgumentKey,
+		viewMode,
 
 		// setters and getters
 		setJobItem,
@@ -501,6 +532,8 @@ export const useJobStore = defineStore('job', () => {
 		getJobLogs,
 		setJobArgumentKey,
 		getJobArgumentKey,
+		setViewMode,
+		getViewMode,
 
 		// actions
 		refreshJobList,

@@ -14,6 +14,7 @@ export const useEndpointStore = defineStore('endpoint', () => {
 	const endpointLogs = ref([])
 	const loading = ref(false)
 	const error = ref(null)
+	const viewMode = ref<string>('cards')
 
 	// ################################
 	// ||    Setters and Getters     ||
@@ -86,6 +87,35 @@ export const useEndpointStore = defineStore('endpoint', () => {
 	const setEndpointLogs = (logs: TLog[]): void => {
 		endpointLogs.value = logs
 	}
+
+	/**
+	 * Set the view mode.
+	 * @param mode - The view mode to set
+	 */
+	const setViewMode = (mode: string) => {
+		viewMode.value = mode
+		console.info('Endpoint view mode set to ' + mode)
+	}
+
+	/**
+	 * Get the view mode.
+	 *
+	 * @description
+	 * Returns the currently active view mode. Note that the return value is non-reactive.
+	 *
+	 * For reactive usage, either:
+	 * 1. Reference the `viewMode` state directly:
+	 * ```js
+	 * const viewMode = useEndpointStore().viewMode // reactive state
+	 * ```
+	 * 2. Or wrap in a `computed` property:
+	 * ```js
+	 * const viewMode = computed(() => useEndpointStore().getViewMode())
+	 * ```
+	 *
+	 * @return {string} The active view mode
+	 */
+	const getViewMode = (): string => viewMode.value as string
 
 	/**
 	 * Refresh the endpoint logs
@@ -290,12 +320,15 @@ export const useEndpointStore = defineStore('endpoint', () => {
 		endpointLogs,
 		loading,
 		error,
+		viewMode,
 		// setter / getter
 		setEndpointItem,
 		getEndpointItem,
 		setEndpointList,
 		getEndpointList,
 		setEndpointLogs,
+		setViewMode,
+		getViewMode,
 		// actions
 		refreshEndpointList,
 		fetchEndpoint,

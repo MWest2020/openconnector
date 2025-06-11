@@ -17,6 +17,7 @@ export const useSynchronizationStore = defineStore('synchronization', () => {
 	const synchronizationLogs = ref<object[]>([])
 	const synchronizationSourceConfigKey = ref<string | null>(null)
 	const synchronizationTargetConfigKey = ref<string | null>(null)
+	const viewMode = ref<string>('cards')
 
 	// ################################
 	// ||    Setters and Getters     ||
@@ -253,6 +254,35 @@ export const useSynchronizationStore = defineStore('synchronization', () => {
 	 * @return {Synchronization | null} The active synchronization item
 	 */
 	const getSynchronizationTargetConfigKey = (): string => synchronizationTargetConfigKey.value as string
+
+	/**
+	 * Set the view mode.
+	 * @param mode - The view mode to set
+	 */
+	const setViewMode = (mode: string) => {
+		viewMode.value = mode
+		console.info('Synchronization view mode set to ' + mode)
+	}
+
+	/**
+	 * Get the view mode.
+	 *
+	 * @description
+	 * Returns the currently active view mode. Note that the return value is non-reactive.
+	 *
+	 * For reactive usage, either:
+	 * 1. Reference the `viewMode` state directly:
+	 * ```js
+	 * const viewMode = useSynchronizationStore().viewMode // reactive state
+	 * ```
+	 * 2. Or wrap in a `computed` property:
+	 * ```js
+	 * const viewMode = computed(() => useSynchronizationStore().getViewMode())
+	 * ```
+	 *
+	 * @return {string} The active view mode
+	 */
+	const getViewMode = (): string => viewMode.value as string
 
 	// ################################
 	// ||          Actions           ||
@@ -605,6 +635,7 @@ export const useSynchronizationStore = defineStore('synchronization', () => {
 		synchronizationLogs,
 		synchronizationSourceConfigKey,
 		synchronizationTargetConfigKey,
+		viewMode,
 
 		// setters and getters
 		setSynchronizationItem,
@@ -623,6 +654,8 @@ export const useSynchronizationStore = defineStore('synchronization', () => {
 		getSynchronizationSourceConfigKey,
 		setSynchronizationTargetConfigKey,
 		getSynchronizationTargetConfigKey,
+		setViewMode,
+		getViewMode,
 
 		// actions
 		refreshSynchronizationList,

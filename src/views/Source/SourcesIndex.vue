@@ -1,8 +1,3 @@
-<script setup>
-import { sourceStore, navigationStore } from '../../store/store.js'
-import { translate as t } from '@nextcloud/l10n'
-</script>
-
 <template>
 	<NcAppContent>
 		<div class="viewContainer">
@@ -27,23 +22,25 @@ import { translate as t } from '@nextcloud/l10n'
 				<div class="viewActions">
 					<div class="viewModeSwitchContainer">
 						<NcCheckboxRadioSwitch
-							v-model="sourceStore.viewMode"
 							v-tooltip="'See sources as cards'"
+							:checked="currentViewMode === 'cards'"
 							:button-variant="true"
 							value="cards"
 							name="view_mode_radio"
 							type="radio"
-							button-variant-grouped="horizontal">
+							button-variant-grouped="horizontal"
+							@click="setViewMode('cards')">
 							Cards
 						</NcCheckboxRadioSwitch>
 						<NcCheckboxRadioSwitch
-							v-model="sourceStore.viewMode"
 							v-tooltip="'See sources as a table'"
+							:checked="currentViewMode === 'table'"
 							:button-variant="true"
 							value="table"
 							name="view_mode_radio"
 							type="radio"
-							button-variant-grouped="horizontal">
+							button-variant-grouped="horizontal"
+							@click="setViewMode('table')">
 							Table
 						</NcCheckboxRadioSwitch>
 					</div>
@@ -90,7 +87,7 @@ import { translate as t } from '@nextcloud/l10n'
 
 			<!-- Content -->
 			<div v-else>
-				<template v-if="sourceStore.viewMode === 'cards'">
+				<template v-if="currentViewMode === 'cards'">
 					<div class="cardGrid">
 						<div v-for="source in paginatedSources" :key="source.id" class="card">
 							<div class="cardHeader">
@@ -151,47 +148,191 @@ import { translate as t } from '@nextcloud/l10n'
 								<p v-if="source.description" class="sourceDescription">
 									{{ source.description }}
 								</p>
-								<!-- Source Statistics Table -->
-								<table class="statisticsTable sourceStats">
-									<thead>
-										<tr>
-											<th>{{ t('openconnector', 'Property') }}</th>
-											<th>{{ t('openconnector', 'Value') }}</th>
-										</tr>
-									</thead>
-									<tbody>
-										<tr>
-											<td>{{ t('openconnector', 'Type') }}</td>
-											<td>{{ source.type || 'Unknown' }}</td>
-										</tr>
-										<tr v-if="source.location">
-											<td>{{ t('openconnector', 'Location') }}</td>
-											<td class="truncatedUrl">
-												{{ source.location }}
-											</td>
-										</tr>
-										<tr v-if="source.version">
-											<td>{{ t('openconnector', 'Version') }}</td>
-											<td>{{ source.version }}</td>
-										</tr>
-										<tr>
-											<td>{{ t('openconnector', 'Configurations') }}</td>
-											<td>{{ getConfigurationCount(source) }}</td>
-										</tr>
-										<tr>
-											<td>{{ t('openconnector', 'Authentication') }}</td>
-											<td>{{ getAuthenticationCount(source) }}</td>
-										</tr>
-										<tr>
-											<td>{{ t('openconnector', 'Created') }}</td>
-											<td>{{ source.created ? new Date(source.created).toLocaleDateString() : '-' }}</td>
-										</tr>
-										<tr>
-											<td>{{ t('openconnector', 'Updated') }}</td>
-											<td>{{ source.updated ? new Date(source.updated).toLocaleDateString() : '-' }}</td>
-										</tr>
-									</tbody>
-								</table>
+								<!-- Toggle between stats and configurations -->
+								<div v-if="!source.showConfigurations">
+									<table class="statisticsTable sourceStats">
+										<thead>
+											<tr>
+												<th>{{ t('openconnector', 'Property') }}</th>
+												<th>{{ t('openconnector', 'Value') }}</th>
+												<th>{{ t('openconnector', 'Actions') }}</th>
+											</tr>
+										</thead>
+										<tbody>
+											<tr>
+												<td>{{ t('openconnector', 'Type') }}</td>
+												<td>{{ source.type || 'Unknown' }}</td>
+												<td />
+											</tr>
+											<tr v-if="source.location">
+												<td>{{ t('openconnector', 'Location') }}</td>
+												<td class="truncatedUrl">
+													{{ source.location }}
+												</td>
+												<td />
+											</tr>
+											<tr v-if="source.version">
+												<td>{{ t('openconnector', 'Version') }}</td>
+												<td>{{ source.version }}</td>
+												<td />
+											</tr>
+											<tr>
+												<td>{{ t('openconnector', 'Configurations') }}</td>
+												<td>{{ getConfigurationCount(source) }}</td>
+												<td />
+											</tr>
+											<tr>
+												<td>{{ t('openconnector', 'Authentication') }}</td>
+												<td>{{ getAuthenticationCount(source) }}</td>
+												<td>
+													<NcButton @click="source.showConfigurations = !source.showConfigurations">
+														<template #icon>
+															<ListIcon :size="16" />
+														</template>
+														view
+													</NcButton>
+												</td>
+											</tr>
+											<tr>
+												<td>{{ t('openconnector', 'Status') }}</td>
+												<td>
+													<span :class="source.isEnabled ? 'status-enabled' : 'status-disabled'">
+														{{ source.isEnabled ? 'Enabled' : 'Disabled' }}
+													</span>
+												</td>
+												<td />
+											</tr>
+											<tr v-if="source.lastCall">
+												<td>{{ t('openconnector', 'Last Call') }}</td>
+												<td>{{ new Date(source.lastCall).toLocaleDateString() + ', ' + new Date(source.lastCall).toLocaleTimeString() }}</td>
+												<td />
+											</tr>
+											<tr v-if="source.lastSync">
+												<td>{{ t('openconnector', 'Last Sync') }}</td>
+												<td>{{ new Date(source.lastSync).toLocaleDateString() + ', ' + new Date(source.lastSync).toLocaleTimeString() }}</td>
+												<td />
+											</tr>
+											<tr>
+												<td>{{ t('openconnector', 'Created') }}</td>
+												<td>{{ source.created ? new Date(source.created).toLocaleDateString() : '-' }}</td>
+												<td />
+											</tr>
+											<tr>
+												<td>{{ t('openconnector', 'Updated') }}</td>
+												<td>{{ source.updated ? new Date(source.updated).toLocaleDateString() : '-' }}</td>
+												<td />
+											</tr>
+										</tbody>
+									</table>
+								</div>
+								<div v-else>
+									<div class="configurationsSection">
+										<h4>{{ t('openconnector', 'Configurations') }}</h4>
+										<table class="statisticsTable sourceStats">
+											<thead>
+												<tr>
+													<th>{{ t('openconnector', 'Key') }}</th>
+													<th>{{ t('openconnector', 'Value') }}</th>
+													<th>{{ t('openconnector', 'Actions') }}</th>
+												</tr>
+											</thead>
+											<tbody>
+												<tr v-for="(value, key) in source.configuration" :key="key">
+													<td>{{ key }}</td>
+													<td class="truncatedText">
+														{{ value }}
+													</td>
+													<td />
+												</tr>
+												<tr v-if="!source.configuration || !Object.keys(source.configuration).length">
+													<td colspan="3">
+														{{ t('openconnector', 'No configurations found') }}
+													</td>
+												</tr>
+											</tbody>
+										</table>
+									</div>
+
+									<div class="authenticationSection" style="margin-top: 20px;">
+										<h4>{{ t('openconnector', 'Authentication') }}</h4>
+										<table class="statisticsTable sourceStats">
+											<thead>
+												<tr>
+													<th>{{ t('openconnector', 'Property') }}</th>
+													<th>{{ t('openconnector', 'Value') }}</th>
+													<th>{{ t('openconnector', 'Actions') }}</th>
+												</tr>
+											</thead>
+											<tbody>
+												<tr v-if="source.auth">
+													<td>{{ t('openconnector', 'Auth Type') }}</td>
+													<td>{{ source.auth }}</td>
+													<td>
+														<NcButton @click="source.showConfigurations = !source.showConfigurations">
+															<template #icon>
+																<TableIcon :size="16" />
+															</template>
+															view
+														</NcButton>
+													</td>
+												</tr>
+												<tr v-if="source.username">
+													<td>{{ t('openconnector', 'Username') }}</td>
+													<td>{{ source.username }}</td>
+													<td></td>
+												</tr>
+												<tr v-if="source.apikey">
+													<td>{{ t('openconnector', 'API Key') }}</td>
+													<td class="truncatedText">
+														{{ source.apikey }}
+													</td>
+													<td></td>
+												</tr>
+												<tr v-if="source.jwt">
+													<td>{{ t('openconnector', 'JWT') }}</td>
+													<td class="truncatedText">
+														{{ source.jwt }}
+													</td>
+													<td></td>
+												</tr>
+												<tr v-if="source.secret">
+													<td>{{ t('openconnector', 'Secret') }}</td>
+													<td class="truncatedText">
+														{{ source.secret }}
+													</td>
+													<td></td>
+												</tr>
+												<tr v-if="source.authorizationHeader">
+													<td>{{ t('openconnector', 'Authorization Header') }}</td>
+													<td class="truncatedText">
+														{{ source.authorizationHeader }}
+													</td>
+													<td></td>
+												</tr>
+												<tr v-for="(config, index) in source.authenticationConfig" :key="`auth-${index}`">
+													<td>{{ t('openconnector', 'Auth Config {index}', { index: index + 1 }) }}</td>
+													<td class="truncatedText">
+														{{ typeof config === 'object' ? JSON.stringify(config) : config }}
+													</td>
+													<td></td>
+												</tr>
+												<tr v-if="!hasAuthenticationData(source)">
+													<td colspan="2">
+														{{ t('openconnector', 'No authentication configured') }}
+													</td>
+													<td>
+														<NcButton @click="source.showConfigurations = !source.showConfigurations">
+															<template #icon>
+																<TableIcon :size="16" />
+															</template>
+															view
+														</NcButton>
+													</td>
+												</tr>
+											</tbody>
+										</table>
+									</div>
+								</div>
 							</div>
 						</div>
 					</div>
@@ -326,6 +467,8 @@ import Plus from 'vue-material-design-icons/Plus.vue'
 import Eye from 'vue-material-design-icons/Eye.vue'
 import Sync from 'vue-material-design-icons/Sync.vue'
 import TextBoxOutline from 'vue-material-design-icons/TextBoxOutline.vue'
+import TableIcon from 'vue-material-design-icons/Table.vue'
+import ListIcon from 'vue-material-design-icons/FormatListBulleted.vue'
 
 import PaginationComponent from '../../components/PaginationComponent.vue'
 import { sourceStore, navigationStore } from '../../store/store.js'
@@ -349,6 +492,8 @@ export default {
 		Eye,
 		Sync,
 		TextBoxOutline,
+		TableIcon,
+		ListIcon,
 		PaginationComponent,
 	},
 	data() {
@@ -363,6 +508,9 @@ export default {
 		}
 	},
 	computed: {
+		currentViewMode() {
+			return this.sourceStore.viewMode
+		},
 		filteredSources() {
 			if (!this.sourceStore.sourceList) return []
 			return this.sourceStore.sourceList
@@ -403,6 +551,11 @@ export default {
 		this.sourceStore.refreshSourceList()
 	},
 	methods: {
+		setViewMode(mode) {
+			if (mode === 'cards' || mode === 'table') {
+				this.sourceStore.setViewMode(mode)
+			}
+		},
 		toggleSelectAll(checked) {
 			if (checked) {
 				this.selectedSources = this.filteredSources.map(source => source.id)
@@ -442,6 +595,16 @@ export default {
 			this.sourceStore.setSourceItem(source)
 			this.sourceStore.setSourceConfigurationKey(null)
 			this.navigationStore.setModal('editSourceConfigurationAuthentication')
+		},
+		/**
+		 * Check if source has any authentication data to display
+		 * @param {object} source - The source to check for authentication data
+		 * @return {boolean} True if source has authentication data
+		 */
+		hasAuthenticationData(source) {
+			return !!(source.auth || source.username || source.apikey || source.jwt
+				|| source.secret || source.authorizationHeader
+				|| (source.authenticationConfig && source.authenticationConfig.length > 0))
 		},
 	},
 }
