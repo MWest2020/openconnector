@@ -497,11 +497,8 @@ class EndpointService
 
         foreach($rewriteParameters as $rewriteParameter) {
             if (
-                ((isset($schema->getProperties()[$rewriteParameter]['$ref']) === false
-                        || empty($schema->getProperties()[$rewriteParameter]['$ref']) === true)
-                    && (isset($schema->getProperties()[$rewriteParameter]['items']['$ref']) === false
-                        || empty($schema->getProperties()[$rewriteParameter]['items']['$ref']) === true))
-                || filter_var($parameters[$rewriteParameter], FILTER_VALIDATE_URL) === false
+                filter_var($parameters[$rewriteParameter], FILTER_VALIDATE_URL) === false
+				&& in_array(parse_url($parameters[$rewriteParameter], PHP_URL_HOST), $this->containerInterface->getParameter('kernel.trusted_hosts')) === false
             ) {
                 continue;
             }
