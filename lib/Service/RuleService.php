@@ -883,10 +883,12 @@ class RuleService
 
 		if (isset($data['extendedParameters']) === true) {
 			$data['extendedParameters'] = array_merge($extendedParameters->all(), $data['extendedParameters']);
-			return $data;
+		} else {
+			$data['extendedParameters'] = $extendedParameters->all();
 		}
 
-		$data['extendedParameters'] = $extendedParameters->all();
+		$data['body']['_extendedInput'] = $data['extendedParameters'];
+
 		return $data;
 
 
