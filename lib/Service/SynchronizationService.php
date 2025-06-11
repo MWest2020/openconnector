@@ -2164,39 +2164,35 @@ class SynchronizationService
 		switch ($this->getArrayType($endpoint)) {
 			// Single file endpoint
 			case 'Not array':
-				$dataDot[$config['filePath']] = $this->fetchFile(source: $source, endpoint: $endpoint, config: $config, objectId: $objectId);
+				$this->fetchFile(source: $source, endpoint: $endpoint, config: $config, objectId: $objectId);
 				break;
 			// Array of object that has file(s)
 			case 'Associative array':
 				$endpoint = $this->getFileContext(config: $config, endpoint: $endpoint, filename: $filename, tags: $tags, objectId: $objectId);
 				if ($endpoint === null) {
-					throw new Exception('Could not get endpoint for fetch file rule' . $rule->getId());
+                    return $dataDot->jsonSerialize();
 				}
-				$dataDot[$config['filePath']] = $this->fetchFile(source: $source, endpoint: $endpoint, config: $config, objectId: $objectId, filename: $filename);
+				$this->fetchFile(source: $source, endpoint: $endpoint, config: $config, objectId: $objectId, filename: $filename);
 				break;
 			// Array of object(s) that has file(s)
 			case "Multidimensional array":
-				$result = [];
 				foreach ($endpoint as $object) {
 					$filename = null;
 					$tags = [];
 					$endpoint = $this->getFileContext(config: $config, endpoint: $object, filename: $filename, tags: $tags, objectId: $objectId);
 					if ($endpoint === null) {
-						throw new Exception('Could not get endpoint for fetch file rule' . $rule->getId());
+                        continue;
 					}
-					$result[] = $this->fetchFile(source: $source, endpoint: $endpoint, config: $config, objectId: $objectId, filename: $filename);
+					$this->fetchFile(source: $source, endpoint: $endpoint, config: $config, objectId: $objectId, filename: $filename);
 				}
-				$dataDot[$config['filePath']] = $result;
 				break;
 			// Array of just endpoints
 			case "Indexed array":
-				$result = [];
 				foreach ($endpoint as $key => $childEndpoint) {
 					$filename = null;
 					$tags = [];
-					$result[] = $this->fetchFile(source: $source, endpoint: $childEndpoint, config: $config, objectId: $objectId);
+					$this->fetchFile(source: $source, endpoint: $childEndpoint, config: $config, objectId: $objectId);
 				}
-				$dataDot[$config['filePath']] = $result;
 				break;
 		}
 
