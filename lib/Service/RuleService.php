@@ -829,7 +829,7 @@ class RuleService
 		}
 
 
-		$object = json_decode($result->getResponse()['body'], true);
+		$object = json_decode(json: $result->getResponse()['body'], associative: true, flags: JSON_THROW_ON_ERROR);
 
 		if ($configuration['extend_external_input']['validate'] === false) {
 			return $object;
