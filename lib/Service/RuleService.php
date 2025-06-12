@@ -829,7 +829,7 @@ class RuleService
 		}
 
 
-		$object = json_decode($result->getResponse()['body'], true);
+		$object = json_decode(json: $result->getResponse()['body'], associative: true, flags: JSON_THROW_ON_ERROR);
 
 		if ($configuration['extend_external_input']['validate'] === false) {
 			return $object;
@@ -883,10 +883,12 @@ class RuleService
 
 		if (isset($data['extendedParameters']) === true) {
 			$data['extendedParameters'] = array_merge($extendedParameters->all(), $data['extendedParameters']);
-			return $data;
+		} else {
+			$data['extendedParameters'] = $extendedParameters->all();
 		}
 
-		$data['extendedParameters'] = $extendedParameters->all();
+		$data['body']['_extendedInput'] = $data['extendedParameters'];
+
 		return $data;
 
 
