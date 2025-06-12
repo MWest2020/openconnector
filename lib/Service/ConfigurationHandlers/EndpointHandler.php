@@ -91,16 +91,18 @@ class EndpointHandler implements ConfigurationHandlerInterface
             $endpointArray['outputMapping'] = $mappings['mapping']['idToSlug'][$endpointArray['outputMapping']];
         }
 
-		$endpointArray['rules'] = array_filter(array_map(function(int|string $rule) use ($mappings) {
-			if(is_numeric($rule)) {
-				$rule = (int)$rule;
-			}
-			if(isset($mappings['rule']['idToSlug'][$rule]) === true) {
+        if (isset($endpointArray['rules']) === true) {
+		    $endpointArray['rules'] = array_filter(array_map(function(int|string $rule) use ($mappings) {
+                if(is_numeric($rule)) {
+                    $rule = (int)$rule;
+                }
+                if(isset($mappings['rule']['idToSlug'][$rule]) === true) {
 
-				return $mappings['rule']['idToSlug'][$rule];
-			}
-			return null;
-		}, $endpointArray['rules']));
+                    return $mappings['rule']['idToSlug'][$rule];
+                }
+                return null;
+            }, $endpointArray['rules']));
+        }
 
 
 
