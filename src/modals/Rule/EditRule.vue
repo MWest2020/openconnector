@@ -45,7 +45,7 @@ import { Rule } from '../../entities/index.js'
 					</div>
 					<div class="close-button">
 						<NcActions>
-							<NcActionButton @click="closeAlert = true">
+							<NcActionButton close-after-click @click="closeAlert = true">
 								<template #icon>
 									<Close :size="20" />
 								</template>
@@ -76,7 +76,9 @@ import { Rule } from '../../entities/index.js'
 					label="Name"
 					required />
 
-				<NcTextArea :value.sync="ruleItem.description"
+				<NcTextArea
+					resize="vertical"
+					:value.sync="ruleItem.description"
 					label="Description" />
 
 				<div class="json-editor">
@@ -160,6 +162,7 @@ import { Rule } from '../../entities/index.js'
 
 					<NcTextArea
 						label="Error Message"
+						resize="vertical"
 						maxlength="2550"
 						:value.sync="ruleItem.configuration.error.message"
 						placeholder="We encountered an unexpected problem" />
@@ -168,6 +171,7 @@ import { Rule } from '../../entities/index.js'
 				<!-- JavaScript Configuration -->
 				<template v-if="typeOptions.value?.id === 'javascript'">
 					<NcTextArea
+						resize="vertical"
 						label="JavaScript Code"
 						:value.sync="ruleItem.configuration.javascript"
 						class="code-editor"
@@ -1260,7 +1264,7 @@ export default {
 				break
 			case 'locking':
 				configuration.locking = {
-					action: this.ruleItem.configuration.locking.action,
+					action: this.ruleItem.configuration.locking.action.value || this.ruleItem.configuration.locking.action,
 					timeout: this.ruleItem.configuration.locking.timeout,
 				}
 				break

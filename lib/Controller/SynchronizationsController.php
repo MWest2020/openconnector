@@ -196,21 +196,21 @@ class SynchronizationsController extends Controller
     }
 
     /**
-     * Retrieves call logs for a job
+     * Retrieves synchronization logs for a synchronization
      *
-     * This method returns all the call logs associated with a source based on its ID.
+     * This method returns all the synchronization logs associated with a synchronization based on its uuid.
      *
      * @NoAdminRequired
      * @NoCSRFRequired
      *
      * @param string $uuid The UUID of the synchronization to retrieve logs for
-     * @return JSONResponse A JSON response containing the call logs
+     * @return JSONResponse A JSON response containing the synchronization logs
     */
     public function logs(string $uuid): JSONResponse
     {
         try {
-            $synchronization = $this->synchronizationMapper->find($uuid);
-            $logs = $this->synchronizationLogMapper->findAll(null, null, ['synchronization_id' => $synchronization->getUuid()]);
+            $synchronization = $this->synchronizationMapper->findByUuid(uuid: $uuid);
+            $logs = $this->synchronizationLogMapper->findAll(null, null, ['synchronization_id' => $synchronization->getId()]);
             return new JSONResponse($logs);
         } catch (DoesNotExistException $e) {
             return new JSONResponse(['error' => 'Logs not found'], 404);

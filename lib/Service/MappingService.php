@@ -243,6 +243,19 @@ class MappingService
 
             $value = false;
             break;
+		case '?bool':
+		case '?boolean':
+			if($value === null) {
+				break;
+			}
+			if ((int) $value === 1 || strtolower($value) === 'true' || strtolower($value) === 'yes') {
+				$value = true;
+				break;
+			}
+
+			$value = false;
+
+			break;
         case 'int':
         case 'integer':
             $value = (int) $value;
