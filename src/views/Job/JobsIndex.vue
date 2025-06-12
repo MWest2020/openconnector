@@ -111,7 +111,7 @@ import { jobStore, navigationStore } from '../../store/store.js'
 									<template #icon>
 										<DotsHorizontal :size="20" />
 									</template>
-									<NcActionButton close-after-click @click="jobStore.setJobItem(job); navigationStore.setSelected('jobs')">
+									<NcActionButton close-after-click @click="jobStore.setJobItem(job); navigationStore.setModal('viewJob')">
 										<template #icon>
 											<Eye :size="20" />
 										</template>
@@ -274,7 +274,7 @@ import { jobStore, navigationStore } from '../../store/store.js'
 											<template #icon>
 												<DotsHorizontal :size="20" />
 											</template>
-											<NcActionButton close-after-click @click="jobStore.setJobItem(job); navigationStore.setSelected('jobs')">
+											<NcActionButton close-after-click @click="jobStore.setJobItem(job); navigationStore.setModal('viewJob')">
 												<template #icon>
 													<Eye :size="20" />
 												</template>

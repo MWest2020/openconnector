@@ -5,253 +5,206 @@ import { sourceStore, navigationStore, logStore, synchronizationStore } from '..
 <template>
 	<NcModal v-if="navigationStore.modal === 'viewSource'"
 		ref="modalRef"
-		label-id="viewSource"
+		:name="sourceStore.sourceItem?.name || t('openconnector', 'Source Details')"
 		@close="navigationStore.setModal(false)">
 		<div class="modal-content">
-			<h2>{{ sourceStore.sourceItem?.name || t('openconnector', 'Source Details') }}</h2>
 			<p v-if="sourceStore.sourceItem?.description" class="source-description">
 				{{ sourceStore.sourceItem.description }}
 			</p>
 
 			<!-- Source Properties -->
 			<div class="source-properties">
-				<div class="property-grid">
-					<div class="property-item">
-						<strong>{{ t('openconnector', 'ID') }}:</strong>
-						<span>{{ sourceStore.sourceItem?.id || sourceStore.sourceItem?.uuid || '-' }}</span>
-					</div>
-					<div class="property-item">
-						<strong>{{ t('openconnector', 'Type') }}:</strong>
-						<span>{{ sourceStore.sourceItem?.type || '-' }}</span>
-					</div>
-					<div class="property-item">
-						<strong>{{ t('openconnector', 'Location') }}:</strong>
-						<span>{{ sourceStore.sourceItem?.location || '-' }}</span>
-					</div>
-					<div class="property-item">
-						<strong>{{ t('openconnector', 'Version') }}:</strong>
-						<span>{{ sourceStore.sourceItem?.version || '-' }}</span>
-					</div>
-					<div class="property-item">
-						<strong>{{ t('openconnector', 'Created') }}:</strong>
-						<span>{{ sourceStore.sourceItem?.created ? new Date(sourceStore.sourceItem.created).toLocaleString() : '-' }}</span>
-					</div>
-					<div class="property-item">
-						<strong>{{ t('openconnector', 'Updated') }}:</strong>
-						<span>{{ sourceStore.sourceItem?.updated ? new Date(sourceStore.sourceItem.updated).toLocaleString() : '-' }}</span>
-					</div>
-				</div>
+				<table class="statisticsTable sourceStats">
+					<thead>
+						<tr>
+							<th>{{ t('openconnector', 'Property') }}</th>
+							<th>{{ t('openconnector', 'Value') }}</th>
+						</tr>
+					</thead>
+					<tbody>
+						<tr>
+							<td>{{ t('openconnector', 'Status') }}</td>
+							<td>{{ sourceStore.sourceItem?.status || 'Unknown' }}</td>
+						</tr>
+						<tr>
+							<td>{{ t('openconnector', 'Enabled') }}</td>
+							<td>{{ sourceStore.sourceItem?.isEnabled ? 'Enabled' : 'Disabled' }}</td>
+						</tr>
+						<tr>
+							<td>{{ t('openconnector', 'Type') }}</td>
+							<td>{{ sourceStore.sourceItem?.type || 'Unknown' }}</td>
+						</tr>
+						<tr v-if="sourceStore.sourceItem?.location">
+							<td>{{ t('openconnector', 'Location') }}</td>
+							<td class="truncatedUrl">
+								{{ sourceStore.sourceItem.location }}
+							</td>
+						</tr>
+						<tr v-if="sourceStore.sourceItem?.version">
+							<td>{{ t('openconnector', 'Version') }}</td>
+							<td>{{ sourceStore.sourceItem.version }}</td>
+						</tr>
+
+						<tr v-if="sourceStore.sourceItem?.lastCall">
+							<td>{{ t('openconnector', 'Last Call') }}</td>
+							<td>{{ new Date(sourceStore.sourceItem.lastCall).toLocaleDateString() + ', ' + new Date(sourceStore.sourceItem.lastCall).toLocaleTimeString() }}</td>
+						</tr>
+						<tr v-if="sourceStore.sourceItem?.lastSync">
+							<td>{{ t('openconnector', 'Last Sync') }}</td>
+							<td>{{ new Date(sourceStore.sourceItem.lastSync).toLocaleDateString() + ', ' + new Date(sourceStore.sourceItem.lastSync).toLocaleTimeString() }}</td>
+						</tr>
+						<tr>
+							<td>{{ t('openconnector', 'Created') }}</td>
+							<td>{{ sourceStore.sourceItem?.dateCreated ? new Date(sourceStore.sourceItem.dateCreated).toLocaleDateString() : '-' }}</td>
+						</tr>
+						<tr>
+							<td>{{ t('openconnector', 'Updated') }}</td>
+							<td>{{ sourceStore.sourceItem?.dateModified ? new Date(sourceStore.sourceItem.dateModified).toLocaleDateString() : '-' }}</td>
+						</tr>
+					</tbody>
+				</table>
 			</div>
 
 			<!-- Tabs -->
-			<div class="tab-navigation">
-				<NcButton 
-					:type="activeTab === 'configurations-tab' ? 'primary' : 'secondary'"
-					@click="activeTab = 'configurations-tab'">
-					<template #icon>
-						<FileCogOutline :size="20" />
-					</template>
-					{{ t('openconnector', 'Configurations') }}
-				</NcButton>
-				<NcButton 
-					:type="activeTab === 'authentication-tab' ? 'primary' : 'secondary'"
-					@click="activeTab = 'authentication-tab'">
-					<template #icon>
-						<KeyOutline :size="20" />
-					</template>
-					{{ t('openconnector', 'Authentication') }}
-				</NcButton>
-				<NcButton 
-					:type="activeTab === 'synchronizations-tab' ? 'primary' : 'secondary'"
-					@click="activeTab = 'synchronizations-tab'">
-					<template #icon>
-						<VectorPolylinePlus :size="20" />
-					</template>
-					{{ t('openconnector', 'Synchronizations') }}
-				</NcButton>
-				<NcButton 
-					:type="activeTab === 'logs-tab' ? 'primary' : 'secondary'"
-					@click="activeTab = 'logs-tab'">
-					<template #icon>
-						<TimelineQuestionOutline :size="20" />
-					</template>
-					{{ t('openconnector', 'Logs') }}
-				</NcButton>
-			</div>
-
-			<div class="tab-content">
-				<!-- Configurations Tab -->
-				<div v-if="activeTab === 'configurations-tab'" class="tab-panel">
-					<div v-if="Object.keys(configuration)?.length" class="configurations-list">
-						<NcListItem v-for="(value, key, i) in configuration"
-							:key="`${key}${i}`"
-							:name="key"
-							:bold="false"
-							:force-display-actions="true"
-							:active="sourceStore.sourceConfigurationKey === key"
-							@click="setActiveSourceConfigurationKey(key)">
-							<template #icon>
-								<FileCogOutline :class="sourceStore.sourceConfigurationKey === key && 'selectedIcon'" :size="44" />
-							</template>
-							<template #subname>
-								{{ value }}
-							</template>
-							<template #actions>
-								<NcActionButton close-after-click @click="editSourceConfiguration(key)">
-									<template #icon>
-										<Pencil :size="20" />
-									</template>
-									Edit
-								</NcActionButton>
-								<NcActionButton close-after-click @click="deleteSourceConfiguration(key)">
-									<template #icon>
-										<Delete :size="20" />
-									</template>
-									Delete
-								</NcActionButton>
-							</template>
-						</NcListItem>
-					</div>
-					<NcEmptyContent v-else
-						:name="t('openconnector', 'No configurations')"
-						:description="t('openconnector', 'No configurations found for this source')">
-						<template #icon>
-							<FileCogOutline :size="64" />
-						</template>
-						<template #action>
-							<NcButton @click="addSourceConfiguration">
-								{{ t('openconnector', 'Add Configuration') }}
-							</NcButton>
-						</template>
-					</NcEmptyContent>
-				</div>
-
-				<!-- Authentication Tab -->
-				<div v-if="activeTab === 'authentication-tab'" class="tab-panel">
-					<div v-if="Object.keys(configurationAuthentication)?.length" class="authentication-list">
-						<NcListItem v-for="(value, key, i) in configurationAuthentication"
-							:key="`${key}${i}`"
-							:name="key"
-							:bold="false"
-							:force-display-actions="true"
-							:active="sourceStore.sourceConfigurationKey === key">
-							<template #icon>
-								<KeyOutline :class="sourceStore.sourceConfigurationKey === key && 'selectedIcon'" :size="44" />
-							</template>
-							<template #subname>
-								{{ value }}
-							</template>
-							<template #actions>
-								<NcActionButton close-after-click @click="sourceStore.setSourceConfigurationKey(key); navigationStore.setModal('editSourceConfigurationAuthentication')">
-									<template #icon>
-										<Pencil :size="20" />
-									</template>
-									Edit
-								</NcActionButton>
-								<NcActionButton close-after-click @click="sourceStore.setSourceConfigurationKey(key); navigationStore.setModal('deleteSourceConfigurationAuthentication')">
-									<template #icon>
-										<Delete :size="20" />
-									</template>
-									Delete
-								</NcActionButton>
-							</template>
-						</NcListItem>
-					</div>
-					<NcEmptyContent v-else
-						:name="t('openconnector', 'No authentication')"
-						:description="t('openconnector', 'No authentication configurations found for this source')">
-						<template #icon>
-							<KeyOutline :size="64" />
-						</template>
-						<template #action>
-							<NcButton @click="addSourceAuthentication">
-								{{ t('openconnector', 'Add Authentication') }}
-							</NcButton>
-						</template>
-					</NcEmptyContent>
-				</div>
-
-				<!-- Synchronizations Tab -->
-				<div v-if="activeTab === 'synchronizations-tab'" class="tab-panel">
-					<div v-if="linkedSynchronizations?.length" class="synchronizations-list">
-						<NcListItem v-for="sync in linkedSynchronizations"
-							:key="sync.id"
-							:name="sync.name"
-							:bold="false"
-							:force-display-actions="true">
-							<template #icon>
-								<VectorPolylinePlus :size="44" />
-							</template>
-							<template #subname>
-								{{ sync.description }}
-							</template>
-							<template #actions>
-								<NcActionButton close-after-click @click="synchronizationStore.setSynchronizationItem(sync); navigationStore.setSelected('synchronizations')">
-									<template #icon>
-										<EyeOutline :size="20" />
-									</template>
-									View
-								</NcActionButton>
-								<NcActionButton close-after-click @click="synchronizationStore.setSynchronizationItem(sync); navigationStore.setModal('editSynchronization')">
-									<template #icon>
-										<Pencil :size="20" />
-									</template>
-									Edit
-								</NcActionButton>
-								<NcActionButton close-after-click @click="synchronizationStore.setSynchronizationItem(sync); navigationStore.setDialog('deleteSynchronization')">
-									<template #icon>
-										<Delete :size="20" />
-									</template>
-									Delete
-								</NcActionButton>
-							</template>
-						</NcListItem>
-					</div>
-					<NcEmptyContent v-else
-						:name="t('openconnector', 'No synchronizations')"
-						:description="t('openconnector', 'No synchronizations found for this source')">
-						<template #icon>
-							<VectorPolylinePlus :size="64" />
-						</template>
-					</NcEmptyContent>
-				</div>
-
-				<!-- Logs Tab -->
-				<div v-if="activeTab === 'logs-tab'" class="tab-panel">
-					<div v-if="sourceStore.sourceLogs?.length" class="logs-list">
-						<NcListItem v-for="(log, i) in sourceStore.sourceLogs"
-							:key="log.id + i"
-							:class="checkIfStatusIsOk(log.statusCode) ? 'okStatus' : 'errorStatus'"
-							:name="`${log.statusMessage} ${log.response?.responseTime ? `(response time: ${(log.response.responseTime / 1000).toFixed(3)} seconds)` : ''}`"
-							:bold="false"
-							:counter-number="log.statusCode"
-							:force-display-actions="true"
-							:active="logStore.activeLogKey === `sourceLog-${log.id}`"
-							@click="setActiveSourceLog(log.id)">
-							<template #icon>
-								<TimelineQuestionOutline :size="44" />
-							</template>
-							<template #subname>
-								{{ new Date(log.created).toLocaleString() }}
-							</template>
-							<template #actions>
-								<NcActionButton close-after-click @click="viewLog(log)">
-									<template #icon>
-										<EyeOutline :size="20" />
-									</template>
-									View
-								</NcActionButton>
-							</template>
-						</NcListItem>
-					</div>
-					<NcEmptyContent v-else
-						:name="t('openconnector', 'No logs')"
-						:description="t('openconnector', 'No logs found for this source')">
-						<template #icon>
-							<TimelineQuestionOutline :size="64" />
-						</template>
-					</NcEmptyContent>
-				</div>
+			<div class="tabContainer">
+				<BTabs content-class="mt-3" justified>
+					<BTab title="Configurations">
+						<div v-if="Object.keys(configuration)?.length" class="configurations-list">
+							<NcListItem v-for="(value, key, i) in configuration"
+								:key="`${key}${i}`"
+								:name="key"
+								:bold="false"
+								:force-display-actions="true"
+								:active="sourceStore.sourceConfigurationKey === key"
+								@click="setActiveSourceConfigurationKey(key)">
+								<template #icon>
+									<FileCogOutline :class="sourceStore.sourceConfigurationKey === key && 'selectedIcon'" :size="44" />
+								</template>
+								<template #subname>
+									{{ value }}
+								</template>
+								<template #actions>
+									<NcActionButton close-after-click @click="editSourceConfiguration(key)">
+										<template #icon>
+											<Pencil :size="20" />
+										</template>
+										Edit
+									</NcActionButton>
+									<NcActionButton close-after-click @click="deleteSourceConfiguration(key)">
+										<template #icon>
+											<Delete :size="20" />
+										</template>
+										Delete
+									</NcActionButton>
+								</template>
+							</NcListItem>
+						</div>
+						<div v-if="!Object.keys(configuration)?.length" class="tabPanel">
+							<NcEmptyContent
+								:name="t('openconnector', 'No configurations')"
+								:description="t('openconnector', 'No configurations found for this source')">
+								<template #icon>
+									<FileCogOutline :size="64" />
+								</template>
+								<template #action>
+									<NcButton @click="addSourceConfiguration">
+										{{ t('openconnector', 'Add Configuration') }}
+									</NcButton>
+								</template>
+							</NcEmptyContent>
+						</div>
+					</BTab>
+					<BTab title="Authentication">
+						<div v-if="Object.keys(configurationAuthentication)?.length" class="authentication-list">
+							<NcListItem v-for="(value, key, i) in configurationAuthentication"
+								:key="`${key}${i}`"
+								:name="key"
+								:bold="false"
+								:force-display-actions="true"
+								:active="sourceStore.sourceConfigurationKey === key">
+								<template #icon>
+									<KeyOutline :class="sourceStore.sourceConfigurationKey === key && 'selectedIcon'" :size="44" />
+								</template>
+								<template #subname>
+									{{ value }}
+								</template>
+								<template #actions>
+									<NcActionButton close-after-click @click="sourceStore.setSourceConfigurationKey(key); navigationStore.setModal('editSourceConfigurationAuthentication')">
+										<template #icon>
+											<Pencil :size="20" />
+										</template>
+										Edit
+									</NcActionButton>
+									<NcActionButton close-after-click @click="sourceStore.setSourceConfigurationKey(key); navigationStore.setModal('deleteSourceConfigurationAuthentication')">
+										<template #icon>
+											<Delete :size="20" />
+										</template>
+										Delete
+									</NcActionButton>
+								</template>
+							</NcListItem>
+						</div>
+						<div v-if="!Object.keys(configurationAuthentication)?.length" class="tabPanel">
+							<NcEmptyContent
+								:name="t('openconnector', 'No authentication')"
+								:description="t('openconnector', 'No authentication configurations found for this source')">
+								<template #icon>
+									<KeyOutline :size="64" />
+								</template>
+								<template #action>
+									<NcButton @click="addSourceAuthentication">
+										{{ t('openconnector', 'Add Authentication') }}
+									</NcButton>
+								</template>
+							</NcEmptyContent>
+						</div>
+					</BTab>
+					<BTab title="Synchronizations">
+						<div v-if="linkedSynchronizations?.length" class="synchronizations-list">
+							<NcListItem v-for="sync in linkedSynchronizations"
+								:key="sync.id"
+								:name="sync.name"
+								:bold="false"
+								:force-display-actions="true">
+								<template #icon>
+									<VectorPolylinePlus :size="44" />
+								</template>
+								<template #subname>
+									{{ sync.description }}
+								</template>
+								<template #actions>
+									<NcActionButton close-after-click @click="synchronizationStore.setSynchronizationItem(sync); navigationStore.setSelected('synchronizations')">
+										<template #icon>
+											<EyeOutline :size="20" />
+										</template>
+										View
+									</NcActionButton>
+									<NcActionButton close-after-click @click="synchronizationStore.setSynchronizationItem(sync); navigationStore.setModal('editSynchronization')">
+										<template #icon>
+											<Pencil :size="20" />
+										</template>
+										Edit
+									</NcActionButton>
+									<NcActionButton close-after-click @click="synchronizationStore.setSynchronizationItem(sync); navigationStore.setDialog('deleteSynchronization')">
+										<template #icon>
+											<Delete :size="20" />
+										</template>
+										Delete
+									</NcActionButton>
+								</template>
+							</NcListItem>
+						</div>
+						<div v-if="!linkedSynchronizations?.length" class="tabPanel">
+							<NcEmptyContent
+								:name="t('openconnector', 'No synchronizations')"
+								:description="t('openconnector', 'No synchronizations found for this source')">
+								<template #icon>
+									<VectorPolylinePlus :size="64" />
+								</template>
+							</NcEmptyContent>
+						</div>
+					</BTab>
+				</BTabs>
 			</div>
 
 			<!-- Action buttons -->
@@ -260,28 +213,25 @@ import { sourceStore, navigationStore, logStore, synchronizationStore } from '..
 					<template #icon>
 						<Pencil :size="20" />
 					</template>
-					{{ t('openconnector', 'Edit Source') }}
+					Edit
 				</NcButton>
 				<NcButton @click="navigationStore.setModal('testSource')">
 					<template #icon>
 						<Sync :size="20" />
 					</template>
-					{{ t('openconnector', 'Test Source') }}
+					Test
 				</NcButton>
-				<NcButton @click="sourceStore.exportSource(sourceStore.sourceItem.id)">
+				<NcButton @click="viewSourceLogs()">
 					<template #icon>
-						<FileExportOutline :size="20" />
+						<TimelineQuestionOutline :size="20" />
 					</template>
-					{{ t('openconnector', 'Export Source') }}
+					Logs
 				</NcButton>
 				<NcButton type="error" @click="navigationStore.setDialog('deleteSource')">
 					<template #icon>
 						<TrashCanOutline :size="20" />
 					</template>
-					{{ t('openconnector', 'Delete Source') }}
-				</NcButton>
-				<NcButton @click="navigationStore.setModal(false)">
-					{{ t('openconnector', 'Close') }}
+					Delete
 				</NcButton>
 			</div>
 		</div>
@@ -290,6 +240,7 @@ import { sourceStore, navigationStore, logStore, synchronizationStore } from '..
 
 <script>
 import { NcModal, NcButton, NcListItem, NcActionButton, NcEmptyContent } from '@nextcloud/vue'
+import { BTabs, BTab } from 'bootstrap-vue'
 import FileCogOutline from 'vue-material-design-icons/FileCogOutline.vue'
 import KeyOutline from 'vue-material-design-icons/KeyOutline.vue'
 import VectorPolylinePlus from 'vue-material-design-icons/VectorPolylinePlus.vue'
@@ -298,7 +249,7 @@ import Pencil from 'vue-material-design-icons/Pencil.vue'
 import Delete from 'vue-material-design-icons/Delete.vue'
 import EyeOutline from 'vue-material-design-icons/EyeOutline.vue'
 import Sync from 'vue-material-design-icons/Sync.vue'
-import FileExportOutline from 'vue-material-design-icons/FileExportOutline.vue'
+
 import TrashCanOutline from 'vue-material-design-icons/TrashCanOutline.vue'
 
 export default {
@@ -309,6 +260,8 @@ export default {
 		NcListItem,
 		NcActionButton,
 		NcEmptyContent,
+		BTabs,
+		BTab,
 		FileCogOutline,
 		KeyOutline,
 		VectorPolylinePlus,
@@ -317,13 +270,7 @@ export default {
 		Delete,
 		EyeOutline,
 		Sync,
-		FileExportOutline,
 		TrashCanOutline,
-	},
-	data() {
-		return {
-			activeTab: 'configurations-tab',
-		}
 	},
 	computed: {
 		configuration() {
@@ -332,7 +279,23 @@ export default {
 			return configWithoutAuth
 		},
 		configurationAuthentication() {
-			return sourceStore.sourceItem?.configuration?.authentication || {}
+			const source = sourceStore.sourceItem
+			if (!source) return {}
+
+			const authData = {}
+			if (source.auth) authData['Auth Type'] = source.auth
+			if (source.username) authData.Username = source.username
+			if (source.apikey) authData['API Key'] = source.apikey
+			if (source.jwt) authData.JWT = source.jwt
+			if (source.secret) authData.Secret = source.secret
+			if (source.authorizationHeader) authData['Authorization Header'] = source.authorizationHeader
+			if (source.authenticationConfig && source.authenticationConfig.length > 0) {
+				source.authenticationConfig.forEach((config, index) => {
+					authData[`Auth Config ${index + 1}`] = typeof config === 'object' ? JSON.stringify(config) : config
+				})
+			}
+
+			return authData
 		},
 		linkedSynchronizations() {
 			return synchronizationStore.synchronizationList?.filter((item) =>
@@ -388,6 +351,13 @@ export default {
 			}
 			return false
 		},
+		/**
+		 * View source logs
+		 */
+		viewSourceLogs() {
+			sourceStore.setSourceItem(sourceStore.sourceItem)
+			navigationStore.setSelected('source-logs')
+		},
 	},
 }
 </script>
@@ -408,47 +378,16 @@ export default {
 
 .source-properties {
 	margin-bottom: 20px;
-	padding: 15px;
-	background-color: var(--color-background-hover);
-	border-radius: var(--border-radius);
 }
 
-.property-grid {
-	display: grid;
-	grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-	gap: 10px;
+.truncatedUrl {
+	max-width: 300px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
-.property-item {
-	display: flex;
-	gap: 8px;
-}
-
-.property-item strong {
-	min-width: 80px;
-	color: var(--color-text-maxcontrast);
-}
-
-.tab-navigation {
-	display: flex;
-	gap: 8px;
-	margin: 20px 0;
-	padding: 0 0 15px 0;
-	border-bottom: 1px solid var(--color-border);
-	flex-wrap: wrap;
-}
-
-.tab-navigation .button-vue {
-	flex: 1;
-	min-width: max-content;
-}
-
-.tab-content {
-	min-height: 300px;
-	margin: 20px 0;
-}
-
-.tab-panel {
+.tabPanel {
 	padding: 15px 0;
 }
 

@@ -1,7 +1,3 @@
-<script setup>
-import { synchronizationStore, navigationStore } from '../../store/store.js'
-</script>
-
 <template>
 	<NcAppContent>
 		<div class="viewContainer">
@@ -111,7 +107,7 @@ import { synchronizationStore, navigationStore } from '../../store/store.js'
 									<template #icon>
 										<DotsHorizontal :size="20" />
 									</template>
-									<NcActionButton close-after-click @click="synchronizationStore.setSynchronizationItem(synchronization); navigationStore.setSelected('synchronizations')">
+									<NcActionButton close-after-click @click="synchronizationStore.setSynchronizationItem(synchronization); navigationStore.setModal('viewSynchronization')">
 										<template #icon>
 											<Eye :size="20" />
 										</template>
@@ -172,53 +168,209 @@ import { synchronizationStore, navigationStore } from '../../store/store.js'
 								<p v-if="synchronization.description" class="synchronizationDescription">
 									{{ synchronization.description }}
 								</p>
-								<!-- Synchronization Statistics Table -->
-								<table class="statisticsTable synchronizationStats">
-									<thead>
-										<tr>
-											<th>{{ t('openconnector', 'Property') }}</th>
-											<th>{{ t('openconnector', 'Value') }}</th>
-										</tr>
-									</thead>
-									<tbody>
-										<tr>
-											<td>{{ t('openconnector', 'Source Type') }}</td>
-											<td>{{ synchronization.sourceType || 'Unknown' }}</td>
-										</tr>
-										<tr>
-											<td>{{ t('openconnector', 'Target Type') }}</td>
-											<td>{{ synchronization.targetType || 'Unknown' }}</td>
-										</tr>
-										<tr v-if="synchronization.version">
-											<td>{{ t('openconnector', 'Version') }}</td>
-											<td>{{ synchronization.version }}</td>
-										</tr>
-										<tr>
-											<td>{{ t('openconnector', 'Source Configs') }}</td>
-											<td>{{ getSourceConfigCount(synchronization) }}</td>
-										</tr>
-										<tr>
-											<td>{{ t('openconnector', 'Target Configs') }}</td>
-											<td>{{ getTargetConfigCount(synchronization) }}</td>
-										</tr>
-										<tr v-if="synchronization.sourceLastSynced">
-											<td>{{ t('openconnector', 'Source Last Synced') }}</td>
-											<td>{{ new Date(synchronization.sourceLastSynced).toLocaleDateString() + ', ' + new Date(synchronization.sourceLastSynced).toLocaleTimeString() }}</td>
-										</tr>
-										<tr v-if="synchronization.targetLastSynced">
-											<td>{{ t('openconnector', 'Target Last Synced') }}</td>
-											<td>{{ new Date(synchronization.targetLastSynced).toLocaleDateString() + ', ' + new Date(synchronization.targetLastSynced).toLocaleTimeString() }}</td>
-										</tr>
-										<tr>
-											<td>{{ t('openconnector', 'Created') }}</td>
-											<td>{{ synchronization.created ? new Date(synchronization.created).toLocaleDateString() : '-' }}</td>
-										</tr>
-										<tr>
-											<td>{{ t('openconnector', 'Updated') }}</td>
-											<td>{{ synchronization.updated ? new Date(synchronization.updated).toLocaleDateString() : '-' }}</td>
-										</tr>
-									</tbody>
-								</table>
+								<!-- Toggle between stats, source configs, and target configs -->
+								<div v-if="!getSyncViewState(synchronization).showSourceConfigs && !getSyncViewState(synchronization).showTargetConfigs">
+									<!-- Synchronization Statistics Table -->
+									<table class="statisticsTable synchronizationStats">
+										<thead>
+											<tr>
+												<th>{{ t('openconnector', 'Property') }}</th>
+												<th>{{ t('openconnector', 'Source') }}</th>
+												<th>{{ t('openconnector', 'Target') }}</th>
+											</tr>
+										</thead>
+										<tbody>
+											<tr>
+												<td>{{ t('openconnector', 'Type') }}</td>
+												<td>{{ synchronization.sourceType || 'Unknown' }}</td>
+												<td>{{ synchronization.targetType || 'Unknown' }}</td>
+											</tr>
+											<tr>
+												<td>{{ t('openconnector', 'ID') }}</td>
+												<td>{{ synchronization.sourceId || '-' }}</td>
+												<td>{{ synchronization.targetId || '-' }}</td>
+											</tr>
+											<tr>
+												<td>{{ t('openconnector', 'Hash') }}</td>
+												<td>{{ synchronization.sourceHash || '-' }}</td>
+												<td>{{ synchronization.targetHash || '-' }}</td>
+											</tr>
+											<tr>
+												<td>{{ t('openconnector', 'Configurations') }}</td>
+												<td>
+													<div style="display: flex; justify-content: space-between; align-items: center;">
+														<span>{{ getSourceConfigCount(synchronization) }}</span>
+														<NcButton @click="showSourceConfigs(synchronization)">
+															<template #icon>
+																<DatabaseSettingsOutline :size="16" />
+															</template>
+															Show
+														</NcButton>
+													</div>
+												</td>
+												<td>
+													<div style="display: flex; justify-content: space-between; align-items: center;">
+														<span>{{ getTargetConfigCount(synchronization) }}</span>
+														<NcButton @click="showTargetConfigs(synchronization)">
+															<template #icon>
+																<CardBulletedSettingsOutline :size="16" />
+															</template>
+															Show
+														</NcButton>
+													</div>
+												</td>
+											</tr>
+											<tr>
+												<td>{{ t('openconnector', 'Last Synced') }}</td>
+												<td>{{ synchronization.sourceLastSynced ? new Date(synchronization.sourceLastSynced).toLocaleDateString() + ', ' + new Date(synchronization.sourceLastSynced).toLocaleTimeString() : '-' }}</td>
+												<td>{{ synchronization.targetLastSynced ? new Date(synchronization.targetLastSynced).toLocaleDateString() + ', ' + new Date(synchronization.targetLastSynced).toLocaleTimeString() : '-' }}</td>
+											</tr>
+											<tr>
+												<td>{{ t('openconnector', 'Last Checked') }}</td>
+												<td>{{ synchronization.sourceLastChecked ? new Date(synchronization.sourceLastChecked).toLocaleDateString() + ', ' + new Date(synchronization.sourceLastChecked).toLocaleTimeString() : '-' }}</td>
+												<td>{{ synchronization.targetLastChecked ? new Date(synchronization.targetLastChecked).toLocaleDateString() + ', ' + new Date(synchronization.targetLastChecked).toLocaleTimeString() : '-' }}</td>
+											</tr>
+											<tr>
+												<td>{{ t('openconnector', 'Version') }}</td>
+												<td colspan="2">
+													{{ synchronization.version || '-' }}
+												</td>
+											</tr>
+											<tr>
+												<td>{{ t('openconnector', 'Created') }}</td>
+												<td colspan="2">
+													{{ synchronization.created ? new Date(synchronization.created).toLocaleDateString() : '-' }}
+												</td>
+											</tr>
+											<tr>
+												<td>{{ t('openconnector', 'Updated') }}</td>
+												<td colspan="2">
+													{{ synchronization.updated ? new Date(synchronization.updated).toLocaleDateString() : '-' }}
+												</td>
+											</tr>
+										</tbody>
+									</table>
+								</div>
+								<!-- Source Configurations view -->
+								<div v-else-if="getSyncViewState(synchronization).showSourceConfigs" style="display: flex; flex-direction: column; height: 100%;">
+									<div style="flex: 1;">
+										<table class="statisticsTable synchronizationStats">
+											<thead>
+												<tr>
+													<th>{{ t('openconnector', 'Key') }}</th>
+													<th>{{ t('openconnector', 'Value') }}</th>
+													<th>{{ t('openconnector', 'Actions') }}</th>
+												</tr>
+											</thead>
+											<tbody>
+												<tr v-for="(value, key) in synchronization.sourceConfig" :key="key">
+													<td>{{ key }}</td>
+													<td class="truncatedText">
+														{{ typeof value === 'object' ? JSON.stringify(value) : value }}
+													</td>
+													<td>
+														<NcActions :primary="false">
+															<template #icon>
+																<DotsHorizontal :size="16" />
+															</template>
+															<NcActionButton close-after-click @click="editSourceConfig(synchronization, key)">
+																<template #icon>
+																	<Pencil :size="16" />
+																</template>
+																Edit
+															</NcActionButton>
+															<NcActionButton close-after-click @click="deleteSourceConfig(synchronization, key)">
+																<template #icon>
+																	<TrashCanOutline :size="16" />
+																</template>
+																Delete
+															</NcActionButton>
+														</NcActions>
+													</td>
+												</tr>
+												<tr v-if="!synchronization.sourceConfig || !Object.keys(synchronization.sourceConfig).length">
+													<td colspan="3">
+														{{ t('openconnector', 'No source configurations found') }}
+													</td>
+												</tr>
+											</tbody>
+										</table>
+									</div>
+									<div style="display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-top: auto; padding-top: 10px;">
+										<NcButton @click="showSyncStats(synchronization)">
+											<template #icon>
+												<ArrowLeft :size="16" />
+											</template>
+											Back
+										</NcButton>
+										<NcButton :primary="true" @click="addSourceConfig(synchronization)">
+											<template #icon>
+												<Plus :size="16" />
+											</template>
+											Add Source Config
+										</NcButton>
+									</div>
+								</div>
+								<!-- Target Configurations view -->
+								<div v-else-if="getSyncViewState(synchronization).showTargetConfigs" style="display: flex; flex-direction: column; height: 100%;">
+									<div style="flex: 1;">
+										<table class="statisticsTable synchronizationStats">
+											<thead>
+												<tr>
+													<th>{{ t('openconnector', 'Key') }}</th>
+													<th>{{ t('openconnector', 'Value') }}</th>
+													<th>{{ t('openconnector', 'Actions') }}</th>
+												</tr>
+											</thead>
+											<tbody>
+												<tr v-for="(value, key) in synchronization.targetConfig" :key="key">
+													<td>{{ key }}</td>
+													<td class="truncatedText">
+														{{ typeof value === 'object' ? JSON.stringify(value) : value }}
+													</td>
+													<td>
+														<NcActions :primary="false">
+															<template #icon>
+																<DotsHorizontal :size="16" />
+															</template>
+															<NcActionButton close-after-click @click="editTargetConfig(synchronization, key)">
+																<template #icon>
+																	<Pencil :size="16" />
+																</template>
+																Edit
+															</NcActionButton>
+															<NcActionButton close-after-click @click="deleteTargetConfig(synchronization, key)">
+																<template #icon>
+																	<TrashCanOutline :size="16" />
+																</template>
+																Delete
+															</NcActionButton>
+														</NcActions>
+													</td>
+												</tr>
+												<tr v-if="!synchronization.targetConfig || !Object.keys(synchronization.targetConfig).length">
+													<td colspan="3">
+														{{ t('openconnector', 'No target configurations found') }}
+													</td>
+												</tr>
+											</tbody>
+										</table>
+									</div>
+									<div style="display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-top: auto; padding-top: 10px;">
+										<NcButton @click="showSyncStats(synchronization)">
+											<template #icon>
+												<ArrowLeft :size="16" />
+											</template>
+											Back
+										</NcButton>
+										<NcButton :primary="true" @click="addTargetConfig(synchronization)">
+											<template #icon>
+												<Plus :size="16" />
+											</template>
+											Add Target Config
+										</NcButton>
+									</div>
+								</div>
 							</div>
 						</div>
 					</div>
@@ -273,7 +425,7 @@ import { synchronizationStore, navigationStore } from '../../store/store.js'
 											<template #icon>
 												<DotsHorizontal :size="20" />
 											</template>
-											<NcActionButton close-after-click @click="synchronizationStore.setSynchronizationItem(synchronization); navigationStore.setSelected('synchronizations')">
+											<NcActionButton close-after-click @click="synchronizationStore.setSynchronizationItem(synchronization); navigationStore.setModal('viewSynchronization')">
 												<template #icon>
 													<Eye :size="20" />
 												</template>
@@ -361,7 +513,6 @@ import TrashCanOutline from 'vue-material-design-icons/TrashCanOutline.vue'
 import Refresh from 'vue-material-design-icons/Refresh.vue'
 import Plus from 'vue-material-design-icons/Plus.vue'
 import Eye from 'vue-material-design-icons/Eye.vue'
-import Sync from 'vue-material-design-icons/Sync.vue'
 import Play from 'vue-material-design-icons/Play.vue'
 import TextBoxOutline from 'vue-material-design-icons/TextBoxOutline.vue'
 import DatabaseSettingsOutline from 'vue-material-design-icons/DatabaseSettingsOutline.vue'
@@ -369,6 +520,7 @@ import CardBulletedSettingsOutline from 'vue-material-design-icons/CardBulletedS
 import FileDocumentOutline from 'vue-material-design-icons/FileDocumentOutline.vue'
 import FileExportOutline from 'vue-material-design-icons/FileExportOutline.vue'
 import FileImportOutline from 'vue-material-design-icons/FileImportOutline.vue'
+import ArrowLeft from 'vue-material-design-icons/ArrowLeft.vue'
 
 import PaginationComponent from '../../components/PaginationComponent.vue'
 import { synchronizationStore, navigationStore } from '../../store/store.js'
@@ -391,7 +543,6 @@ export default {
 		Refresh,
 		Plus,
 		Eye,
-		Sync,
 		Play,
 		TextBoxOutline,
 		DatabaseSettingsOutline,
@@ -399,6 +550,7 @@ export default {
 		FileDocumentOutline,
 		FileExportOutline,
 		FileImportOutline,
+		ArrowLeft,
 		PaginationComponent,
 	},
 	data() {
@@ -410,6 +562,7 @@ export default {
 				page: 1,
 				limit: 20,
 			},
+			syncViewStates: {}, // Track view states for each synchronization
 		}
 	},
 	computed: {
@@ -493,7 +646,7 @@ export default {
 		getLastSyncedDisplay(synchronization) {
 			const sourceSynced = synchronization.sourceLastSynced
 			const targetSynced = synchronization.targetLastSynced
-			
+
 			if (sourceSynced && targetSynced) {
 				const sourceDate = new Date(sourceSynced)
 				const targetDate = new Date(targetSynced)
@@ -525,6 +678,95 @@ export default {
 			this.synchronizationStore.setSynchronizationItem(synchronization)
 			// Navigate to the contracts view
 			this.navigationStore.setSelected('contracts')
+		},
+
+		/**
+		 * Get view state for a synchronization
+		 * @param {object} synchronization - The synchronization object
+		 * @return {object} View state object
+		 */
+		getSyncViewState(synchronization) {
+			if (!this.syncViewStates[synchronization.id]) {
+				this.$set(this.syncViewStates, synchronization.id, {
+					showSourceConfigs: false,
+					showTargetConfigs: false,
+				})
+			}
+			return this.syncViewStates[synchronization.id]
+		},
+
+		/**
+		 * Show source configurations for a synchronization
+		 * @param {object} synchronization - The synchronization object
+		 */
+		showSourceConfigs(synchronization) {
+			const viewState = this.getSyncViewState(synchronization)
+			viewState.showSourceConfigs = true
+			viewState.showTargetConfigs = false
+		},
+
+		/**
+		 * Show target configurations for a synchronization
+		 * @param {object} synchronization - The synchronization object
+		 */
+		showTargetConfigs(synchronization) {
+			const viewState = this.getSyncViewState(synchronization)
+			viewState.showTargetConfigs = true
+			viewState.showSourceConfigs = false
+		},
+
+		/**
+		 * Show stats for a synchronization (hide configurations)
+		 * @param {object} synchronization - The synchronization object
+		 */
+		showSyncStats(synchronization) {
+			const viewState = this.getSyncViewState(synchronization)
+			viewState.showSourceConfigs = false
+			viewState.showTargetConfigs = false
+		},
+
+		/**
+		 * Edit source configuration
+		 * @param {object} synchronization - The synchronization object
+		 * @param {string} key - The configuration key to edit
+		 */
+		editSourceConfig(synchronization, key) {
+			this.synchronizationStore.setSynchronizationItem(synchronization)
+			this.synchronizationStore.setSynchronizationSourceConfigKey(key)
+			this.navigationStore.setModal('editSynchronizationSourceConfig')
+		},
+
+		/**
+		 * Delete source configuration
+		 * @param {object} synchronization - The synchronization object
+		 * @param {string} key - The configuration key to delete
+		 */
+		deleteSourceConfig(synchronization, key) {
+			this.synchronizationStore.setSynchronizationItem(synchronization)
+			this.synchronizationStore.setSynchronizationSourceConfigKey(key)
+			this.navigationStore.setModal('deleteSynchronizationSourceConfig')
+		},
+
+		/**
+		 * Edit target configuration
+		 * @param {object} synchronization - The synchronization object
+		 * @param {string} key - The configuration key to edit
+		 */
+		editTargetConfig(synchronization, key) {
+			this.synchronizationStore.setSynchronizationItem(synchronization)
+			this.synchronizationStore.setSynchronizationTargetConfigKey(key)
+			this.navigationStore.setModal('editSynchronizationTargetConfig')
+		},
+
+		/**
+		 * Delete target configuration
+		 * @param {object} synchronization - The synchronization object
+		 * @param {string} key - The configuration key to delete
+		 */
+		deleteTargetConfig(synchronization, key) {
+			this.synchronizationStore.setSynchronizationItem(synchronization)
+			this.synchronizationStore.setSynchronizationTargetConfigKey(key)
+			this.navigationStore.setModal('deleteSynchronizationTargetConfig')
 		},
 	},
 }

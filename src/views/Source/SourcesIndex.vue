@@ -148,86 +148,86 @@
 								<p v-if="source.description" class="sourceDescription">
 									{{ source.description }}
 								</p>
-								<!-- Toggle between stats and configurations -->
-								<div v-if="!source.showConfigurations">
+								<!-- Toggle between stats, configurations, and authentication -->
+								<div v-if="!getSourceViewState(source).showConfigurations && !getSourceViewState(source).showAuthentication">
 									<table class="statisticsTable sourceStats">
 										<thead>
 											<tr>
 												<th>{{ t('openconnector', 'Property') }}</th>
 												<th>{{ t('openconnector', 'Value') }}</th>
-												<th>{{ t('openconnector', 'Actions') }}</th>
 											</tr>
 										</thead>
 										<tbody>
 											<tr>
+												<td>{{ t('openconnector', 'Status') }}</td>
+												<td>{{ source.status || 'Unknown' }}</td>
+											</tr>
+											<tr>
+												<td>{{ t('openconnector', 'Enabled') }}</td>
+												<td>
+													{{ source.isEnabled ? 'Enabled' : 'Disabled' }}
+												</td>
+											</tr>
+											<tr>
 												<td>{{ t('openconnector', 'Type') }}</td>
 												<td>{{ source.type || 'Unknown' }}</td>
-												<td />
 											</tr>
 											<tr v-if="source.location">
 												<td>{{ t('openconnector', 'Location') }}</td>
 												<td class="truncatedUrl">
 													{{ source.location }}
 												</td>
-												<td />
 											</tr>
 											<tr v-if="source.version">
 												<td>{{ t('openconnector', 'Version') }}</td>
 												<td>{{ source.version }}</td>
-												<td />
 											</tr>
 											<tr>
 												<td>{{ t('openconnector', 'Configurations') }}</td>
-												<td>{{ getConfigurationCount(source) }}</td>
-												<td />
-											</tr>
-											<tr>
-												<td>{{ t('openconnector', 'Authentication') }}</td>
-												<td>{{ getAuthenticationCount(source) }}</td>
-												<td>
-													<NcButton @click="source.showConfigurations = !source.showConfigurations">
+												<td style="display: flex; justify-content: space-between; align-items: center;">
+													<span>{{ getConfigurationCount(source) }}</span>
+													<NcButton @click="showSourceConfigurations(source)">
 														<template #icon>
-															<ListIcon :size="16" />
+															<FileCogOutline :size="16" />
 														</template>
-														view
+														Show
 													</NcButton>
 												</td>
 											</tr>
 											<tr>
-												<td>{{ t('openconnector', 'Status') }}</td>
-												<td>
-													<span :class="source.isEnabled ? 'status-enabled' : 'status-disabled'">
-														{{ source.isEnabled ? 'Enabled' : 'Disabled' }}
-													</span>
+												<td>{{ t('openconnector', 'Authentication') }}</td>
+												<td style="display: flex; justify-content: space-between; align-items: center;">
+													<span>{{ getAuthenticationCount(source) }}</span>
+													<NcButton @click="showSourceAuthentication(source)">
+														<template #icon>
+															<KeyOutline :size="16" />
+														</template>
+														Show
+													</NcButton>
 												</td>
-												<td />
 											</tr>
 											<tr v-if="source.lastCall">
 												<td>{{ t('openconnector', 'Last Call') }}</td>
 												<td>{{ new Date(source.lastCall).toLocaleDateString() + ', ' + new Date(source.lastCall).toLocaleTimeString() }}</td>
-												<td />
 											</tr>
 											<tr v-if="source.lastSync">
 												<td>{{ t('openconnector', 'Last Sync') }}</td>
 												<td>{{ new Date(source.lastSync).toLocaleDateString() + ', ' + new Date(source.lastSync).toLocaleTimeString() }}</td>
-												<td />
 											</tr>
 											<tr>
 												<td>{{ t('openconnector', 'Created') }}</td>
-												<td>{{ source.created ? new Date(source.created).toLocaleDateString() : '-' }}</td>
-												<td />
+												<td>{{ source.dateCreated ? new Date(source.dateCreated).toLocaleDateString() : '-' }}</td>
 											</tr>
 											<tr>
 												<td>{{ t('openconnector', 'Updated') }}</td>
-												<td>{{ source.updated ? new Date(source.updated).toLocaleDateString() : '-' }}</td>
-												<td />
+												<td>{{ source.dateModified ? new Date(source.dateModified).toLocaleDateString() : '-' }}</td>
 											</tr>
 										</tbody>
 									</table>
 								</div>
-								<div v-else>
-									<div class="configurationsSection">
-										<h4>{{ t('openconnector', 'Configurations') }}</h4>
+								<!-- Configurations view -->
+								<div v-else-if="getSourceViewState(source).showConfigurations" style="display: flex; flex-direction: column; height: 100%;">
+									<div style="flex: 1;">
 										<table class="statisticsTable sourceStats">
 											<thead>
 												<tr>
@@ -242,7 +242,25 @@
 													<td class="truncatedText">
 														{{ value }}
 													</td>
-													<td />
+													<td>
+														<NcActions :primary="false">
+															<template #icon>
+																<DotsHorizontal :size="16" />
+															</template>
+															<NcActionButton close-after-click @click="editSourceConfiguration(source, key)">
+																<template #icon>
+																	<Pencil :size="16" />
+																</template>
+																Edit
+															</NcActionButton>
+															<NcActionButton close-after-click @click="deleteSourceConfiguration(source, key)">
+																<template #icon>
+																	<TrashCanOutline :size="16" />
+																</template>
+																Delete
+															</NcActionButton>
+														</NcActions>
+													</td>
 												</tr>
 												<tr v-if="!source.configuration || !Object.keys(source.configuration).length">
 													<td colspan="3">
@@ -252,9 +270,25 @@
 											</tbody>
 										</table>
 									</div>
+									<div style="display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-top: auto; padding-top: 10px;">
+										<NcButton @click="showSourceStats(source)">
+											<template #icon>
+												<ArrowLeft :size="16" />
+											</template>
+											Back
+										</NcButton>
+										<NcButton :primary="true" @click="addSourceConfiguration(source)">
+											<template #icon>
+												<Plus :size="16" />
+											</template>
+											Add Configuration
+										</NcButton>
+									</div>
+								</div>
 
-									<div class="authenticationSection" style="margin-top: 20px;">
-										<h4>{{ t('openconnector', 'Authentication') }}</h4>
+								<!-- Authentication view -->
+								<div v-else-if="getSourceViewState(source).showAuthentication" style="display: flex; flex-direction: column; height: 100%;">
+									<div style="flex: 1;">
 										<table class="statisticsTable sourceStats">
 											<thead>
 												<tr>
@@ -268,69 +302,194 @@
 													<td>{{ t('openconnector', 'Auth Type') }}</td>
 													<td>{{ source.auth }}</td>
 													<td>
-														<NcButton @click="source.showConfigurations = !source.showConfigurations">
+														<NcActions :primary="false">
 															<template #icon>
-																<TableIcon :size="16" />
+																<DotsHorizontal :size="16" />
 															</template>
-															view
-														</NcButton>
+															<NcActionButton close-after-click @click="editSourceAuthentication(source, 'auth')">
+																<template #icon>
+																	<Pencil :size="16" />
+																</template>
+																Edit
+															</NcActionButton>
+															<NcActionButton close-after-click @click="deleteSourceAuthentication(source, 'auth')">
+																<template #icon>
+																	<TrashCanOutline :size="16" />
+																</template>
+																Delete
+															</NcActionButton>
+														</NcActions>
 													</td>
 												</tr>
 												<tr v-if="source.username">
 													<td>{{ t('openconnector', 'Username') }}</td>
 													<td>{{ source.username }}</td>
-													<td></td>
+													<td>
+														<NcActions :primary="false">
+															<template #icon>
+																<DotsHorizontal :size="16" />
+															</template>
+															<NcActionButton close-after-click @click="editSourceAuthentication(source, 'username')">
+																<template #icon>
+																	<Pencil :size="16" />
+																</template>
+																Edit
+															</NcActionButton>
+															<NcActionButton close-after-click @click="deleteSourceAuthentication(source, 'username')">
+																<template #icon>
+																	<TrashCanOutline :size="16" />
+																</template>
+																Delete
+															</NcActionButton>
+														</NcActions>
+													</td>
 												</tr>
 												<tr v-if="source.apikey">
 													<td>{{ t('openconnector', 'API Key') }}</td>
 													<td class="truncatedText">
 														{{ source.apikey }}
 													</td>
-													<td></td>
+													<td>
+														<NcActions :primary="false">
+															<template #icon>
+																<DotsHorizontal :size="16" />
+															</template>
+															<NcActionButton close-after-click @click="editSourceAuthentication(source, 'apikey')">
+																<template #icon>
+																	<Pencil :size="16" />
+																</template>
+																Edit
+															</NcActionButton>
+															<NcActionButton close-after-click @click="deleteSourceAuthentication(source, 'apikey')">
+																<template #icon>
+																	<TrashCanOutline :size="16" />
+																</template>
+																Delete
+															</NcActionButton>
+														</NcActions>
+													</td>
 												</tr>
 												<tr v-if="source.jwt">
 													<td>{{ t('openconnector', 'JWT') }}</td>
 													<td class="truncatedText">
 														{{ source.jwt }}
 													</td>
-													<td></td>
+													<td>
+														<NcActions :primary="false">
+															<template #icon>
+																<DotsHorizontal :size="16" />
+															</template>
+															<NcActionButton close-after-click @click="editSourceAuthentication(source, 'jwt')">
+																<template #icon>
+																	<Pencil :size="16" />
+																</template>
+																Edit
+															</NcActionButton>
+															<NcActionButton close-after-click @click="deleteSourceAuthentication(source, 'jwt')">
+																<template #icon>
+																	<TrashCanOutline :size="16" />
+																</template>
+																Delete
+															</NcActionButton>
+														</NcActions>
+													</td>
 												</tr>
 												<tr v-if="source.secret">
 													<td>{{ t('openconnector', 'Secret') }}</td>
 													<td class="truncatedText">
 														{{ source.secret }}
 													</td>
-													<td></td>
+													<td>
+														<NcActions :primary="false">
+															<template #icon>
+																<DotsHorizontal :size="16" />
+															</template>
+															<NcActionButton close-after-click @click="editSourceAuthentication(source, 'secret')">
+																<template #icon>
+																	<Pencil :size="16" />
+																</template>
+																Edit
+															</NcActionButton>
+															<NcActionButton close-after-click @click="deleteSourceAuthentication(source, 'secret')">
+																<template #icon>
+																	<TrashCanOutline :size="16" />
+																</template>
+																Delete
+															</NcActionButton>
+														</NcActions>
+													</td>
 												</tr>
 												<tr v-if="source.authorizationHeader">
 													<td>{{ t('openconnector', 'Authorization Header') }}</td>
 													<td class="truncatedText">
 														{{ source.authorizationHeader }}
 													</td>
-													<td></td>
+													<td>
+														<NcActions :primary="false">
+															<template #icon>
+																<DotsHorizontal :size="16" />
+															</template>
+															<NcActionButton close-after-click @click="editSourceAuthentication(source, 'authorizationHeader')">
+																<template #icon>
+																	<Pencil :size="16" />
+																</template>
+																Edit
+															</NcActionButton>
+															<NcActionButton close-after-click @click="deleteSourceAuthentication(source, 'authorizationHeader')">
+																<template #icon>
+																	<TrashCanOutline :size="16" />
+																</template>
+																Delete
+															</NcActionButton>
+														</NcActions>
+													</td>
 												</tr>
 												<tr v-for="(config, index) in source.authenticationConfig" :key="`auth-${index}`">
 													<td>{{ t('openconnector', 'Auth Config {index}', { index: index + 1 }) }}</td>
 													<td class="truncatedText">
 														{{ typeof config === 'object' ? JSON.stringify(config) : config }}
 													</td>
-													<td></td>
+													<td>
+														<NcActions :primary="false">
+															<template #icon>
+																<DotsHorizontal :size="16" />
+															</template>
+															<NcActionButton close-after-click @click="editSourceAuthentication(source, `authenticationConfig.${index}`)">
+																<template #icon>
+																	<Pencil :size="16" />
+																</template>
+																Edit
+															</NcActionButton>
+															<NcActionButton close-after-click @click="deleteSourceAuthentication(source, `authenticationConfig.${index}`)">
+																<template #icon>
+																	<TrashCanOutline :size="16" />
+																</template>
+																Delete
+															</NcActionButton>
+														</NcActions>
+													</td>
 												</tr>
 												<tr v-if="!hasAuthenticationData(source)">
-													<td colspan="2">
+													<td colspan="3">
 														{{ t('openconnector', 'No authentication configured') }}
-													</td>
-													<td>
-														<NcButton @click="source.showConfigurations = !source.showConfigurations">
-															<template #icon>
-																<TableIcon :size="16" />
-															</template>
-															view
-														</NcButton>
 													</td>
 												</tr>
 											</tbody>
 										</table>
+									</div>
+									<div style="display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-top: auto; padding-top: 10px;">
+										<NcButton @click="showSourceStats(source)">
+											<template #icon>
+												<ArrowLeft :size="16" />
+											</template>
+											Back
+										</NcButton>
+										<NcButton :primary="true" @click="addSourceAuthentication(source)">
+											<template #icon>
+												<Plus :size="16" />
+											</template>
+											Add Authentication
+										</NcButton>
 									</div>
 								</div>
 							</div>
@@ -467,8 +626,9 @@ import Plus from 'vue-material-design-icons/Plus.vue'
 import Eye from 'vue-material-design-icons/Eye.vue'
 import Sync from 'vue-material-design-icons/Sync.vue'
 import TextBoxOutline from 'vue-material-design-icons/TextBoxOutline.vue'
-import TableIcon from 'vue-material-design-icons/Table.vue'
-import ListIcon from 'vue-material-design-icons/FormatListBulleted.vue'
+import ArrowLeft from 'vue-material-design-icons/ArrowLeft.vue'
+import FileCogOutline from 'vue-material-design-icons/FileCogOutline.vue'
+import KeyOutline from 'vue-material-design-icons/KeyOutline.vue'
 
 import PaginationComponent from '../../components/PaginationComponent.vue'
 import { sourceStore, navigationStore } from '../../store/store.js'
@@ -492,8 +652,9 @@ export default {
 		Eye,
 		Sync,
 		TextBoxOutline,
-		TableIcon,
-		ListIcon,
+		ArrowLeft,
+		FileCogOutline,
+		KeyOutline,
 		PaginationComponent,
 	},
 	data() {
@@ -505,6 +666,7 @@ export default {
 				page: 1,
 				limit: 20,
 			},
+			sourceViewStates: {}, // Track view states for each source
 		}
 	},
 	computed: {
@@ -583,8 +745,17 @@ export default {
 			return Object.keys(configWithoutAuth).length
 		},
 		getAuthenticationCount(source) {
-			const authentication = source.configuration?.authentication || {}
-			return Object.keys(authentication).length
+			let count = 0
+			if (source.auth) count++
+			if (source.username) count++
+			if (source.apikey) count++
+			if (source.jwt) count++
+			if (source.secret) count++
+			if (source.authorizationHeader) count++
+			if (source.authenticationConfig && source.authenticationConfig.length > 0) {
+				count += source.authenticationConfig.length
+			}
+			return count
 		},
 		addSourceConfiguration(source) {
 			this.sourceStore.setSourceItem(source)
@@ -605,6 +776,95 @@ export default {
 			return !!(source.auth || source.username || source.apikey || source.jwt
 				|| source.secret || source.authorizationHeader
 				|| (source.authenticationConfig && source.authenticationConfig.length > 0))
+		},
+
+		/**
+		 * Get view state for a source
+		 * @param {object} source - The source object
+		 * @return {object} View state object
+		 */
+		getSourceViewState(source) {
+			if (!this.sourceViewStates[source.id]) {
+				this.$set(this.sourceViewStates, source.id, {
+					showConfigurations: false,
+					showAuthentication: false,
+				})
+			}
+			return this.sourceViewStates[source.id]
+		},
+
+		/**
+		 * Show configurations for a source
+		 * @param {object} source - The source object
+		 */
+		showSourceConfigurations(source) {
+			const viewState = this.getSourceViewState(source)
+			viewState.showConfigurations = true
+			viewState.showAuthentication = false
+		},
+
+		/**
+		 * Show authentication for a source
+		 * @param {object} source - The source object
+		 */
+		showSourceAuthentication(source) {
+			const viewState = this.getSourceViewState(source)
+			viewState.showAuthentication = true
+			viewState.showConfigurations = false
+		},
+
+		/**
+		 * Show stats for a source (hide configurations and authentication)
+		 * @param {object} source - The source object
+		 */
+		showSourceStats(source) {
+			const viewState = this.getSourceViewState(source)
+			viewState.showConfigurations = false
+			viewState.showAuthentication = false
+		},
+
+		/**
+		 * Edit source authentication
+		 * @param {object} source - The source object
+		 * @param {string} field - The authentication field to edit
+		 */
+		editSourceAuthentication(source, field) {
+			this.sourceStore.setSourceItem(source)
+			this.sourceStore.setSourceConfigurationKey(field)
+			this.navigationStore.setModal('editSourceConfigurationAuthentication')
+		},
+
+		/**
+		 * Delete source authentication
+		 * @param {object} source - The source object
+		 * @param {string} field - The authentication field to delete
+		 */
+		deleteSourceAuthentication(source, field) {
+			this.sourceStore.setSourceItem(source)
+			this.sourceStore.setSourceConfigurationKey(field)
+			this.navigationStore.setDialog('deleteSourceConfigurationAuthentication')
+		},
+
+		/**
+		 * Edit source configuration
+		 * @param {object} source - The source object
+		 * @param {string} key - The configuration key to edit
+		 */
+		editSourceConfiguration(source, key) {
+			this.sourceStore.setSourceItem(source)
+			this.sourceStore.setSourceConfigurationKey(key)
+			this.navigationStore.setModal('editSourceConfiguration')
+		},
+
+		/**
+		 * Delete source configuration
+		 * @param {object} source - The source object
+		 * @param {string} key - The configuration key to delete
+		 */
+		deleteSourceConfiguration(source, key) {
+			this.sourceStore.setSourceItem(source)
+			this.sourceStore.setSourceConfigurationKey(key)
+			this.navigationStore.setModal('deleteSourceConfiguration')
 		},
 	},
 }
