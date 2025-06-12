@@ -390,7 +390,7 @@ class CallService
 		// Let's make the call.
 		$time_start = microtime(true);
 
-        if ($source->getType() === 'file') {
+        if ($source->getType() === 'soap') {
             $soapService = new SoapService();
 
             $response = $soapService->createMessage($source, $endpoint, $config);

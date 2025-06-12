@@ -60,7 +60,6 @@ class SOAPService
                 )
             );
         } catch (\SoapFault $fault) {
-            var_dump($fault->getTrace());
             throw $fault;
         }
 
