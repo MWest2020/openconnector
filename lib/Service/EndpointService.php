@@ -1061,12 +1061,19 @@ class EndpointService
         $configuration = $rule->getConfiguration();
         $header = $data['headers']['Authorization'] ?? $data['headers']['authorization'] ?? '';
 
+		if(isset($configuration['authentication']) === false) {
+			return $data;
+		}
+
+		if (isset($configuration['authentication']['header']) === true) {
+			$header = $data['headers'][$configuration['authentication']['header']] ??
+				$data['headers'][strtolower($configuration['authentication']['header'])] ??
+				$data['headers'][str_replace(search: '-', replace: '_', subject: strtolower($configuration['authentication']['header']))] ??
+				null;
+		}
+
         if ($header === '' || $header === null) {
             return new JSONResponse(['error' => 'forbidden', 'details' => 'you are not allowed to access this endpoint unauththenticated'], Http::STATUS_FORBIDDEN);
-        }
-
-        if(isset($configuration['authentication']) === false) {
-            return $data;
         }
 
         switch($configuration['authentication']['type']) {
@@ -1697,7 +1704,7 @@ class EndpointService
         if (isset($filename) === false && count($files) === 1) {
             $filename = $files[0]->getName();
         }
-        
+
         if (isset($filename) === false) {
             throw new Exception('File could not be determined');
         }
