@@ -23,7 +23,7 @@ Documentation is available at [https://conduction.nl/openconnector](https://cond
 
 ## Project Structure
 
-This monorepo is a Nextcloud app, it is based on the following structure:
+This monorepo is a Nextcloud app, it's based on the following structure:
 
     /
     ├── app/          # App initialization and bootstrap files
