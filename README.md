@@ -1,4 +1,4 @@
-# OpenConector
+# Open Connector
 
 Provides gateway and service bus functionality like mapping, translation and synchronisation of data
 
@@ -12,6 +12,7 @@ Documentation is available at [https://conduction.nl/openconnector](https://cond
 - PHP 8.1 or higher
 - Database: MySQL/MariaDB
 
+
 ## Installation
 
 [Installation instructions](https://conduction.nl/openconnector/installation)
@@ -22,7 +23,7 @@ Documentation is available at [https://conduction.nl/openconnector](https://cond
 
 ## Project Structure
 
-This monorepo is a Nextcloud app, it is based on the following structure:
+This monorepo is a Nextcloud app, it's based on the following structure:
 
     /
     ├── app/          # App initialization and bootstrap files
